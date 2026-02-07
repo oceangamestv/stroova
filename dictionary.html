@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <title>STroova — Словарь</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="top-bar">
+        <div class="logo">
+          <span class="logo-icon">🟢</span>
+          <span class="logo-text">STroova</span>
+        </div>
+        <nav class="main-nav">
+          <a href="index.html" class="nav-link">Упражнения</a>
+          <a href="dictionary.html" class="nav-link active">Словарь</a>
+        </nav>
+        <div class="user-info">
+          <div class="streak-pill">
+            <span class="streak-icon">🔥</span>
+            <span class="streak-text">Day 1</span>
+          </div>
+          <div class="user-menu">
+            <span class="username" id="username-display"></span>
+            <button class="logout-btn" id="logout-btn" title="Выйти">
+              Выйти
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <main class="main">
+        <section class="dictionary-section">
+          <div class="dictionary-header">
+            <h1 class="dictionary-title">Мой словарь</h1>
+            <p class="dictionary-subtitle">
+              Отслеживай прогресс изучения каждого слова уровня A0
+            </p>
+            <div class="dictionary-stats">
+              <div class="stat-item">
+                <span class="stat-value" id="total-words">0</span>
+                <span class="stat-label">Всего слов</span>
+              </div>
+              <div class="stat-item">
+                <span class="stat-value" id="learned-words">0</span>
+                <span class="stat-label">Изучено (100%)</span>
+              </div>
+              <div class="stat-item">
+                <span class="stat-value" id="avg-progress">0%</span>
+                <span class="stat-label">Средний прогресс</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="dictionary-filters">
+            <button class="filter-btn active" data-filter="all">Все слова</button>
+            <button class="filter-btn" data-filter="uk">🇬🇧 Британский</button>
+            <button class="filter-btn" data-filter="us">🇺🇸 Американский</button>
+            <button class="filter-btn" data-filter="both">🌍 Общий</button>
+            <button class="filter-btn" data-filter="learned">✅ Изученные</button>
+            <button class="filter-btn" data-filter="learning">📚 В процессе</button>
+          </div>
+
+          <div class="dictionary-toolbar">
+            <div class="dictionary-search">
+              <input
+                type="text"
+                id="search-input"
+                placeholder="Поиск по словам..."
+                class="search-input"
+              />
+            </div>
+            <div class="dictionary-view-settings">
+              <button class="view-settings-btn" id="view-settings-btn" type="button">
+                Настроить вид
+              </button>
+              <div class="view-settings-panel" id="view-settings-panel">
+                <label class="view-setting">
+                  <input type="checkbox" data-view-setting="translation" checked />
+                  Перевод
+                </label>
+                <label class="view-setting">
+                  <input type="checkbox" data-view-setting="audio" checked />
+                  Озвучивание
+                </label>
+                <label class="view-setting">
+                  <input type="checkbox" data-view-setting="slowAudio" checked />
+                  Медленное озвучивание
+                </label>
+                <label class="view-setting">
+                  <input type="checkbox" data-view-setting="transcription" checked />
+                  Транскрипция
+                </label>
+                <label class="view-setting">
+                  <input type="checkbox" data-view-setting="example" checked />
+                  Пример
+                </label>
+                <label class="view-setting">
+                  <input type="checkbox" data-view-setting="exampleRu" checked />
+                  Перевод примера
+                </label>
+                <label class="view-setting">
+                  <input type="checkbox" data-view-setting="level" checked />
+                  Уровень
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <div class="words-grid" id="words-grid">
+            <!-- Слова будут загружены скриптом -->
+          </div>
+          <div class="word-modal" id="word-modal" aria-hidden="true">
+            <div class="word-modal-card">
+              <button class="word-modal-close" id="word-modal-close" type="button">
+                ✕
+              </button>
+              <div class="word-modal-content" id="word-modal-content"></div>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <script src="auth.js"></script>
+    <script src="dictionary.js"></script>
+    <script src="dictionary-page.js"></script>
+  </body>
+</html>

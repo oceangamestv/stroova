@@ -1,0 +1,26 @@
+import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
+
+export default defineConfig({
+  appType: "spa",
+  plugins: [
+    react(),
+    // Гарантируем, что маршруты SPA (/dictionary, /profile и т.д.) отдают index.html,
+    // а не файлы из корня (dictionary.html), чтобы после F5 показывалось приложение, а не статика.
+    {
+      name: "spa-fallback-routes",
+      configureServer(server) {
+        server.middlewares.use((req, res, next) => {
+          if (req.method !== "GET" || !req.url) return next();
+          const path = req.url.replace(/\?.*$/, "");
+          if (path.startsWith("/@") || path.startsWith("/node_modules") || path.includes(".")) return next();
+          req.url = "/index.html";
+          next();
+        });
+      },
+    },
+  ],
+  server: {
+    port: 5173,
+  },
+});

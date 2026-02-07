@@ -1,0 +1,19 @@
+# Деплой на сервер при push в main.
+# В настройках репозитория (Secrets) добавь: SSH_HOST, SSH_USER, SSH_PRIVATE_KEY.
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: cd ${{ secrets.APP_DIR || '~/stroova' }} && ./deploy.sh
