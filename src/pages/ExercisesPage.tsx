@@ -11,7 +11,7 @@ const ExercisesPage: React.FC = () => {
     pathname === "/puzzle" ? "puzzle" : pathname === "/danetka" ? "danetka" : "pairs";
 
   return (
-    <div className="app-shell">
+    <div className="app-shell app-shell--game">
       <Header />
       <main className="main">
         <section className="lesson-card">

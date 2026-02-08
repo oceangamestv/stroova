@@ -82,8 +82,20 @@ const PuzzleExercise: React.FC = () => {
   const sessionXpRef = useRef(0);
   const sessionWordsRef = useRef<SessionWordResult[]>([]);
   const hardInputRef = useRef<HTMLInputElement>(null);
+  const learningAreaRef = useRef<HTMLDivElement>(null);
   sessionXpRef.current = sessionXp;
   sessionWordsRef.current = sessionWords;
+
+  /* На мобильных при открытии пазла — акцент на области обучения (слово + слоты + буквы) */
+  useEffect(() => {
+    if (typeof window === "undefined" || window.innerWidth > 768) return;
+    const el = learningAreaRef.current;
+    if (!el) return;
+    const t = setTimeout(() => {
+      el.scrollIntoView({ block: "start", behavior: "auto" });
+    }, 100);
+    return () => clearTimeout(t);
+  }, []);
 
   const endGameByTime = useCallback(() => {
     setTimerRunning(false);
@@ -404,6 +416,7 @@ const PuzzleExercise: React.FC = () => {
           </svg>
         </button>
 
+        <div ref={learningAreaRef} id="puzzle-learning-area" className="puzzle-learning-area">
         <div className="puzzle-difficulty-switcher">
           <button
             className={`difficulty-btn ${difficulty === "easy" ? "active" : ""}`}
@@ -526,6 +539,8 @@ const PuzzleExercise: React.FC = () => {
             })}
           </div>
         )}
+        </div>
+
       </div>
 
       {showRules && (
