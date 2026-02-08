@@ -30,7 +30,9 @@ async function request<T>(
   options: RequestInitWithBody = {}
 ): Promise<T> {
   const { body, ...rest } = options;
-  const url = `${API_BASE_URL.replace(/\/$/, "")}/${path.replace(/^\//, "")}`;
+  // Если VITE_API_URL не задан — используем относительный /api (тот же домен, что и сайт)
+  const base = (API_BASE_URL || "").trim() || "/api";
+  const url = `${base.replace(/\/$/, "")}/${path.replace(/^\//, "")}`;
   const headers: HeadersInit = {
     "Content-Type": "application/json",
     ...((rest.headers as Record<string, string>) || {}),
