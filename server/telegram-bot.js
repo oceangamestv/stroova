@@ -1,10 +1,10 @@
 /**
- * Telegram-бот для STroova. Приветствие, помощь, ссылка на приложение.
+ * Telegram-бот для STroova. Открывает приложение как Mini App (Web App) в Telegram.
  * Запуск: npm run telegram-bot (из корня проекта).
  * В .env нужен TELEGRAM_BOT_TOKEN (токен от @BotFather).
  */
 import "dotenv/config";
-import { Telegraf } from "telegraf";
+import { Telegraf, Markup } from "telegraf";
 
 const token = process.env.TELEGRAM_BOT_TOKEN;
 const appUrl = process.env.APP_URL || "https://stroova.ru";
@@ -16,20 +16,30 @@ if (!token) {
 
 const bot = new Telegraf(token);
 
-bot.start((ctx) => {
-  ctx.reply(
-    `Привет! Я бот STroova — приложения для изучения английского.\n\n` +
-      `Открой приложение в браузере: ${appUrl}\n\n` +
-      `Команды: /help — справка.`
+// Кнопка «Открыть приложение» — открывает STroova как Mini App внутри Telegram
+const openAppKeyboard = Markup.inlineKeyboard([
+  [Markup.button.webApp("Открыть STroova", appUrl)],
+]);
+
+bot.start(async (ctx) => {
+  // Кнопка меню рядом с полем ввода — тоже открывает приложение
+  await ctx.setChatMenuButton({
+    type: "web_app",
+    text: "Открыть STroova",
+    web_app: { url: appUrl },
+  });
+  await ctx.reply(
+    "Привет! Я бот STroova — приложения для изучения английского.\n\n" +
+      "Нажми кнопку ниже, чтобы открыть приложение прямо в Telegram:",
+    openAppKeyboard
   );
 });
 
-bot.help((ctx) => {
-  ctx.reply(
-    "Команды:\n" +
-      "/start — приветствие и ссылка на приложение\n" +
-      "/help — эта справка\n\n" +
-      `Приложение: ${appUrl}`
+bot.help(async (ctx) => {
+  await ctx.reply(
+    "Нажми кнопку «Открыть STroova» — приложение откроется в Telegram.\n\n" +
+      "Команды: /start — приветствие и кнопка приложения.",
+    openAppKeyboard
   );
 });
 
