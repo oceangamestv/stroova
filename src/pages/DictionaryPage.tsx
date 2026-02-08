@@ -1,13 +1,15 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import Header from "../components/common/Header";
+import { useDictionary } from "../features/dictionary/useDictionary";
 import { dictionaryService } from "../services/dictionaryService";
 import { personalDictionaryService } from "../services/personalDictionaryService";
 import { progressService } from "../services/progressService";
 import { speakWord as speakWordUtil } from "../utils/sounds";
-import type { Word, WordProgressMap } from "../data/contracts/types";
+import type { Word, WordProgressMap, Level } from "../data/contracts/types";
 
 type DictionaryTab = "general" | "personal";
-type Filter = "all" | "uk" | "us" | "both" | "learned" | "learning";
+const LEVELS: Level[] = ["A0", "A1", "A2", "B1", "B2", "C1", "C2"];
+type Filter = "all" | Level | "learned" | "learning";
 type ViewSettingKey =
   | "translation"
   | "audio"
@@ -36,6 +38,17 @@ function highlightWordInExample(example: string, word: string): string {
   return example.replace(regex, "<strong class=\"example-keyword\">$1</strong>");
 }
 
+/** Иконка «В моём словаре» — книжка */
+const InMyDictionaryIcon: React.FC<{ className?: string; title?: string }> = ({ className, title }) => (
+  <span className={className} title={title} role="img" aria-label={title || "В моём словаре"}>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="18" height="18" aria-hidden>
+      <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+      <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+      <path d="M8 7h8M8 11h6M8 15h4" />
+    </svg>
+  </span>
+);
+
 const DictionaryPage: React.FC = () => {
   const [tab, setTab] = useState<DictionaryTab>("general");
   const [filter, setFilter] = useState<Filter>("all");
@@ -53,15 +66,14 @@ const DictionaryPage: React.FC = () => {
   const [modalWord, setModalWord] = useState<Word | null>(null);
   const settingsRef = useRef<HTMLDivElement | null>(null);
 
-  const generalWords = useMemo(() => dictionaryService.getAllWords(), []);
+  const { words: generalWords, loading: wordsLoading, error: wordsError } = useDictionary();
   const [personalIds, setPersonalIds] = useState<number[]>(() =>
     personalDictionaryService.getPersonalWordIds()
   );
   const personalWords = useMemo(() => {
-    const all = dictionaryService.getAllWords();
     const set = new Set(personalIds);
-    return all.filter((w) => set.has(w.id));
-  }, [personalIds]);
+    return generalWords.filter((w) => set.has(w.id));
+  }, [generalWords, personalIds]);
 
   const dictionary = tab === "general" ? generalWords : personalWords;
   const [progress, setProgress] = useState<WordProgressMap>(
@@ -70,9 +82,7 @@ const DictionaryPage: React.FC = () => {
 
   const filteredWords = useMemo(() => {
     let words = [...dictionary];
-    if (filter === "uk") words = words.filter((w) => w.accent === "UK");
-    if (filter === "us") words = words.filter((w) => w.accent === "US");
-    if (filter === "both") words = words.filter((w) => w.accent === "both");
+    if (LEVELS.includes(filter as Level)) words = words.filter((w) => w.level === filter);
     if (filter === "learned") words = words.filter((w) => progressService.isWordLearned(w.id));
     if (filter === "learning") {
       words = words.filter((w) => {
@@ -110,6 +120,17 @@ const DictionaryPage: React.FC = () => {
 
   const addToPersonal = (word: Word) => {
     personalDictionaryService.addWord(word.id);
+    setPersonalIds(personalDictionaryService.getPersonalWordIds());
+  };
+
+  const addAllFilteredToPersonal = () => {
+    const toAdd = filteredWords.filter((w) => !personalIds.includes(w.id));
+    if (toAdd.length === 0) {
+      return;
+    }
+    const message = `Добавить в мой словарь ${toAdd.length} ${toAdd.length === 1 ? "слово" : toAdd.length < 5 ? "слова" : "слов"} из текущего списка?`;
+    if (!confirm(message)) return;
+    toAdd.forEach((w) => personalDictionaryService.addWord(w.id));
     setPersonalIds(personalDictionaryService.getPersonalWordIds());
   };
 
@@ -173,9 +194,25 @@ const DictionaryPage: React.FC = () => {
     .filter(Boolean)
     .join(" ");
 
+  if (wordsLoading) {
+    return (
+      <div className="app-shell">
+        <Header />
+        <main className="main">
+          <p className="dictionary-subtitle">Загрузка словаря…</p>
+        </main>
+      </div>
+    );
+  }
+
   return (
     <div className="app-shell">
       <Header />
+      {wordsError && (
+        <div className="dictionary-error-banner" style={{ padding: "8px 16px", background: "#fff3cd", margin: "8px" }}>
+          {wordsError}
+        </div>
+      )}
       <main className="main">
         <section className={sectionClassName}>
           <div className="dictionary-header">
@@ -220,23 +257,37 @@ const DictionaryPage: React.FC = () => {
           </div>
 
           <div className="dictionary-filters">
-            {[
-              { id: "all", label: "Все слова" },
-              { id: "uk", label: "🇬🇧 Британский" },
-              { id: "us", label: "🇺🇸 Американский" },
-              { id: "both", label: "🌍 Общий" },
-              { id: "learned", label: "✅ Изученные" },
-              { id: "learning", label: "📚 В процессе" },
-            ].map((btn) => (
+            <button
+              className={`filter-btn ${filter === "all" ? "active" : ""}`}
+              onClick={() => setFilter("all")}
+              type="button"
+            >
+              Все слова
+            </button>
+            {LEVELS.map((level) => (
               <button
-                key={btn.id}
-                className={`filter-btn ${filter === btn.id ? "active" : ""}`}
-                onClick={() => setFilter(btn.id as Filter)}
+                key={level}
+                className={`filter-btn ${filter === level ? "active" : ""}`}
+                onClick={() => setFilter(level)}
                 type="button"
               >
-                {btn.label}
+                {level}
               </button>
             ))}
+            <button
+              className={`filter-btn ${filter === "learned" ? "active" : ""}`}
+              onClick={() => setFilter("learned")}
+              type="button"
+            >
+              ✅ Изученные
+            </button>
+            <button
+              className={`filter-btn ${filter === "learning" ? "active" : ""}`}
+              onClick={() => setFilter("learning")}
+              type="button"
+            >
+              📚 В процессе
+            </button>
           </div>
 
           <div className="dictionary-toolbar">
@@ -249,6 +300,18 @@ const DictionaryPage: React.FC = () => {
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
+            {tab === "general" && (() => {
+              const canAddCount = filteredWords.filter((w) => !personalIds.includes(w.id)).length;
+              return canAddCount > 0 ? (
+                <button
+                  type="button"
+                  className="word-action-btn word-action-add-personal"
+                  onClick={addAllFilteredToPersonal}
+                >
+                  Добавить все из списка ({canAddCount})
+                </button>
+              ) : null;
+            })()}
             <div className="dictionary-view-settings" ref={settingsRef}>
               <button
                 className="view-settings-btn"
@@ -307,19 +370,22 @@ const DictionaryPage: React.FC = () => {
               const experiencedVal = progressService.getWordProgressValue(word.id, "experienced");
               const exampleHighlighted = highlightWordInExample(word.example, word.en);
               return (
-                <React.Fragment key={word.id}>
+                <div key={word.id} className="word-card">
                   <div className="word-row">
                     <div className="word-cell word-cell-level">
                       <span className={`word-level-badge word-level-${word.level}`}>
                         {word.level}
                       </span>
+                      {personalIds.includes(word.id) && (
+                        <InMyDictionaryIcon className="word-level-in-dict-icon" title="В моём словаре" />
+                      )}
                     </div>
                     <div className="word-cell word-cell-main">
                       <div className="word-title">{word.en}</div>
                       <div className="word-translation-under">{word.ru}</div>
                       <button
                         type="button"
-                        className="word-details-btn"
+                        className="word-details-btn word-details-btn--desktop"
                         onClick={() => setModalWord(word)}
                       >
                         Подробнее
@@ -343,18 +409,32 @@ const DictionaryPage: React.FC = () => {
                         🐢
                       </button>
                     </div>
-                    <div className="word-cell word-cell-transcription">
-                      <div>🇬🇧 UK {word.ipaUk}</div>
-                      <div>🇺🇸 US {word.ipaUs}</div>
-                    </div>
-                    <div className="word-cell word-cell-example">
-                      <div
-                        className="word-example-text"
-                        dangerouslySetInnerHTML={{ __html: exampleHighlighted }}
-                      />
-                      {word.exampleRu != null && word.exampleRu !== "" && (
-                        <div className="word-example-ru-under">{word.exampleRu}</div>
-                      )}
+                    <div className="word-card-details">
+                      <div className="word-cell word-cell-transcription word-card-table-row">
+                        <span className="word-card-details-label word-card-table-caption">Транскрипция</span>
+                        <div className="word-card-details-value word-card-table-grid">
+                          <span className="word-card-table-th">🇬🇧 UK</span>
+                          <span className="word-card-table-td">{word.ipaUk}</span>
+                          <span className="word-card-table-th">🇺🇸 US</span>
+                          <span className="word-card-table-td">{word.ipaUs}</span>
+                        </div>
+                      </div>
+                      <div className="word-cell word-cell-example word-card-table-row">
+                        <span className="word-card-details-label word-card-table-caption">Пример</span>
+                        <div className="word-card-details-value word-card-table-grid">
+                          <span className="word-card-table-th">EN</span>
+                          <span className="word-card-table-td">
+                            <span
+                              className="word-example-text"
+                              dangerouslySetInnerHTML={{ __html: exampleHighlighted }}
+                            />
+                          </span>
+                          <span className="word-card-table-th">RU</span>
+                          <span className="word-card-table-td">
+                            {word.exampleRu != null && word.exampleRu !== "" ? word.exampleRu : "—"}
+                          </span>
+                        </div>
+                      </div>
                     </div>
                   </div>
                   <div className="word-row-footer">
@@ -386,9 +466,7 @@ const DictionaryPage: React.FC = () => {
                     </div>
                     <div className="word-card-actions">
                       {tab === "general" ? (
-                        personalIds.includes(word.id) ? (
-                          <span className="word-action-label">В моём словаре</span>
-                        ) : (
+                        personalIds.includes(word.id) ? null : (
                           <button
                             type="button"
                             className="word-action-btn word-action-add-personal"
@@ -422,7 +500,7 @@ const DictionaryPage: React.FC = () => {
                       </button>
                     </div>
                   </div>
-                </React.Fragment>
+                </div>
               );
             })}
           </div>

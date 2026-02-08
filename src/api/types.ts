@@ -25,3 +25,28 @@ export type PatchMeBody = {
 export type CheckUsernameResponse = {
   available: boolean;
 };
+
+/** Один участник в лидерборде */
+export type LeaderboardEntry = {
+  rank: number;
+  username: string;
+  displayName: string;
+  xp: number;
+  level: number;
+  maxStreak: number;
+};
+
+/** Лидерборд за один период */
+export type LeaderboardPeriod = {
+  items: LeaderboardEntry[];
+  currentUser?: LeaderboardEntry;
+  participating: boolean;
+};
+
+/** Ответ GET /rating/leaderboard */
+export type LeaderboardResponse = {
+  day: LeaderboardPeriod;
+  week: LeaderboardPeriod;
+  all: LeaderboardPeriod;
+  participating: boolean;
+};

@@ -23,6 +23,9 @@ function getGameMultiplier(
     const difficulty: PuzzleDifficulty = puzzleDifficulty ?? "EASY";
     return PUZZLE_DIFFICULTY_MULTIPLIERS[difficulty];
   }
+  if (gameType === "DANETKA") {
+    return GAME_MULTIPLIERS.DANETKA;
+  }
   return 1.0;
 }
 

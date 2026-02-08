@@ -1,6 +1,12 @@
 export type Accent = "UK" | "US" | "both";
 export type Level = "A0" | "A1" | "A2" | "B1" | "B2" | "C1" | "C2";
 
+/** Редкость слова в языке. */
+export type Rarity = "не редкое" | "редкое" | "очень редкое";
+
+/** Регистр употребления: официальная или разговорная речь. */
+export type Register = "официальная" | "разговорная";
+
 /** Тип прогресса слова: начинающий (зелёный), опытный (жёлтый), эксперт (красный — пока не используется). */
 export type WordProgressType = "beginner" | "experienced" | "expert";
 
@@ -21,6 +27,10 @@ export type Word = {
   ru: string;
   accent: Accent;
   level: Level;
+  /** Чем меньше — тем частотнее слово (из БД). */
+  frequencyRank?: number;
+  rarity?: Rarity;
+  register?: Register;
   ipaUk: string;
   ipaUs: string;
   example: string;
@@ -48,6 +58,16 @@ export type UserGameSettings = {
   dictionarySource?: "general" | "personal";
 };
 
+/** Активные дни: серия дней подряд с выполнением хотя бы одного задания (по серверной дате). */
+export type UserActiveDays = {
+  /** Текущая длина серии активных дней (0 если ещё не было активности или серия сброшена). */
+  streakDays: number;
+  /** Дата последней активности в формате YYYY-MM-DD. */
+  lastActiveDate: string | null;
+  /** Максимальная серия активных дней за всё время. */
+  maxStreak?: number;
+};
+
 export type User = {
   /** Логин — для входа, уникальный, не меняется при смене никнейма. */
   username: string;
@@ -61,6 +81,8 @@ export type User = {
   /** Идентификаторы слов, добавленных пользователем в «Мой словарь». */
   personalDictionary?: number[];
   gameSettings?: UserGameSettings;
+  /** Активные дни: серия и дата последней активности (с сервера). */
+  activeDays?: UserActiveDays;
 };
 
 export type Session = {

@@ -97,6 +97,9 @@ const ProfilePage: React.FC = () => {
 
   const currentDisplayName = getDisplayName(user);
 
+  const dictionarySource: "general" | "personal" =
+    user?.gameSettings?.dictionarySource ?? "personal";
+
   const handleVoiceChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const value = e.target.value;
     setVoiceUri(value);
@@ -108,6 +111,12 @@ const ProfilePage: React.FC = () => {
       localStorage.setItem(VOICE_STORAGE_KEY_PREFIX + user.username, value);
       setPreferredVoiceUri(value);
     }
+  };
+
+  const handleDictionarySourceChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const value = e.target.value as "general" | "personal";
+    authService.updateGameSettings({ dictionarySource: value });
+    refresh();
   };
 
   const pickRandomWord = () => {
@@ -338,6 +347,22 @@ const ProfilePage: React.FC = () => {
             {previewWord && (
               <span className="profile-voice-preview">Пример: <em>{previewWord}</em></span>
             )}
+          </section>
+
+          <section className="profile-section profile-dictionary">
+            <h2 className="profile-section-title">Словарь в играх</h2>
+            <p className="profile-section-desc">Из какого словаря по умолчанию брать слова в упражнениях.</p>
+            <div className="profile-voice-row">
+              <select
+                id="profile-dictionary-source"
+                value={dictionarySource}
+                onChange={handleDictionarySourceChange}
+                className="profile-voice-select"
+              >
+                <option value="personal">Мой словарь</option>
+                <option value="general">Общий словарь</option>
+              </select>
+            </div>
           </section>
 
           <section className="profile-section profile-actions">

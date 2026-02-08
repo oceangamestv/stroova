@@ -30,6 +30,7 @@ export const EXERCISE_MULTIPLIERS: Record<ExerciseType, number> = {
 export const GAME_MULTIPLIERS: Record<GameType, number> = {
   PAIR_MATCH: 1.0,
   PUZZLE: 0, // не использовать напрямую; для пазлов берётся из PUZZLE_DIFFICULTY_MULTIPLIERS
+  DANETKA: 1.2,
 };
 
 /** Множители за сложность пазлов (k_game для PUZZLE). */

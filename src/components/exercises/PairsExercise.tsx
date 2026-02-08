@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import type { Word } from "../../data/contracts/types";
+import { useDictionary } from "../../features/dictionary/useDictionary";
 import type { DictionarySource } from "../../services/dictionaryService";
 import { dictionaryService } from "../../services/dictionaryService";
 import { personalDictionaryService } from "../../services/personalDictionaryService";
@@ -8,6 +9,7 @@ import { progressService } from "../../services/progressService";
 import { speakWord, playErrorSound } from "../../utils/sounds";
 import { buildPairsCards, isMatch, PairsCard } from "../../domain/exercises/pairs";
 import { authService } from "../../services/authService";
+import { guestPendingResultService } from "../../services/guestPendingResultService";
 import { useAuth } from "../../features/auth/AuthContext";
 import { calculateXp, formatXp } from "../../domain/xp";
 
@@ -45,9 +47,10 @@ const PAIRS_PER_STAGE = 5;
 
 const PairsExercise: React.FC = () => {
   const { user, refresh: refreshUser } = useAuth();
+  const { words: dictionaryWords, loading: wordsLoading } = useDictionary();
   const navigate = useNavigate();
   const dictionarySource: DictionarySource =
-    user?.gameSettings?.dictionarySource ?? "general";
+    user?.gameSettings?.dictionarySource ?? (user ? "personal" : "general");
   const [stage, setStage] = useState(1);
   const [cards, setCards] = useState<PairsCard[]>([]);
   const [stageWords, setStageWords] = useState<Word[]>([]);
@@ -64,6 +67,7 @@ const PairsExercise: React.FC = () => {
   const [wrongIndices, setWrongIndices] = useState<number[]>([]);
   const stageCompletedRef = useRef<number>(0);
   const sessionXpRef = useRef<number>(0);
+  const sessionWordsRef = useRef<SessionWordEntry[]>([]);
   const stageTransitionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   // После смены этапа в том же цикле matchedCount ещё 5 (старый). Пропускаем завершение этапа только при реальной смене этапа.
   const justChangedStageRef = useRef<boolean>(false);
@@ -72,6 +76,9 @@ const PairsExercise: React.FC = () => {
   useEffect(() => {
     sessionXpRef.current = sessionXp;
   }, [sessionXp]);
+  useEffect(() => {
+    sessionWordsRef.current = sessionWords;
+  }, [sessionWords]);
 
   const setDictionarySource = (source: DictionarySource) => {
     authService.updateGameSettings({ dictionarySource: source });
@@ -79,12 +86,13 @@ const PairsExercise: React.FC = () => {
   };
 
   useEffect(() => {
-    // Ставим флаг только при реальной смене этапа (не при первом монтировании, когда prevStage === stage)
+    if (wordsLoading || dictionaryWords.length === 0) return;
     if (prevStageRef.current !== stage) {
       justChangedStageRef.current = true;
       prevStageRef.current = stage;
     }
-    const words = dictionaryService.getRandomWordsForGame(
+    const words = dictionaryService.getRandomWordsForGameFromPool(
+      dictionaryWords,
       PAIRS_PER_STAGE,
       "both",
       "beginner",
@@ -100,7 +108,7 @@ const PairsExercise: React.FC = () => {
       clearTimeout(stageTransitionTimeoutRef.current);
       stageTransitionTimeoutRef.current = null;
     }
-  }, [stage, dictionarySource]);
+  }, [stage, dictionarySource, dictionaryWords, wordsLoading]);
 
   const handleCardClick = (index: number) => {
     if (locked) return;
@@ -125,15 +133,17 @@ const PairsExercise: React.FC = () => {
 
     setLocked(true);
 
-    if (isMatch(selected, card)) {
+    if (isMatch(selected, card, stageWords)) {
       const updated = cards.map((c) =>
         c.index === selected.index || c.index === card.index ? { ...c, matched: true } : c
       );
       setCards(updated);
       setMatchedCount((prev) => prev + 1);
 
-      const wordId = selected.pairId;
-      const wordData = stageWords.find((w) => w.id === wordId);
+      const enLabel = selected.type === "en" ? selected.label : card.label;
+      const ruLabel = selected.type === "ru" ? selected.label : card.label;
+      const wordData = stageWords.find((w) => w.en === enLabel && w.ru === ruLabel);
+      const wordId = wordData?.id ?? selected.pairId;
       const hadErrorThisStage = wordsWithErrorThisStage.has(wordId);
       // Если по этой паре уже была ошибка на этапе — не начисляем опыт и не обновляем прогресс слова.
       const xpEarned =
@@ -239,18 +249,30 @@ const PairsExercise: React.FC = () => {
     } else {
       // Последний этап завершен
       setShowResult(true);
-      const stats = authService.getCurrentUser()?.stats;
       const earnedXp = sessionXpRef.current;
-      authService.updateUserStats(
-        {
-          totalXp: (stats?.totalXp ?? stats?.totalScore ?? 0) + earnedXp,
-          exercisesCompleted: (stats?.exercisesCompleted || 0) + 1,
-          pairsCompleted: (stats?.pairsCompleted || 0) + 1,
-          bestScore: Math.max(stats?.bestScore ?? 0, earnedXp),
-        },
-        { xpEarnedToday: earnedXp }
-      );
-      setTimeout(() => refreshUser(), 0);
+      const words = sessionWordsRef.current;
+      if (user) {
+        const stats = authService.getCurrentUser()?.stats;
+        authService.updateUserStats(
+          {
+            totalXp: (stats?.totalXp ?? stats?.totalScore ?? 0) + earnedXp,
+            exercisesCompleted: (stats?.exercisesCompleted || 0) + 1,
+            pairsCompleted: (stats?.pairsCompleted || 0) + 1,
+            bestScore: Math.max(stats?.bestScore ?? 0, earnedXp),
+          },
+          { xpEarnedToday: earnedXp }
+        );
+        setTimeout(() => refreshUser(), 0);
+      } else {
+        const wordUpdates = words.map((entry) => ({
+          wordId: entry.word.id,
+          progressType: "beginner" as const,
+          progressValue: entry.hadError
+            ? Math.max(0, entry.progressBefore - 1)
+            : Math.min(100, entry.progressBefore + 1),
+        }));
+        guestPendingResultService.addGameResult("pairs", earnedXp, wordUpdates);
+      }
     }
     // Не очищаем таймер здесь: иначе в Strict Mode / при повторном запуске эффекта
     // таймер сбрасывается и этап 2→3 (и далее) не срабатывает.
@@ -273,8 +295,19 @@ const PairsExercise: React.FC = () => {
   const completedStages = stage - 1;
   const currentStageProgress = matchedCount / PAIRS_PER_STAGE;
   const progressPercent = ((completedStages + currentStageProgress) / PAIRS_STAGES_TOTAL) * 100;
-  const personalWordsCount = personalDictionaryService.getPersonalWords().length;
+  const personalWordsCount =
+    dictionaryWords.length > 0
+      ? personalDictionaryService.getPersonalWordsFromPool(dictionaryWords).length
+      : personalDictionaryService.getPersonalWordIds().length;
   const showPersonalEmpty = dictionarySource === "personal" && personalWordsCount === 0;
+
+  if (wordsLoading) {
+    return (
+      <div className="exercise-area">
+        <p className="dictionary-subtitle">Загрузка словаря…</p>
+      </div>
+    );
+  }
 
   return (
     <div className="exercise-area">
@@ -354,7 +387,7 @@ const PairsExercise: React.FC = () => {
                     {card.accent === "UK" ? "🇬🇧 UK" : "🇺🇸 US"}
                   </span>
                 )}
-                <span>{card.label}</span>
+                <span className="card-label">{card.label}</span>
               </button>
             ))}
           </div>
@@ -371,7 +404,7 @@ const PairsExercise: React.FC = () => {
                 type="button"
               >
                 <span className="card-tag">RU</span>
-                <span>{card.label}</span>
+                <span className="card-label">{card.label}</span>
               </button>
             ))}
           </div>
@@ -437,6 +470,20 @@ const PairsExercise: React.FC = () => {
                 })}
               </ul>
             </section>
+            {!user && (
+              <div className="puzzle-result-guest-cta" role="region" aria-label="Сохранить прогресс">
+                <p className="puzzle-result-guest-cta-text">
+                  Войдите или зарегистрируйтесь, чтобы сохранить прогресс и не потерять достижения.
+                </p>
+                <button
+                  type="button"
+                  className="primary-btn puzzle-result-guest-btn"
+                  onClick={() => navigate("/login")}
+                >
+                  Войти / Зарегистрироваться
+                </button>
+              </div>
+            )}
             <footer className="puzzle-result-footer">
               <button
                 className="primary-btn puzzle-result-btn"

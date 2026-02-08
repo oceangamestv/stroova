@@ -8,8 +8,13 @@
  *   PATCH /me            { username? | stats? | wordProgress? } → User
  */
 
-import type { User } from "../data/contracts/types";
-import type { AuthResponse, CheckUsernameResponse, PatchMeBody } from "./types";
+import type { User, Word } from "../data/contracts/types";
+import type {
+  AuthResponse,
+  CheckUsernameResponse,
+  PatchMeBody,
+  LeaderboardResponse,
+} from "./types";
 import { api } from "./client";
 
 export const authApi = {
@@ -26,4 +31,22 @@ export const authApi = {
 export const meApi = {
   get: () => api.get<User>("/me"),
   patch: (body: PatchMeBody) => api.patch<User>("/me", body),
+};
+
+export const dictionaryApi = {
+  getLanguages: () =>
+    api.get<Array<{ id: number; code: string; name: string }>>("/languages"),
+  getWords: (params?: { lang?: string; accent?: string; level?: string }) => {
+    const search = new URLSearchParams();
+    if (params?.lang) search.set("lang", params.lang);
+    if (params?.accent) search.set("accent", params.accent);
+    if (params?.level) search.set("level", params.level);
+    const q = search.toString();
+    return api.get<Word[]>(`/dictionary/words${q ? `?${q}` : ""}`);
+  },
+};
+
+export const ratingApi = {
+  participate: () => api.post<{ ok: boolean }>("/rating/participate", {}),
+  getLeaderboard: () => api.get<LeaderboardResponse>("/rating/leaderboard"),
 };

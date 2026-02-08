@@ -39,5 +39,22 @@ export const buildPairsCards = (words: Word[]): PairsCard[] => {
   return [...englishCards, ...russianCards];
 };
 
-export const isMatch = (a: PairsCard, b: PairsCard) =>
-  a.pairId === b.pairId && a.type !== b.type;
+/**
+ * Проверяет, образуют ли две карточки правильную пару «слово — перевод».
+ * Если передан массив words текущего этапа — считаем правильным любой выбор,
+ * где комбинация (англ. слово, рус. перевод) совпадает с одной из пар в words.
+ * Так «Hello» + «привет» засчитывается даже если на экране два слова с переводом «привет» (Hello, Hi).
+ * Без words — классическая проверка по pairId (одна карточка от одного слова).
+ */
+export const isMatch = (a: PairsCard, b: PairsCard, words?: Word[]): boolean => {
+  if (a.type === b.type) return false;
+  const enCard = a.type === "en" ? a : b;
+  const ruCard = a.type === "ru" ? a : b;
+  const enLabel = enCard.label;
+  const ruLabel = ruCard.label;
+
+  if (words && words.length > 0) {
+    return words.some((w) => w.en === enLabel && w.ru === ruLabel);
+  }
+  return a.pairId === b.pairId;
+};

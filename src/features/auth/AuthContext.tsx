@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import type { User } from "../../data/contracts/types";
 import { authService } from "../../services/authService";
+import { guestPendingResultService } from "../../services/guestPendingResultService";
 import { hydrateUser } from "../../data/adapters/serverAuthAdapter";
 
 type AuthContextValue = {
@@ -41,12 +42,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       user,
       login: async (username, password) => {
         const result = await authService.login(username, password);
-        if (result.success) refresh();
+        if (result.success) {
+          guestPendingResultService.applyAndClear();
+          refresh();
+        }
         return result;
       },
       register: async (username, password) => {
         const result = await authService.register(username, password);
-        if (result.success) refresh();
+        if (result.success) {
+          guestPendingResultService.applyAndClear();
+          refresh();
+        }
         return result;
       },
       logout: () => {

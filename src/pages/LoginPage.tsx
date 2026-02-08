@@ -132,7 +132,7 @@ const LoginPage: React.FC = () => {
             </div>
           )}
 
-          <div className="form-error">{error}</div>
+          {error && <div className="form-error">{error}</div>}
 
           <button type="submit" className="primary-btn auth-submit-btn" disabled={loading}>
             {loading ? "…" : mode === "login" ? "Войти" : "Зарегистрироваться"}

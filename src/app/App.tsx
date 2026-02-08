@@ -4,6 +4,7 @@ import ExercisesPage from "../pages/ExercisesPage";
 import DictionaryPage from "../pages/DictionaryPage";
 import ProfilePage from "../pages/ProfilePage";
 import LoginPage from "../pages/LoginPage";
+import RatingsPage from "../pages/RatingsPage";
 import { AuthProvider, useAuth } from "../features/auth/AuthContext";
 import ThemeProvider from "../features/theme/ThemeProvider";
 import { authAdapter } from "../data/adapters/authAdapter";
@@ -16,14 +17,7 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
 
 const routeConfig = [
   { path: "/login", element: <LoginPage /> },
-  {
-    path: "/dictionary",
-    element: (
-      <ProtectedRoute>
-        <DictionaryPage />
-      </ProtectedRoute>
-    ),
-  },
+  { path: "/dictionary", element: <DictionaryPage /> },
   {
     path: "/profile",
     element: (
@@ -33,30 +27,11 @@ const routeConfig = [
     ),
   },
   { path: "/settings", element: <Navigate to="/profile" replace /> },
-  {
-    path: "/",
-    element: (
-      <ProtectedRoute>
-        <ExercisesPage />
-      </ProtectedRoute>
-    ),
-  },
-  {
-    path: "/pairs",
-    element: (
-      <ProtectedRoute>
-        <ExercisesPage />
-      </ProtectedRoute>
-    ),
-  },
-  {
-    path: "/puzzle",
-    element: (
-      <ProtectedRoute>
-        <ExercisesPage />
-      </ProtectedRoute>
-    ),
-  },
+  { path: "/rating", element: <RatingsPage /> },
+  { path: "/", element: <ExercisesPage /> },
+  { path: "/pairs", element: <ExercisesPage /> },
+  { path: "/puzzle", element: <ExercisesPage /> },
+  { path: "/danetka", element: <ExercisesPage /> },
   { path: "*", element: <Navigate to="/" replace /> },
 ];
 

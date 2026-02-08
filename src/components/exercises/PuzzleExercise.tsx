@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import type { Word } from "../../data/contracts/types";
+import { useDictionary } from "../../features/dictionary/useDictionary";
 import type { DictionarySource } from "../../services/dictionaryService";
 import { dictionaryService } from "../../services/dictionaryService";
 import { personalDictionaryService } from "../../services/personalDictionaryService";
@@ -15,6 +16,7 @@ import {
   PuzzleState,
 } from "../../domain/exercises/puzzle";
 import { authService } from "../../services/authService";
+import { guestPendingResultService } from "../../services/guestPendingResultService";
 import { useAuth } from "../../features/auth/AuthContext";
 import { calculateXp, formatXp } from "../../domain/xp";
 
@@ -57,9 +59,10 @@ const formatTimer = (seconds: number) => {
 
 const PuzzleExercise: React.FC = () => {
   const { user, refresh: refreshUser } = useAuth();
+  const { words: dictionaryWords, loading: wordsLoading } = useDictionary();
   const navigate = useNavigate();
   const dictionarySource: DictionarySource =
-    user?.gameSettings?.dictionarySource ?? "general";
+    user?.gameSettings?.dictionarySource ?? (user ? "personal" : "general");
   const [difficulty, setDifficulty] = useState<PuzzleDifficulty>("easy");
   const [currentIndex, setCurrentIndex] = useState(1);
   const [sessionXp, setSessionXp] = useState(0);
@@ -78,6 +81,7 @@ const PuzzleExercise: React.FC = () => {
 
   const sessionXpRef = useRef(0);
   const sessionWordsRef = useRef<SessionWordResult[]>([]);
+  const hardInputRef = useRef<HTMLInputElement>(null);
   sessionXpRef.current = sessionXp;
   sessionWordsRef.current = sessionWords;
 
@@ -87,19 +91,28 @@ const PuzzleExercise: React.FC = () => {
     setEndedByTime(true);
     setShowResult(true);
     const earnedXp = sessionXpRef.current;
-    const stats = authService.getCurrentUser()?.stats;
-    authService.updateUserStats(
-      {
-        totalXp: (stats?.totalXp ?? stats?.totalScore ?? 0) + earnedXp,
-        exercisesCompleted: (stats?.exercisesCompleted || 0) + 1,
-        puzzlesCompleted: (stats?.puzzlesCompleted || 0) + 1,
-        bestScore: Math.max(stats?.bestScore ?? 0, earnedXp),
-      },
-      { xpEarnedToday: earnedXp }
-    );
-    // Отложить обновление контекста, чтобы не вызывать setState родителя во время своего обновления
-    setTimeout(() => refreshUser(), 0);
-  }, [refreshUser]);
+    const words = sessionWordsRef.current;
+    if (user) {
+      const stats = authService.getCurrentUser()?.stats;
+      authService.updateUserStats(
+        {
+          totalXp: (stats?.totalXp ?? stats?.totalScore ?? 0) + earnedXp,
+          exercisesCompleted: (stats?.exercisesCompleted || 0) + 1,
+          puzzlesCompleted: (stats?.puzzlesCompleted || 0) + 1,
+          bestScore: Math.max(stats?.bestScore ?? 0, earnedXp),
+        },
+        { xpEarnedToday: earnedXp }
+      );
+      setTimeout(() => refreshUser(), 0);
+    } else {
+      const wordUpdates = words.map((w) => ({
+        wordId: w.word.id,
+        progressType: (difficulty === "hard" ? "experienced" : "beginner") as "beginner" | "experienced",
+        progressValue: w.progressAfter,
+      }));
+      guestPendingResultService.addGameResult("puzzle", earnedXp, wordUpdates);
+    }
+  }, [refreshUser, user, difficulty]);
 
   const setDictionarySource = (source: DictionarySource) => {
     authService.updateGameSettings({ dictionarySource: source });
@@ -109,13 +122,16 @@ const PuzzleExercise: React.FC = () => {
   const progressType = difficulty === "hard" ? "experienced" : "beginner";
   const randomWord = useMemo(
     () =>
-      dictionaryService.getRandomWordsForGame(
-        1,
-        "both",
-        progressType,
-        dictionarySource
-      )[0],
-    [currentIndex, difficulty, dictionarySource]
+      dictionaryWords.length > 0
+        ? dictionaryService.getRandomWordsForGameFromPool(
+            dictionaryWords,
+            1,
+            "both",
+            progressType,
+            dictionarySource
+          )[0]
+        : undefined,
+    [currentIndex, difficulty, dictionarySource, dictionaryWords]
   );
 
   useEffect(() => {
@@ -158,6 +174,26 @@ const PuzzleExercise: React.FC = () => {
     const complete = isPuzzleComplete(updated);
     if (complete) {
       finalizePuzzle(updated);
+    }
+  };
+
+  const handleHardInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!state || locked) return;
+    const raw = e.target.value.toUpperCase().replace(/[^A-Z\s\-]/g, "");
+    const maxLen = state.slots.length;
+    const filtered = raw.slice(0, maxLen);
+    const current = state.slots.join("");
+    if (filtered.length <= current.length) return;
+    const added = filtered.slice(current.length);
+    let nextState: PuzzleState = state;
+    for (const letter of added) {
+      const emptyIdx = nextState.slots.findIndex((s) => s === null);
+      if (emptyIdx === -1) break;
+      nextState = placeLetterInSlot(nextState, letter, emptyIdx, difficulty);
+    }
+    setState({ ...nextState, letters: [...nextState.letters] });
+    if (isPuzzleComplete(nextState)) {
+      finalizePuzzle(nextState);
     }
   };
 
@@ -258,6 +294,8 @@ const PuzzleExercise: React.FC = () => {
         return;
       }
       if (!state || locked) return;
+      const target = event.target as Node;
+      if (target instanceof HTMLInputElement && target.getAttribute("data-puzzle-hard-input") === "true") return;
       if (event.key === "Escape" || event.key === "Tab") return;
       const key = event.key;
       const isLetter = key.length === 1 && /[a-zA-Z]/.test(key);
@@ -284,8 +322,19 @@ const PuzzleExercise: React.FC = () => {
   const showLettersPanel =
     difficulty === "easy" && hasEmptySlot && visibleLetterCount > 0;
 
-  const personalWordsCount = personalDictionaryService.getPersonalWords().length;
+  const personalWordsCount =
+    dictionaryWords.length > 0
+      ? personalDictionaryService.getPersonalWordsFromPool(dictionaryWords).length
+      : personalDictionaryService.getPersonalWordIds().length;
   const showPersonalEmpty = dictionarySource === "personal" && personalWordsCount === 0;
+
+  if (wordsLoading) {
+    return (
+      <div className="exercise-area">
+        <p className="dictionary-subtitle">Загрузка словаря…</p>
+      </div>
+    );
+  }
 
   return (
     <div className="exercise-area">
@@ -389,6 +438,11 @@ const PuzzleExercise: React.FC = () => {
               <span className="puzzle-translation-correct"> — {state.word}</span>
             )}
           </p>
+          {difficulty === "hard" && state && state.slots.length > 0 && (
+            <p className="puzzle-hint-letter-count" aria-live="polite">
+              Слово из {state.slots.length} букв
+            </p>
+          )}
         </div>
 
         <div className="puzzle-slots-wrapper" id="puzzle-slots-wrapper">
@@ -420,6 +474,40 @@ const PuzzleExercise: React.FC = () => {
             </button>
           )}
         </div>
+
+        {difficulty === "hard" && state && hasEmptySlot && !locked && (
+          <div className="puzzle-hard-input-wrap">
+            <label htmlFor="puzzle-hard-input" className="puzzle-hard-input-label">
+              Введите слово сюда
+            </label>
+            <div
+              className="puzzle-hard-input-inner"
+              onClick={() => hardInputRef.current?.focus()}
+            >
+              <span className="puzzle-hard-input-icon" aria-hidden>
+                <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="2" y="4" width="20" height="16" rx="2" ry="2" />
+                  <path d="M6 8h.01M10 8h.01M14 8h.01M18 8h.01M8 12h.01M12 12h.01M16 12h.01M7 16h10" />
+                </svg>
+              </span>
+              <input
+                ref={hardInputRef}
+                id="puzzle-hard-input"
+                type="text"
+                className="puzzle-hard-input"
+                data-puzzle-hard-input="true"
+                autoComplete="off"
+                autoCapitalize="characters"
+                inputMode="text"
+                maxLength={state.slots.length}
+                value={state.slots.join("")}
+                onChange={handleHardInputChange}
+                placeholder=""
+                aria-label={`Введите слово из ${state.slots.length} букв. Нажмите в это поле, чтобы открыть клавиатуру.`}
+              />
+            </div>
+          </div>
+        )}
 
         {showLettersPanel && (
           <div className="puzzle-letters" id="puzzle-letters">
@@ -512,6 +600,20 @@ const PuzzleExercise: React.FC = () => {
                 ))}
               </ul>
             </section>
+            {!user && (
+              <div className="puzzle-result-guest-cta" role="region" aria-label="Сохранить прогресс">
+                <p className="puzzle-result-guest-cta-text">
+                  Войдите или зарегистрируйтесь, чтобы сохранить прогресс и не потерять достижения.
+                </p>
+                <button
+                  type="button"
+                  className="primary-btn puzzle-result-guest-btn"
+                  onClick={() => navigate("/login")}
+                >
+                  Войти / Зарегистрироваться
+                </button>
+              </div>
+            )}
             <footer className="puzzle-result-footer">
               <button className="primary-btn puzzle-result-btn" onClick={restartGame} type="button">
                 Играть снова
