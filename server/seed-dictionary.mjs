@@ -41,13 +41,19 @@ function parseCsvLine(line) {
   return out;
 }
 
+/** Убирает BOM и нормализует заголовки CSV. */
+function normalizeHeader(header) {
+  return header.map((h) => String(h).replace(/^\uFEFF/, "").trim());
+}
+
 /** Читает CSV и возвращает массив объектов с ключами из заголовка. */
 function loadCsv(filePath) {
   const abs = path.isAbsolute(filePath) ? filePath : path.resolve(process.cwd(), filePath);
-  const text = fs.readFileSync(abs, "utf8");
+  let text = fs.readFileSync(abs, "utf8");
+  if (text.charCodeAt(0) === 0xfeff) text = text.slice(1);
   const lines = text.split("\n").filter((l) => l.trim());
   if (lines.length === 0) return [];
-  const header = parseCsvLine(lines[0]);
+  const header = normalizeHeader(parseCsvLine(lines[0]));
   const rows = [];
   for (let i = 1; i < lines.length; i++) {
     const values = parseCsvLine(lines[i]);
@@ -76,7 +82,14 @@ function normRegister(v) {
   return DEFAULT_REGISTER;
 }
 
+/** Проверяет, что строка похожа на настоящую IPA (есть символы вроде ə, ɔ, ɪ, ˈ). */
+function hasRealIpa(str) {
+  if (!str || !str.trim()) return false;
+  return /[əɔɪʊɜːˈˌθðŋɑɒæʃʒʔɛʌ]/.test(str);
+}
+
 async function seedFromCsv(client, filePath) {
+  const { getIpaBoth } = await import("./lib/ipaGenerator.js");
   const rows = loadCsv(filePath);
   console.log(`  Загружено из CSV: ${rows.length} строк`);
   await client.query("DELETE FROM dictionary_entries WHERE language_id = 1");
@@ -86,6 +99,13 @@ async function seedFromCsv(client, filePath) {
     if (!Number.isFinite(id) || !r.en) continue;
     const rarity = normRarity(r.rarity);
     const register = normRegister(r.register);
+    let ipaUk = (r.ipa_uk || "").trim();
+    let ipaUs = (r.ipa_us || "").trim();
+    if (!hasRealIpa(ipaUk) || !hasRealIpa(ipaUs)) {
+      const generated = await getIpaBoth((r.en || "").trim());
+      if (!hasRealIpa(ipaUk)) ipaUk = generated.ipaUk;
+      if (!hasRealIpa(ipaUs)) ipaUs = generated.ipaUs;
+    }
     await client.query(
       `INSERT INTO dictionary_entries (id, language_id, en, ru, accent, level, frequency_rank, rarity, register, ipa_uk, ipa_us, example, example_ru)
        VALUES ($1, 1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
@@ -98,13 +118,14 @@ async function seedFromCsv(client, filePath) {
         Number.isFinite(parseInt(r.frequency_rank, 10)) ? parseInt(r.frequency_rank, 10) : 15000,
         rarity,
         register,
-        (r.ipa_uk || "").trim(),
-        (r.ipa_us || "").trim(),
+        ipaUk,
+        ipaUs,
         (r.example || "").trim(),
         (r.example_ru || "").trim(),
       ]
     );
     inserted++;
+    if (inserted % 200 === 0) console.log(`  вставлено ${inserted}/${rows.length}`);
   }
   await client.query(
     "SELECT setval(pg_get_serial_sequence('dictionary_entries', 'id'), COALESCE((SELECT MAX(id) FROM dictionary_entries), 1))"

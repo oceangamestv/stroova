@@ -9,22 +9,23 @@
     "build": "vite build",
     "preview": "vite preview",
     "server": "node server/index.js",
-    "seed": "npx tsx server/seed-dictionary.mjs"
+    "seed": "npx tsx server/seed-dictionary.mjs",
+    "update-ipa": "node server/update-ipa-from-dictionary.mjs"
   },
   "dependencies": {
     "dotenv": "^16.3.1",
     "pg": "^8.11.3",
+    "phonemizer": "^1.2.1",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^6.26.2"
   },
   "devDependencies": {
-    "tsx": "^4.7.0",
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^4.3.1",
+    "tsx": "^4.7.0",
     "typescript": "^5.5.4",
     "vite": "^5.4.2"
   }
 }
-
