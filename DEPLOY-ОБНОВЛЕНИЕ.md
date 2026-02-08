@@ -92,7 +92,79 @@ pm2 save
 
 ---
 
-## Шаги заливки обновления
+## Инструкция для будущих обновлений
+
+Используй эти шаги каждый раз, когда нужно выкатить новую версию на боевой сервер.
+
+### 1. На своём компьютере (в Cursor или PowerShell)
+
+Перейди в папку проекта и отправь изменения на GitHub:
+
+```bash
+cd d:\Cursor
+git add .
+git commit -m "описание изменений"
+git push
+```
+
+(Команда именно **git**, не it. Описание в кавычках можно менять.)
+
+### 2. На сервере (подключись по SSH)
+
+Перейди в папку проекта:
+
+```bash
+cd ~/stroova
+```
+
+Подтяни код с GitHub:
+
+```bash
+git pull
+```
+
+**Если появилась ошибка** вроде:
+`error: Your local changes to the following files would be overwritten by merge: ... Please commit your changes or stash them before you merge.`
+
+Значит на сервере изменён файл (часто `node_modules/.package-lock.json`). Отмени это изменение и снова выполни pull:
+
+```bash
+git checkout -- node_modules/.package-lock.json
+git pull
+```
+
+(Если в сообщении об ошибке указан другой файл — подставь его путь вместо `node_modules/.package-lock.json`.)
+
+Установи зависимости и пересобери фронт, перезапусти API:
+
+```bash
+npm ci
+npm run build
+pm2 restart stroova-api
+```
+
+Либо вместо трёх команд выше можно один раз выполнить скрипт деплоя (он сделает то же самое, включая `git pull` и `npm ci`):
+
+```bash
+./deploy.sh
+```
+
+Но если перед этим `git pull` падал с ошибкой — сначала выполни `git checkout -- ...` и `git pull` вручную, как выше, затем уже `./deploy.sh` или вручную `npm ci`, `npm run build`, `pm2 restart stroova-api`.
+
+### 3. Проверка
+
+Открой сайт в браузере и убедись, что всё работает. Логи API: `pm2 logs stroova-api` (выход — Ctrl+C).
+
+**Шпаргалка — команды по порядку:**
+
+| Где | Команды |
+|-----|--------|
+| Компьютер | `cd d:\Cursor` → `git add .` → `git commit -m "описание"` → `git push` |
+| Сервер | `cd ~/stroova` → `git pull` (при ошибке: `git checkout -- node_modules/.package-lock.json` и снова `git pull`) → `npm ci` → `npm run build` → `pm2 restart stroova-api` |
+
+---
+
+## Шаги заливки обновления (подробно)
 
 ### 1. Локально: push в репозиторий
 
@@ -112,6 +184,8 @@ cd ~/stroova
 ```
 
 Скрипт [deploy.sh](deploy.sh) делает по порядку: `git pull` → `npm ci` → `npm run build` → `pm2 restart stroova-api`.
+
+**Если `./deploy.sh` не срабатывает из‑за конфликта при pull** (см. раздел «Инструкция для будущих обновлений» выше): сначала на сервере выполни `git checkout -- node_modules/.package-lock.json` и `git pull`, затем снова `./deploy.sh`.
 
 (Если проект клонирован не в домашнюю папку, перейди в каталог проекта — например для пользователя root это `/root/stroova`.)
 
