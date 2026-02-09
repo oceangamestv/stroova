@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useIsMobile } from "../../hooks/useIsMobile";
+import { useGameOnlyLayout } from "../../contexts/GameOnlyLayoutContext";
 import type { Word } from "../../data/contracts/types";
 import { useDictionary } from "../../features/dictionary/useDictionary";
 import type { DictionarySource } from "../../services/dictionaryService";
@@ -90,6 +91,8 @@ const PuzzleExercise: React.FC = () => {
   const hardInputRef = useRef<HTMLInputElement>(null);
   const learningAreaRef = useRef<HTMLDivElement>(null);
   const isMobile = useIsMobile();
+  const isGameOnly = useGameOnlyLayout();
+  const isCompact = isMobile || isGameOnly;
   sessionXpRef.current = sessionXp;
   sessionWordsRef.current = sessionWords;
 
@@ -281,7 +284,7 @@ const PuzzleExercise: React.FC = () => {
       ]);
       if (isFirstWord) setTimerRunning(true);
       setTimeLeft((prev) => prev + 1);
-      speakWord(currentWordData.en, currentWordData.accent || "both");
+      speakWord(currentWordData.en, currentWordData.accent || "both", undefined);
       setStatus("Отлично! Слово собрано верно.");
       setShowNext(true);
       return;
@@ -397,7 +400,7 @@ const PuzzleExercise: React.FC = () => {
 
   return (
     <div className="exercise-area">
-      {!isMobile && (
+      {!isCompact && (
         <div className="game-dictionary-source">
           <span className="game-dictionary-source-label">Слова из:</span>
           <div className="game-dictionary-source-btns">
@@ -431,7 +434,7 @@ const PuzzleExercise: React.FC = () => {
         </div>
       ) : (
         <>
-      {isMobile ? (
+      {isCompact ? (
         <div className="puzzle-mobile-status">
           <div className="puzzle-mobile-status-row">
             <span>{`Слов: ${sessionWords.length}`}</span>
@@ -462,7 +465,7 @@ const PuzzleExercise: React.FC = () => {
         </div>
       )}
 
-      <div className={`puzzle-exercise ${isMobile ? "puzzle-exercise--mobile" : ""}`} id="puzzle-exercise">
+      <div className={`puzzle-exercise ${isCompact ? "puzzle-exercise--mobile" : ""}`} id="puzzle-exercise">
         <button
           className="puzzle-help-btn"
           id="puzzle-help-btn"
@@ -478,7 +481,7 @@ const PuzzleExercise: React.FC = () => {
         </button>
 
         <div ref={learningAreaRef} id="puzzle-learning-area" className="puzzle-learning-area">
-        {!isMobile && (
+        {!isCompact && (
           <div className="puzzle-difficulty-switcher">
             <button
               className={`difficulty-btn ${difficulty === "easy" ? "active" : ""}`}
@@ -554,7 +557,7 @@ const PuzzleExercise: React.FC = () => {
 
         {difficulty === "hard" && state && hasEmptySlot && !locked && (
           <div className={`puzzle-hard-input-wrap ${isMobile ? "puzzle-hard-input-wrap--mobile" : ""}`}>
-            {!isMobile && (
+            {!isCompact && (
               <label htmlFor="puzzle-hard-input" className="puzzle-hard-input-label">
                 Введите слово сюда
               </label>
@@ -563,7 +566,7 @@ const PuzzleExercise: React.FC = () => {
               className={`puzzle-hard-input-inner ${isMobile ? "puzzle-hard-input-inner--mobile" : ""}`}
               onClick={() => hardInputRef.current?.focus()}
             >
-              {!isMobile && (
+              {!isCompact && (
                 <span className="puzzle-hard-input-icon" aria-hidden>
                   <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <rect x="2" y="4" width="20" height="16" rx="2" ry="2" />

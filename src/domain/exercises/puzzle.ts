@@ -63,38 +63,15 @@ export const placeLetterInSlot = (
   const correctLetter = state.word[slotIndex];
   if (letter === correctLetter) {
     nextSlotsState[slotIndex] = "correct";
-    if (difficulty === "easy") {
-      // Если передан индекс кликнутой буквы, помечаем именно её
-      if (clickedLetterIndex !== undefined) {
-        const clickedLetterItem = state.letters.find((item) => item.index === clickedLetterIndex);
-        if (clickedLetterItem && !clickedLetterItem.used) {
-          clickedLetterItem.used = true;
-        }
-      } else {
-        // Fallback для клавиатуры: находим первую неиспользованную букву с таким символом
-        const letterItem = state.letters.find(
-          (item) => item.letter === letter && !item.used
-        );
-        if (letterItem) letterItem.used = true;
-      }
-    }
   } else {
     nextSlotsState[slotIndex] = "wrong";
-    if (difficulty === "easy") {
-      // Если передан индекс кликнутой буквы, помечаем именно её
-      if (clickedLetterIndex !== undefined) {
-        const clickedLetterItem = state.letters.find((item) => item.index === clickedLetterIndex);
-        if (clickedLetterItem && !clickedLetterItem.used) {
-          clickedLetterItem.used = true;
-        }
-      } else {
-        // Fallback для клавиатуры: находим первую неиспользованную букву с таким символом
-        const letterItem = state.letters.find(
-          (item) => item.letter === letter && !item.used
-        );
-        if (letterItem) letterItem.used = true;
-      }
-    }
+  }
+  // В лёгком режиме из списка возможных убираем букву, которая должна стоять на этом месте
+  if (difficulty === "easy") {
+    const letterToMark = state.letters.find(
+      (item) => item.letter === correctLetter && !item.used
+    );
+    if (letterToMark) letterToMark.used = true;
   }
 
   return {

@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from "react";
 import Header from "../components/common/Header";
+import { useIsMobile } from "../hooks/useIsMobile";
 import { useAuth } from "../features/auth/AuthContext";
 import { ratingApi } from "../api/endpoints";
 import { formatXp } from "../domain/xp";
@@ -87,6 +88,7 @@ function LeaderboardTable({
 }
 
 const RatingsPage: React.FC = () => {
+  const isMobile = useIsMobile();
   const { user } = useAuth();
   const [data, setData] = useState<{
     day: LeaderboardPeriod;
@@ -136,8 +138,9 @@ const RatingsPage: React.FC = () => {
     <div className="app-shell">
       <Header />
       <main className="main main--top">
-        <div className="rating-page">
-          <h1 className="rating-page-title">Рейтинг</h1>
+        <div className={isMobile ? undefined : "page-card"}>
+          <div className="rating-page">
+            <h1 className="rating-page-title">Рейтинг</h1>
 
           {user && !data?.participating && (
             <div className="rating-actions">
@@ -185,6 +188,7 @@ const RatingsPage: React.FC = () => {
               />
             </section>
           ) : null}
+          </div>
         </div>
       </main>
       <footer className="footer">STroova</footer>

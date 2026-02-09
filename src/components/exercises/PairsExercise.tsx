@@ -13,6 +13,7 @@ import { guestPendingResultService } from "../../services/guestPendingResultServ
 import { useAuth } from "../../features/auth/AuthContext";
 import { calculateXp, formatXp } from "../../domain/xp";
 import { useIsMobile } from "../../hooks/useIsMobile";
+import { useGameOnlyLayout } from "../../contexts/GameOnlyLayoutContext";
 
 /** Результат по слову за всю игру: одна запись на слово, progressAfter считаем при показе модалки */
 type SessionWordEntry = {
@@ -48,6 +49,9 @@ const PAIRS_PER_STAGE = 5;
 
 const PairsExercise: React.FC = () => {
   const { user, refresh: refreshUser } = useAuth();
+  const isMobile = useIsMobile();
+  const isGameOnly = useGameOnlyLayout();
+  const isCompact = isMobile || isGameOnly;
   const { words: dictionaryWords, loading: wordsLoading } = useDictionary();
   const navigate = useNavigate();
   const dictionarySource: DictionarySource =
@@ -178,7 +182,7 @@ const PairsExercise: React.FC = () => {
       }
 
       const englishWord = selected.type === "en" ? selected.label : card.label;
-      speakWord(englishWord, wordData?.accent || "both");
+      speakWord(englishWord, wordData?.accent || "both", undefined);
 
       setStatus("Отлично! Ты нашёл правильную пару.");
       setSelectedIndex(null);
@@ -306,7 +310,6 @@ const PairsExercise: React.FC = () => {
       ? personalDictionaryService.getPersonalWordsFromPool(dictionaryWords).length
       : personalDictionaryService.getPersonalWordIds().length;
   const showPersonalEmpty = dictionarySource === "personal" && personalWordsCount === 0;
-  const isMobile = useIsMobile();
 
   if (wordsLoading) {
     return (
@@ -318,7 +321,7 @@ const PairsExercise: React.FC = () => {
 
   return (
     <div className="exercise-area">
-      {!isMobile && (
+      {!isCompact && (
         <div className="game-dictionary-source">
           <span className="game-dictionary-source-label">Слова из:</span>
           <div className="game-dictionary-source-btns">
@@ -352,7 +355,7 @@ const PairsExercise: React.FC = () => {
         </div>
       ) : (
         <>
-      {isMobile ? (
+      {isCompact ? (
         <div className="pairs-stages-dots" role="progressbar" aria-valuenow={stage} aria-valuemin={1} aria-valuemax={PAIRS_STAGES_TOTAL} aria-label={`Этап ${stage} из ${PAIRS_STAGES_TOTAL}`}>
           {Array.from({ length: PAIRS_STAGES_TOTAL }, (_, i) => i + 1).map((s) => (
             <span
@@ -388,7 +391,7 @@ const PairsExercise: React.FC = () => {
         </div>
       )}
 
-      <div className={`pairs-exercise ${isMobile ? "pairs-exercise--mobile" : ""}`} id="pairs-exercise">
+      <div className={`pairs-exercise ${isCompact ? "pairs-exercise--mobile" : ""}`} id="pairs-exercise">
         <div className="cards-pairs-wrapper" id="cards-grid">
           <div className="cards-column" id="cards-column-english">
           {cards

@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import Header from "../components/common/Header";
+import { useIsMobile } from "../hooks/useIsMobile";
 import { useAuth } from "../features/auth/AuthContext";
 import {
   getAvailableVoices,
@@ -85,6 +86,7 @@ function getDisplayName(user: { displayName?: string; username: string } | null)
 }
 
 const ProfilePage: React.FC = () => {
+  const isMobile = useIsMobile();
   const { user, refresh, logout } = useAuth();
   const [voiceUri, setVoiceUri] = useState<string>(VOICE_DEFAULT);
   const [voiceOptions, setVoiceOptions] = useState<{ voiceURI: string; name: string }[]>([]);
@@ -119,9 +121,12 @@ const ProfilePage: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    if (user) {
-      const stored = localStorage.getItem(VOICE_STORAGE_KEY_PREFIX + user.username);
-      setVoiceUri(stored ?? VOICE_DEFAULT);
+    // Загружаем выбранный голос для текущего пользователя или гостя
+    const username = user?.username || "guest";
+    const stored = localStorage.getItem(VOICE_STORAGE_KEY_PREFIX + username);
+    setVoiceUri(stored ?? VOICE_DEFAULT);
+    if (stored) {
+      setPreferredVoiceUri(stored);
     }
   }, [user?.username]);
 
@@ -134,12 +139,15 @@ const ProfilePage: React.FC = () => {
   const handleVoiceChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const value = e.target.value;
     setVoiceUri(value);
-    if (!user) return;
+    
+    // Сохраняем для текущего пользователя или гостя
+    const username = user?.username || "guest";
+    
     if (value === VOICE_DEFAULT) {
-      localStorage.removeItem(VOICE_STORAGE_KEY_PREFIX + user.username);
+      localStorage.removeItem(VOICE_STORAGE_KEY_PREFIX + username);
       setPreferredVoiceUri(null);
     } else {
-      localStorage.setItem(VOICE_STORAGE_KEY_PREFIX + user.username, value);
+      localStorage.setItem(VOICE_STORAGE_KEY_PREFIX + username, value);
       setPreferredVoiceUri(value);
     }
   };
@@ -190,7 +198,8 @@ const ProfilePage: React.FC = () => {
     <div className="app-shell">
       <Header />
       <main className="main main--top">
-        <div className="profile-card">
+        <div className={isMobile ? undefined : "page-card"}>
+          <div className="profile-card">
           {/* Герой: аватар + имя + уровень + серия */}
           <header className="profile-card__hero">
             <div className="profile-card__avatar" aria-hidden>
@@ -475,6 +484,7 @@ const ProfilePage: React.FC = () => {
               Выйти из аккаунта
             </button>
           </footer>
+          </div>
         </div>
       </main>
       <footer className="footer">STroova</footer>

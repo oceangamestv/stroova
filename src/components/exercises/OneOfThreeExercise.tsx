@@ -12,6 +12,7 @@ import { guestPendingResultService } from "../../services/guestPendingResultServ
 import { useAuth } from "../../features/auth/AuthContext";
 import { calculateXp, formatXp } from "../../domain/xp";
 import { useIsMobile } from "../../hooks/useIsMobile";
+import { useGameOnlyLayout } from "../../contexts/GameOnlyLayoutContext";
 
 const ONE_OF_THREE_TIMER_INITIAL_SEC = 60;
 
@@ -102,6 +103,8 @@ const OneOfThreeExercise: React.FC = () => {
   const { words: dictionaryWords, loading: wordsLoading } = useDictionary();
   const navigate = useNavigate();
   const isMobile = useIsMobile();
+  const isGameOnly = useGameOnlyLayout();
+  const isCompact = isMobile || isGameOnly;
   const dictionarySource: DictionarySource =
     user?.gameSettings?.dictionarySource ?? (user ? "personal" : "general");
 
@@ -229,7 +232,7 @@ const OneOfThreeExercise: React.FC = () => {
         { word: currentWord, progressBefore, progressAfter, hadError: false },
       ]);
       setTimeLeft((prev) => Math.max(0, prev + 1));
-      speakWord(currentWord.en, currentWord.accent || "both");
+      speakWord(currentWord.en, currentWord.accent || "both", undefined);
       setStatus("Верно! Следующее слово…");
       const nextWord = pickNextWord();
       setTimeout(() => {
@@ -321,7 +324,7 @@ const OneOfThreeExercise: React.FC = () => {
 
   return (
     <div className="exercise-area">
-      {!isMobile && (
+      {!isCompact && (
         <div className="game-dictionary-source">
           <span className="game-dictionary-source-label">Слова из:</span>
           <div className="game-dictionary-source-btns">
@@ -355,7 +358,7 @@ const OneOfThreeExercise: React.FC = () => {
         </div>
       ) : (
         <>
-      {isMobile ? (
+      {isCompact ? (
         <div className="puzzle-mobile-status">
           <div className="puzzle-mobile-status-row">
             <span>{`Слов: ${sessionWords.length}`}</span>
@@ -402,7 +405,7 @@ const OneOfThreeExercise: React.FC = () => {
         </div>
       )}
 
-          <div className={`danetka-exercise ${isMobile ? "danetka-exercise--mobile" : ""}`} id="one-of-three-exercise">
+          <div className={`danetka-exercise ${isCompact ? "danetka-exercise--mobile" : ""}`} id="one-of-three-exercise">
             {currentWord && (
               <>
                 <p className="danetka-word" aria-label={`Слово: ${currentWord.en}`}>

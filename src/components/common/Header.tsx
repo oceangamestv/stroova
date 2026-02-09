@@ -1,7 +1,8 @@
 import React, { useEffect } from "react";
-import { NavLink, Link, useLocation } from "react-router-dom";
+import { NavLink, useLocation } from "react-router-dom";
 import { useAuth } from "../../features/auth/AuthContext";
 import { setPreferredVoiceUri, VOICE_STORAGE_KEY_PREFIX } from "../../utils/sounds";
+import { useIsMobile } from "../../hooks/useIsMobile";
 
 /** Конфиг навигации: легко добавлять новые разделы (например, "Уроки") */
 const NAV_GROUPS: { id: string; label?: string; items: { to: string; label: string; shortLabel?: string; isGame?: boolean }[] }[] = [
@@ -10,6 +11,7 @@ const NAV_GROUPS: { id: string; label?: string; items: { to: string; label: stri
     items: [
       { to: "/dictionary", label: "Словарь" },
       { to: "/rating", label: "Рейтинг" },
+      { to: "/about", label: "О проекте" },
     ],
   },
   {
@@ -61,6 +63,14 @@ const NavIcons = {
   ),
 };
 
+/** Пункты сайдбара на десктопе: иконка + подпись, включая кнопку «Игры» */
+const SIDEBAR_ITEMS: { to: string; label: string; iconKey: keyof typeof NavIcons }[] = [
+  { to: "/", label: "Игры", iconKey: "games" },
+  { to: "/dictionary", label: "Словарь", iconKey: "dictionary" },
+  { to: "/rating", label: "Рейтинг", iconKey: "rating" },
+  { to: "/about", label: "О проекте", iconKey: "about" },
+];
+
 /** Иконки для сегментов игр в полусфере (компактные) */
 const GameSegmentIcons = [
   /* Пара — две карты */
@@ -76,6 +86,7 @@ const GameSegmentIcons = [
 const Header: React.FC = () => {
   const { user } = useAuth();
   const location = useLocation();
+  const isMobile = useIsMobile();
 
   useEffect(() => {
     if (user) {
@@ -88,37 +99,66 @@ const Header: React.FC = () => {
 
   const streakDays = user?.activeDays?.streakDays ?? 0;
 
+  /** На десктопе — сайдбар с кнопкой «Игры» и иконками; на мобильном — все группы в верхней шапке */
+  const navGroups = isMobile ? NAV_GROUPS : NAV_GROUPS.filter((g) => g.id !== "games");
+  const gamePaths = ["/pairs", "/puzzle", "/danetka", "/one-of-three"];
+
   return (
     <>
-      <header className="site-header" role="banner">
+      <header className={`site-header ${!isMobile ? "site-header--sidebar" : ""}`} role="banner">
         <div className="site-header__inner">
           <NavLink to="/" className="site-header__logo" aria-label="На главную">
-            <span className="site-header__logo-icon" aria-hidden>🟢</span>
+            <img src="/logo.png" alt="" className="site-header__logo-icon" width={40} height={40} />
             <span className="site-header__logo-text">STroova</span>
           </NavLink>
 
           <nav className="site-header__nav" aria-label="Основная навигация">
-            {NAV_GROUPS.map((group) => (
-              <div key={group.id} className="site-header__nav-group">
-                {group.label && (
-                  <span className="site-header__nav-group-label">{group.label}</span>
-                )}
-                <ul className="site-header__nav-list" role="list">
-                  {group.items.map((item) => (
+            {!isMobile ? (
+              <ul className="site-header__nav-list site-header__nav-list--sidebar" role="list">
+                {SIDEBAR_ITEMS.map((item) => {
+                  const isGamesActive =
+                    item.to === "/" &&
+                    (location.pathname === "/" || gamePaths.includes(location.pathname));
+                  return (
                     <li key={item.to}>
                       <NavLink
                         to={item.to}
                         className={({ isActive }) =>
-                          `site-header__link ${item.isGame ? "site-header__link--game" : ""} ${isActive ? "site-header__link--active" : ""}`
+                          `site-header__link site-header__link--sidebar ${item.to === "/" ? "site-header__link--game" : ""} ${isActive || isGamesActive ? "site-header__link--active" : ""}`
                         }
                       >
-                        {item.label}
+                        <span className="site-header__sidebar-link-icon">{NavIcons[item.iconKey]}</span>
+                        <span className="site-header__sidebar-link-text">{item.label}</span>
                       </NavLink>
                     </li>
-                  ))}
-                </ul>
-              </div>
-            ))}
+                  );
+                })}
+              </ul>
+            ) : (
+              <>
+                {navGroups.map((group) => (
+                  <div key={group.id} className="site-header__nav-group">
+                    {group.label && (
+                      <span className="site-header__nav-group-label">{group.label}</span>
+                    )}
+                    <ul className="site-header__nav-list" role="list">
+                      {group.items.map((item) => (
+                        <li key={item.to}>
+                          <NavLink
+                            to={item.to}
+                            className={({ isActive }) =>
+                              `site-header__link ${item.isGame ? "site-header__link--game" : ""} ${isActive ? "site-header__link--active" : ""}`
+                            }
+                          >
+                            {item.label}
+                          </NavLink>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ))}
+              </>
+            )}
           </nav>
 
           <div className="site-header__user">
@@ -169,8 +209,11 @@ const Header: React.FC = () => {
         <div className="site-header__bottom-center">
           <NavLink
             to="/"
-            className={({ isActive }) =>
-              `site-header__bottom-games-btn ${isActive ? "site-header__bottom-games-btn--active" : ""}`}
+            className={({ isActive }) => {
+              const gamePaths = ["/pairs", "/puzzle", "/danetka", "/one-of-three"];
+              const isGamesSection = isActive || gamePaths.some((p) => location.pathname === p);
+              return `site-header__bottom-games-btn ${isGamesSection ? "site-header__bottom-games-btn--active" : ""}`;
+            }}
             aria-label="Игры"
           >
             <span className="site-header__bottom-games-btn-icon">{NavIcons.games}</span>

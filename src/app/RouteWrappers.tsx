@@ -1,7 +1,5 @@
 import React, { useState, useEffect } from "react";
 import { useLocation } from "react-router-dom";
-import { useIsMobile } from "../hooks/useIsMobile";
-import ExercisesPage from "../pages/ExercisesPage";
 import GameHubPage from "../pages/GameHubPage";
 import GameOnlyLayout from "../components/layout/GameOnlyLayout";
 import GameIntroScreen from "../components/game-intro/GameIntroScreen";
@@ -12,20 +10,17 @@ import DanetkaExercise from "../components/exercises/DanetkaExercise";
 import OneOfThreeExercise from "../components/exercises/OneOfThreeExercise";
 
 /**
- * Главная: на мобильном — гейм-хаб, на десктопе — текущая главная (игра «Пара»).
+ * Главная: и на мобильном, и на десктопе — гейм-хаб (одинаковый сценарий и стиль).
  */
 export const HomeOrHub: React.FC = () => {
-  const isMobile = useIsMobile();
-  if (isMobile) return <GameHubPage />;
-  return <ExercisesPage />;
+  return <GameHubPage />;
 };
 
 /**
- * Маршруты игр: на мобильном — сначала экран с описанием и настройками, затем игра в GameOnlyLayout.
+ * Маршруты игр: сначала экран с описанием и настройками, затем игра в минимальном layout (мобильный и десктоп).
  */
 export const GameRoute: React.FC = () => {
   const { pathname } = useLocation();
-  const isMobile = useIsMobile();
   const [showIntro, setShowIntro] = useState(true);
 
   const exercise: GameSlug =
@@ -41,32 +36,30 @@ export const GameRoute: React.FC = () => {
     setShowIntro(true);
   }, [pathname]);
 
-  if (isMobile) {
-    if (showIntro) {
-      return (
-        <GameOnlyLayout backIconOnly={false}>
-          <section className="lesson-card game-intro-card">
-            <GameIntroScreen gameSlug={exercise} onStart={() => setShowIntro(false)} />
-          </section>
-        </GameOnlyLayout>
-      );
-    }
-    const content =
-      exercise === "puzzle" ? (
-        <PuzzleExercise />
-      ) : exercise === "danetka" ? (
-        <DanetkaExercise />
-      ) : exercise === "one-of-three" ? (
-        <OneOfThreeExercise />
-      ) : (
-        <PairsExercise />
-      );
+  if (showIntro) {
     return (
-      <GameOnlyLayout backIconOnly={exercise === "pairs"}>
-        <section className="lesson-card">{content}</section>
+      <GameOnlyLayout backIconOnly={false}>
+        <section className="lesson-card game-intro-card">
+          <GameIntroScreen gameSlug={exercise} onStart={() => setShowIntro(false)} />
+        </section>
       </GameOnlyLayout>
     );
   }
 
-  return <ExercisesPage />;
+  const content =
+    exercise === "puzzle" ? (
+      <PuzzleExercise />
+    ) : exercise === "danetka" ? (
+      <DanetkaExercise />
+    ) : exercise === "one-of-three" ? (
+      <OneOfThreeExercise />
+    ) : (
+      <PairsExercise />
+    );
+
+  return (
+    <GameOnlyLayout backIconOnly={exercise === "pairs"}>
+      <section className="lesson-card">{content}</section>
+    </GameOnlyLayout>
+  );
 };

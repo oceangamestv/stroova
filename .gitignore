@@ -26,3 +26,6 @@ android/capacitor/build/
 # Логи и кэш
 *.log
 .cache/
+
+# Озвучка словаря (Bella/Michael) — не в репо, загружается на сервер по FTP/SCP
+public/audio/

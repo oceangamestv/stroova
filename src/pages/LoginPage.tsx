@@ -60,7 +60,7 @@ const LoginPage: React.FC = () => {
       <div className="auth-card">
         <div className="auth-header">
           <div className="logo">
-            <span className="logo-icon">🟢</span>
+            <img src="/logo.png" alt="" className="logo-icon" width={40} height={40} />
             <span className="logo-text">STroova</span>
           </div>
           <h1 className="auth-title">{mode === "login" ? "Вход" : "Регистрация"}</h1>

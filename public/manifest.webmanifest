@@ -8,5 +8,9 @@
   "theme_color": "#ffc107",
   "orientation": "portrait-primary",
   "scope": "/",
-  "lang": "ru"
+  "lang": "ru",
+  "icons": [
+    { "src": "/logo.png", "sizes": "any", "type": "image/png", "purpose": "any" },
+    { "src": "/logo.png", "sizes": "any", "type": "image/png", "purpose": "maskable" }
+  ]
 }

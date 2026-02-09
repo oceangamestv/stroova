@@ -224,8 +224,9 @@ const DictionaryPage: React.FC = () => {
         </div>
       )}
       <main className="main">
-        <section className={sectionClassName}>
-          <div className="dictionary-header">
+        <div className={isMobile ? undefined : "page-card"}>
+          <section className={sectionClassName}>
+            <div className="dictionary-header">
             {!isMobile && (
               <div className="dictionary-tabs">
                 <button
@@ -583,6 +584,7 @@ const DictionaryPage: React.FC = () => {
             </div>
           )}
         </section>
+        </div>
       </main>
       {isMobile && (
         <div className="dictionary-tabs-bar" role="tablist" aria-label="Выбор словаря">

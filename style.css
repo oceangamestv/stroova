@@ -138,6 +138,223 @@ body::after {
   transition: background-color var(--transition-theme);
 }
 
+/* Десктоп: меню слева (фиксированный сайдбар), рабочая область справа */
+@media (min-width: 1101px) {
+  .app-shell {
+    margin: 0 0 0 284px;
+    max-width: none;
+    width: calc(100vw - 284px);
+    box-sizing: border-box;
+    padding-left: 24px;
+    padding-right: 24px;
+    padding-bottom: 24px;
+    padding-top: 24px;
+    min-width: 0;
+  }
+
+  .app-shell .main {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .site-header--sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 260px;
+    height: 100vh;
+    min-height: 100%;
+    margin: 0;
+    z-index: 100;
+    border-radius: 0;
+    border-right: 2px solid var(--border-subtle);
+    border-bottom: none;
+    background: var(--card);
+    transition: background-color var(--transition-theme);
+  }
+
+  .site-header--sidebar .site-header__inner {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-start;
+    gap: 24px;
+    min-height: 100%;
+    height: 100%;
+    border-radius: 0;
+    border: none;
+    border-right: none;
+    box-shadow: none;
+    padding: 20px 16px;
+    background: transparent;
+  }
+
+  [data-theme="dark"] .site-header--sidebar {
+    border-right-color: var(--border-strong);
+  }
+
+  .site-header--sidebar .site-header__logo {
+    flex-shrink: 0;
+  }
+
+  .site-header--sidebar .site-header__nav {
+    flex: 1;
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-start;
+    gap: 8px;
+  }
+
+  .site-header--sidebar .site-header__nav-group {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 6px;
+  }
+
+  .site-header--sidebar .site-header__nav-group-label {
+    padding-right: 0;
+    padding-bottom: 4px;
+  }
+
+  .site-header--sidebar .site-header__nav-list,
+  .site-header--sidebar .site-header__nav-list--sidebar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .site-header--sidebar .site-header__link {
+    justify-content: flex-start;
+    padding: 12px 14px;
+  }
+
+  /* Сайдбар: крупные кнопки с иконками, обводка и выделение */
+  .site-header--sidebar .site-header__link--sidebar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 16px;
+    font-size: 0.9375rem;
+    font-weight: 700;
+    border: 2px solid var(--border-subtle);
+    border-radius: 12px;
+    background: var(--bg-elevated);
+    min-height: 52px;
+    transition: background-color var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast);
+  }
+
+  .site-header--sidebar .site-header__link--sidebar:hover {
+    background: var(--accent-soft);
+    border-color: var(--accent);
+    box-shadow: 0 2px 8px rgba(255, 193, 7, 0.2);
+  }
+
+  .site-header--sidebar .site-header__link--sidebar.site-header__link--active {
+    background: var(--accent);
+    color: #000;
+    border-color: rgba(0, 0, 0, 0.2);
+    box-shadow: 0 3px 12px rgba(255, 193, 7, 0.4);
+  }
+
+  .site-header--sidebar .site-header__link--sidebar.site-header__link--game.site-header__link--active {
+    background: var(--accent-secondary);
+    color: #fff;
+    border-color: rgba(33, 150, 243, 0.4);
+    box-shadow: 0 3px 12px rgba(33, 150, 243, 0.4);
+  }
+
+  .site-header--sidebar .site-header__link--sidebar.site-header__link--game:hover {
+    background: rgba(33, 150, 243, 0.2);
+    border-color: var(--accent-secondary);
+  }
+
+  .site-header--sidebar .site-header__sidebar-link-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    flex-shrink: 0;
+  }
+
+  .site-header--sidebar .site-header__sidebar-link-icon svg {
+    width: 24px;
+    height: 24px;
+  }
+
+  .site-header--sidebar .site-header__sidebar-link-text {
+    flex: 1;
+    text-align: left;
+  }
+
+  [data-theme="dark"] .site-header--sidebar .site-header__link--sidebar {
+    border-color: var(--border-strong);
+    background: var(--card-soft);
+  }
+
+  [data-theme="dark"] .site-header--sidebar .site-header__link--sidebar:hover {
+    border-color: var(--accent);
+  }
+
+  .site-header--sidebar .site-header__user {
+    flex-direction: column;
+    align-items: stretch;
+    margin-top: auto;
+    padding-top: 16px;
+    border-top: 1px solid var(--border-subtle);
+  }
+
+  [data-theme="dark"] .site-header--sidebar .site-header__user {
+    border-top-color: var(--border-strong);
+  }
+
+  .site-header--sidebar .site-header__streak,
+  .site-header--sidebar .site-header__profile {
+    width: 100%;
+    justify-content: center;
+    padding: 12px 16px;
+    min-height: 48px;
+    border: 2px solid var(--border-subtle);
+    border-radius: 12px;
+    font-size: 0.875rem;
+  }
+
+  .site-header--sidebar .site-header__streak {
+    background: var(--bg-elevated);
+  }
+
+  .site-header--sidebar .site-header__profile {
+    background: var(--bg-elevated);
+  }
+
+  .site-header--sidebar .site-header__profile:hover {
+    border-color: var(--accent);
+    background: var(--accent-soft);
+  }
+
+  [data-theme="dark"] .site-header--sidebar .site-header__streak,
+  [data-theme="dark"] .site-header--sidebar .site-header__profile {
+    border-color: var(--border-strong);
+    background: var(--card-soft);
+  }
+}
+
+/* Десктоп 1101–1500px: контент по центру, масштабируется по доступной ширине */
+@media (min-width: 1101px) and (max-width: 1500px) {
+  .main {
+    max-width: 960px;
+    width: 100%;
+    min-width: 0;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .page-card {
+    max-width: 100%;
+  }
+}
+
 .top-bar {
   display: flex;
   align-items: center;
@@ -164,9 +381,13 @@ body::after {
   --header-radius: 14px;
   --header-padding-x: 20px;
   --header-padding-y: 12px;
+  z-index: 100;
+}
+
+/* Верхняя шапка в потоке только когда это НЕ десктопный сайдбар */
+.site-header:not(.site-header--sidebar) {
   margin-bottom: 24px;
   position: relative;
-  z-index: 100;
 }
 
 .site-header__inner {
@@ -204,22 +425,17 @@ body::after {
 }
 
 .site-header__logo-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+  display: block;
   width: 40px;
   height: 40px;
   border-radius: 10px;
-  background: linear-gradient(145deg, var(--accent), var(--accent-strong));
-  color: #000;
-  font-size: 20px;
-  box-shadow: 0 2px 8px rgba(255, 193, 7, 0.35);
-  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+  object-fit: contain;
+  flex-shrink: 0;
+  transition: transform var(--transition-fast);
 }
 
 .site-header__logo:hover .site-header__logo-icon {
   transform: scale(1.05);
-  box-shadow: 0 4px 12px rgba(255, 193, 7, 0.4);
 }
 
 .site-header__logo-text {
@@ -361,12 +577,12 @@ body::after {
   color: #000;
 }
 
-/* Нижняя навигация (только на мобильных) */
+/* Нижняя навигация только на мобильных */
 .site-header__bottom-nav {
   display: none;
 }
 
-@media (max-width: 768px) {
+@media (max-width: 1100px) {
   /* В мобильной версии верхняя шапка (логотип, навигация) не показывается */
   .site-header {
     display: none;
@@ -672,7 +888,6 @@ body::after {
   .site-header__logo-icon {
     width: 36px;
     height: 36px;
-    font-size: 18px;
   }
 
   .site-header__bottom-link {
@@ -774,18 +989,12 @@ body::after {
 }
 
 .logo-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+  display: block;
   width: 40px;
   height: 40px;
-  border-radius: 0;
-  background: #ffc107;
-  border: 2px solid #000000;
-  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.2);
-  font-size: 20px;
-  font-weight: 900;
-  color: #000000;
+  border-radius: 10px;
+  object-fit: contain;
+  flex-shrink: 0;
 }
 
 .logo-text {
@@ -1158,6 +1367,91 @@ body::after {
   opacity: 0.15;
 }
 
+/* --- Общая карточка страницы для десктопа (словарь, рейтинг, о проекте, профиль) — в духе раздела Игры --- */
+.page-card {
+  width: 100%;
+  max-width: 960px;
+  margin-left: auto;
+  margin-right: auto;
+  padding: 0;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+}
+
+@media (min-width: 1101px) {
+  .page-card {
+    padding: 32px;
+    background: var(--card);
+    border: 4px solid var(--border-strong);
+    box-shadow: 0 4px 0 rgba(0, 0, 0, 0.2);
+    border-radius: 0;
+    position: relative;
+    transition: background-color var(--transition-theme), border-color var(--transition-theme), box-shadow var(--transition-theme);
+  }
+
+  .page-card::before {
+    content: "";
+    position: absolute;
+    top: -4px;
+    left: -4px;
+    right: -4px;
+    bottom: -4px;
+    background: linear-gradient(135deg, #ffc107, #2196f3);
+    z-index: -1;
+    opacity: 0.1;
+    transition: opacity var(--transition-theme);
+  }
+
+  [data-theme="dark"] .page-card {
+    box-shadow: 0 4px 0 rgba(0, 0, 0, 0.5), 0 0 20px rgba(255, 193, 7, 0.2);
+  }
+
+  [data-theme="dark"] .page-card::before {
+    opacity: 0.15;
+  }
+
+  .page-card .profile-card {
+    max-width: 100%;
+    box-shadow: none;
+  }
+
+  .page-card .profile-card::before {
+    display: none;
+  }
+
+  .page-card__header {
+    margin-bottom: 24px;
+  }
+
+  .page-card__title {
+    margin: 0 0 8px;
+    font-size: clamp(1.4rem, 3vw, 1.75rem);
+    font-weight: 800;
+    color: var(--text);
+    letter-spacing: -0.02em;
+    transition: color var(--transition-theme);
+  }
+
+  .page-card__subtitle {
+    margin: 0;
+    font-size: 0.95rem;
+    color: var(--text-soft);
+    transition: color var(--transition-theme);
+  }
+
+  .page-card .lesson-card {
+    max-width: 100%;
+    border: none;
+    box-shadow: none;
+    padding: 0;
+  }
+
+  .page-card .lesson-card::before {
+    display: none;
+  }
+}
+
 /* --- Game-only layout (mobile: без шапки и нижнего меню) --- */
 .app-shell--game-only {
   padding-bottom: 0;
@@ -1242,6 +1536,24 @@ body::after {
   height: 24px;
 }
 
+/* Десктоп: игровой layout с тем же сценарием, что и на мобильном */
+@media (min-width: 901px) {
+  .app-shell--game-only .game-only-header {
+    padding: 16px 24px;
+  }
+  .app-shell--game-only .game-only-header__back:not(.game-only-header__back--icon-only) {
+    padding: 10px 16px;
+    font-size: 1rem;
+  }
+  .app-shell--game-only .game-only-main {
+    padding: 32px 24px;
+  }
+  .app-shell--game-only .lesson-card {
+    width: 100%;
+    max-width: 720px;
+  }
+}
+
 /* --- Экран перед игрой (описание, правила, настройки) --- */
 .game-intro-card {
   max-width: 520px;
@@ -1250,33 +1562,45 @@ body::after {
 .game-intro {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 0;
+}
+
+/* Блок заголовка: название и краткое описание */
+.game-intro__header {
+  margin: 0 0 24px;
+  padding: 0 0 20px;
+  border-bottom: 2px solid var(--border-subtle);
+  transition: border-color var(--transition-theme);
 }
 
 .game-intro__title {
-  margin: 0;
+  margin: 0 0 8px;
   font-size: 1.5rem;
   font-weight: 800;
   color: var(--text);
   transition: color var(--transition-theme);
+  line-height: 1.25;
 }
 
 .game-intro__description {
   margin: 0;
   font-size: 1rem;
-  line-height: 1.4;
+  line-height: 1.5;
   color: var(--text-soft);
   transition: color var(--transition-theme);
 }
 
-.game-intro__rules,
-.game-intro__settings {
+/* Блок правил: визуально отделён */
+.game-intro__rules {
+  margin: 0 0 24px;
+  padding: 0 0 20px;
+  border-bottom: 2px solid var(--border-subtle);
   text-align: left;
+  transition: border-color var(--transition-theme);
 }
 
-.game-intro__rules-title,
-.game-intro__settings-title {
-  margin: 0 0 8px;
+.game-intro__rules-title {
+  margin: 0 0 12px;
   font-size: 0.95rem;
   font-weight: 700;
   color: var(--text);
@@ -1287,13 +1611,31 @@ body::after {
   margin: 0 0 0 1.2em;
   padding: 0;
   font-size: 0.9rem;
-  line-height: 1.5;
+  line-height: 1.6;
   color: var(--text-soft);
   transition: color var(--transition-theme);
 }
 
-.game-intro__rules-list li {
-  margin-bottom: 4px;
+.game-intro__rules-item {
+  margin-bottom: 10px;
+}
+
+.game-intro__rules-item:last-child {
+  margin-bottom: 0;
+}
+
+/* Блок настроек */
+.game-intro__settings {
+  margin: 0 0 24px;
+  text-align: left;
+}
+
+.game-intro__settings-title {
+  margin: 0 0 12px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--text);
+  transition: color var(--transition-theme);
 }
 
 .game-intro__setting {
@@ -1320,13 +1662,35 @@ body::after {
 }
 
 /* На мобильном кнопки настроек на всю ширину, без пустого пространства справа */
-@media (max-width: 768px) {
+@media (max-width: 1100px) {
   .game-intro .game-intro__setting {
     width: 100%;
   }
   .game-intro .game-dictionary-source-btns {
     width: 100%;
     display: flex;
+  }
+  .game-intro .game-dictionary-source-btn {
+    flex: 1;
+    min-width: 0;
+  }
+}
+
+/* Десктоп: корректное расположение кнопок настроек в интро (под подписью, без смещения влево) */
+@media (min-width: 1101px) {
+  .game-intro .game-intro__setting {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+  }
+  .game-intro .game-intro__setting-label {
+    margin-bottom: 0;
+  }
+  .game-intro .game-dictionary-source-btns {
+    display: flex;
+    justify-content: stretch;
+    width: 100%;
   }
   .game-intro .game-dictionary-source-btn {
     flex: 1;
@@ -1391,7 +1755,7 @@ body::after {
 }
 
 /* --- Поиск пары мобильный: крупные карточки и шрифт, в стиле lesson-card --- */
-@media (max-width: 768px) {
+@media (max-width: 1100px) {
   .pairs-exercise--mobile .cards-pairs-wrapper {
     gap: 20px;
   }
@@ -3941,7 +4305,7 @@ body::after {
   justify-content: center;
   align-items: center;
   gap: 4px;
-  min-height: auto;
+  min-height: 100px;
   padding: 24px 16px;
   line-height: 1.5;
 }
@@ -4286,7 +4650,7 @@ body::after {
 }
 
 /* Мобильная версия: скрыть визуально поле ввода, но оставить активным для клавиатуры */
-@media (max-width: 768px) {
+@media (max-width: 1100px) {
   .puzzle-hard-input-wrap--mobile {
     position: absolute;
     top: -9999px;
@@ -6458,7 +6822,7 @@ body::after {
 }
 
 /* Уменьшаем декоративные фоны на мобильных */
-@media (max-width: 768px) {
+@media (max-width: 1100px) {
   body::before {
     width: 320px;
     height: 320px;
@@ -6568,7 +6932,6 @@ body::after {
   .logo-icon {
     width: 36px;
     height: 36px;
-    font-size: 18px;
   }
 
   .main-nav {

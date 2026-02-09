@@ -4,6 +4,7 @@ import {
   getAvailableVoices,
   initializeVoices,
   setPreferredVoiceUri,
+  speakWord,
   VOICE_STORAGE_KEY_PREFIX,
 } from "../../utils/sounds";
 
@@ -25,6 +26,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
   const [voiceOptions, setVoiceOptions] = useState<{ voiceURI: string; name: string }[]>([]);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
+  const [isPlayingPreview, setIsPlayingPreview] = useState(false);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -38,10 +40,17 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
   }, [isOpen]);
 
   useEffect(() => {
-    if (isOpen && user) {
-      setNickname(getDisplayName(user));
-      const stored = localStorage.getItem(VOICE_STORAGE_KEY_PREFIX + user.username);
+    if (isOpen) {
+      if (user) {
+        setNickname(getDisplayName(user));
+      }
+      // Загружаем выбранный голос для текущего пользователя или гостя
+      const username = user?.username || "guest";
+      const stored = localStorage.getItem(VOICE_STORAGE_KEY_PREFIX + username);
       setVoiceUri(stored ?? VOICE_DEFAULT);
+      if (stored) {
+        setPreferredVoiceUri(stored);
+      }
       setError("");
       setSuccess(false);
     }
@@ -79,13 +88,28 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
   const handleVoiceChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const value = e.target.value;
     setVoiceUri(value);
-    if (!user) return;
+    
+    // Сохраняем для текущего пользователя или гостя
+    const username = user?.username || "guest";
+    
     if (value === VOICE_DEFAULT) {
-      localStorage.removeItem(VOICE_STORAGE_KEY_PREFIX + user.username);
+      localStorage.removeItem(VOICE_STORAGE_KEY_PREFIX + username);
       setPreferredVoiceUri(null);
     } else {
-      localStorage.setItem(VOICE_STORAGE_KEY_PREFIX + user.username, value);
+      localStorage.setItem(VOICE_STORAGE_KEY_PREFIX + username, value);
       setPreferredVoiceUri(value);
+    }
+  };
+
+  const handlePreviewVoice = async () => {
+    if (isPlayingPreview) return;
+    setIsPlayingPreview(true);
+    try {
+      await speakWord("Hello", "both");
+    } catch (error) {
+      console.error("Preview error:", error);
+    } finally {
+      setTimeout(() => setIsPlayingPreview(false), 1000);
     }
   };
 
@@ -121,19 +145,38 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
           </div>
           <div className="form-group">
             <label htmlFor="settings-voice">Голос озвучивания</label>
-            <select
-              id="settings-voice"
-              value={voiceUri}
-              onChange={handleVoiceChange}
-              className="settings-voice-select"
-            >
-              <option value={VOICE_DEFAULT}>По умолчанию (системный)</option>
-              {voiceOptions.map((v) => (
-                <option key={v.voiceURI} value={v.voiceURI}>
-                  {v.name}
-                </option>
-              ))}
-            </select>
+            <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+              <select
+                id="settings-voice"
+                value={voiceUri}
+                onChange={handleVoiceChange}
+                className="settings-voice-select"
+                style={{ flex: 1 }}
+              >
+                <option value={VOICE_DEFAULT}>По умолчанию (системный)</option>
+                {voiceOptions.map((v) => (
+                  <option key={v.voiceURI} value={v.voiceURI}>
+                    {v.name}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                onClick={handlePreviewVoice}
+                disabled={isPlayingPreview}
+                style={{
+                  padding: "8px 12px",
+                  background: isPlayingPreview ? "#ccc" : "#007bff",
+                  color: "white",
+                  border: "none",
+                  borderRadius: "4px",
+                  cursor: isPlayingPreview ? "not-allowed" : "pointer",
+                }}
+                title="Прослушать пример"
+              >
+                {isPlayingPreview ? "…" : "🔊"}
+              </button>
+            </div>
             <span className="form-hint">Используется при озвучке слов на всём сайте</span>
           </div>
           {error && <div className="form-error">{error}</div>}

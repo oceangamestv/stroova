@@ -1,5 +1,6 @@
 import React from "react";
 import Header from "../components/common/Header";
+import { useIsMobile } from "../hooks/useIsMobile";
 
 const TelegramIcon: React.FC<{ className?: string }> = ({ className }) => (
   <svg
@@ -28,11 +29,13 @@ const BoostyIcon: React.FC<{ className?: string }> = ({ className }) => (
 );
 
 const AboutPage: React.FC = () => {
+  const isMobile = useIsMobile();
   return (
     <div className="app-shell">
       <Header />
       <main className="main">
-        <section className="lesson-card">
+        <div className={isMobile ? undefined : "page-card"}>
+          <section className="lesson-card">
           <div style={{ 
             position: "relative",
             marginBottom: "0.5rem",
@@ -307,7 +310,8 @@ const AboutPage: React.FC = () => {
               </div>
             </div>
           </div>
-        </section>
+          </section>
+        </div>
       </main>
       <footer className="footer">STroova</footer>
     </div>
