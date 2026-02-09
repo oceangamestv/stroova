@@ -2,6 +2,7 @@
  * Словари из БД: получение слов по языку.
  */
 
+import crypto from "crypto";
 import { pool } from "./db.js";
 
 /**
@@ -69,4 +70,35 @@ export async function getWordIdsByLevel(langCode, level) {
     [languageId, level]
   );
   return res.rows.map((r) => r.id);
+}
+
+/**
+ * Получить версию словаря (хэш) для проверки изменений.
+ * Версия вычисляется как хэш от всех записей словаря для данного языка.
+ * @param {string} langCode — код языка (например 'en')
+ * @returns {Promise<string>} — версия словаря (хэш)
+ */
+export async function getDictionaryVersion(langCode) {
+  const langResult = await pool.query(
+    "SELECT id FROM languages WHERE code = $1",
+    [langCode]
+  );
+  if (langResult.rows.length === 0) return "";
+  const languageId = langResult.rows[0].id;
+  
+  // Получаем все записи словаря для вычисления хэша
+  const res = await pool.query(
+    `SELECT id, en, ru, accent, level,
+            frequency_rank, rarity, register,
+            ipa_uk, ipa_us, example, example_ru
+     FROM dictionary_entries
+     WHERE language_id = $1
+     ORDER BY id`,
+    [languageId]
+  );
+  
+  // Вычисляем хэш от всех записей
+  const dataString = JSON.stringify(res.rows);
+  const hash = crypto.createHash("sha256").update(dataString).digest("hex");
+  return hash.substring(0, 16); // Используем первые 16 символов для краткости
 }

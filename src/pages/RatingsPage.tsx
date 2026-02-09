@@ -17,14 +17,27 @@ const PERIOD_LABELS: Record<PeriodKey, string> = {
 function LeaderboardTable({
   data,
   currentUsername,
+  period,
 }: {
   data: LeaderboardPeriod;
   currentUsername: string | null;
+  period: PeriodKey;
 }) {
   const { items, currentUser } = data;
-  const showCurrentBelow = currentUser && currentUser.rank > 10;
+  // Не показываем currentUser, если у него XP = 0
+  const shouldShowCurrentUser = currentUser && currentUser.rank > 10 && currentUser.xp > 0;
+  const isEmpty = items.length === 0 && !shouldShowCurrentUser;
+  const showEmptyMessage = isEmpty && (period === "day" || period === "week");
 
   const cellLabels = { rank: "Место", name: "Участник", level: "Уровень", streak: "🔥", xp: "XP" };
+
+  if (showEmptyMessage) {
+    return (
+      <div className="rating-table-wrapper">
+        <p className="rating-empty-message">Пока тут нет чемпионов</p>
+      </div>
+    );
+  }
 
   return (
     <div className="rating-table-wrapper">
@@ -53,7 +66,7 @@ function LeaderboardTable({
               <td className="rating-col-xp" data-label={cellLabels.xp}>{formatXp(entry.xp)}</td>
             </tr>
           ))}
-          {showCurrentBelow && currentUser && (
+          {shouldShowCurrentUser && currentUser && (
             <tr className="rating-row rating-row--below-top rating-row--you">
               <td className="rating-col-rank" data-label={cellLabels.rank}>
                 <span className="rating-rank">{currentUser.rank}</span>
@@ -168,6 +181,7 @@ const RatingsPage: React.FC = () => {
               <LeaderboardTable
                 data={currentData!}
                 currentUsername={user?.username ?? null}
+                period={period}
               />
             </section>
           ) : null}

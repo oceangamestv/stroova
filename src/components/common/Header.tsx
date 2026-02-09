@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect } from "react";
 import { NavLink, Link, useLocation } from "react-router-dom";
 import { useAuth } from "../../features/auth/AuthContext";
 import { setPreferredVoiceUri, VOICE_STORAGE_KEY_PREFIX } from "../../utils/sounds";
@@ -19,6 +19,7 @@ const NAV_GROUPS: { id: string; label?: string; items: { to: string; label: stri
       { to: "/pairs", label: "Поиск пары", shortLabel: "Пара", isGame: true },
       { to: "/puzzle", label: "Puzzle Words", shortLabel: "Puzzle", isGame: true },
       { to: "/danetka", label: "Данетка", shortLabel: "Данетка", isGame: true },
+      { to: "/one-of-three", label: "1 из 3", shortLabel: "1 из 3", isGame: true },
     ],
   },
 ];
@@ -52,6 +53,12 @@ const NavIcons = {
       <path d="M8 7h8M8 11h6M8 15h4" />
     </svg>
   ),
+  about: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <circle cx="12" cy="12" r="10" />
+      <path d="M12 16v-4M12 8h.01" />
+    </svg>
+  ),
 };
 
 /** Иконки для сегментов игр в полусфере (компактные) */
@@ -62,26 +69,13 @@ const GameSegmentIcons = [
   <svg key="puzzle" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden><path d="M10 4H6a2 2 0 0 0-2 2v4h6V4zM14 4h4a2 2 0 0 1 2 2v4h-6V4zM4 14v4a2 2 0 0 0 2 2h4v-6H4zM14 14v6h4a2 2 0 0 0 2-2v-4h-6z" /></svg>,
   /* Данетка — вопросительный знак в круге */
   <svg key="danetka" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden><circle cx="12" cy="12" r="9" /><path d="M9.5 9.5a2.5 2.5 0 0 1 4 2.2c0 1.5-1.5 2.5-1.5 2.5M12 16h.01" /></svg>,
+  /* 1 из 3 — три точки */
+  <svg key="one-of-three" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden><circle cx="8" cy="12" r="2" /><circle cx="12" cy="12" r="2" /><circle cx="16" cy="12" r="2" /></svg>,
 ];
 
 const Header: React.FC = () => {
   const { user } = useAuth();
   const location = useLocation();
-  const [gamesMenuOpen, setGamesMenuOpen] = useState(false);
-  const gamesMenuRef = useRef<HTMLDivElement>(null);
-
-  const isGameActive = ["/pairs", "/puzzle", "/danetka"].includes(location.pathname);
-
-  useEffect(() => {
-    if (!gamesMenuOpen) return;
-    const close = (e: MouseEvent) => {
-      if (gamesMenuRef.current && !gamesMenuRef.current.contains(e.target as Node)) {
-        setGamesMenuOpen(false);
-      }
-    };
-    document.addEventListener("click", close, true);
-    return () => document.removeEventListener("click", close, true);
-  }, [gamesMenuOpen]);
 
   useEffect(() => {
     if (user) {
@@ -162,6 +156,30 @@ const Header: React.FC = () => {
             </span>
           </NavLink>
           <NavLink
+            to="/about"
+            className={({ isActive }) =>
+              `site-header__bottom-link ${isActive ? "site-header__bottom-link--active" : ""}`}
+            aria-label="О проекте"
+          >
+            <span className="site-header__bottom-link-icon">{NavIcons.about}</span>
+            <span className="site-header__bottom-link-text">О проекте</span>
+          </NavLink>
+        </div>
+
+        <div className="site-header__bottom-center">
+          <NavLink
+            to="/"
+            className={({ isActive }) =>
+              `site-header__bottom-games-btn ${isActive ? "site-header__bottom-games-btn--active" : ""}`}
+            aria-label="Игры"
+          >
+            <span className="site-header__bottom-games-btn-icon">{NavIcons.games}</span>
+            <span className="site-header__bottom-games-btn-text">Игры</span>
+          </NavLink>
+        </div>
+
+        <div className="site-header__bottom-right">
+          <NavLink
             to="/rating"
             className={({ isActive }) =>
               `site-header__bottom-link ${isActive ? "site-header__bottom-link--active" : ""}`}
@@ -170,42 +188,6 @@ const Header: React.FC = () => {
             <span className="site-header__bottom-link-icon">{NavIcons.rating}</span>
             <span className="site-header__bottom-link-text">Рейтинг</span>
           </NavLink>
-        </div>
-
-        <div className="site-header__bottom-center" ref={gamesMenuRef}>
-          <button
-            type="button"
-            className={`site-header__bottom-games-btn ${gamesMenuOpen || isGameActive ? "site-header__bottom-games-btn--active" : ""}`}
-            onClick={() => setGamesMenuOpen((o) => !o)}
-            aria-expanded={gamesMenuOpen}
-            aria-haspopup="true"
-            aria-label="Игры"
-          >
-            <span className="site-header__bottom-games-btn-icon">{NavIcons.games}</span>
-            <span className="site-header__bottom-games-btn-text">Игры</span>
-          </button>
-          <div
-            className={`site-header__games-panel ${gamesMenuOpen ? "site-header__games-panel--open" : ""}`}
-            role="menu"
-            aria-label="Выбор игры"
-            aria-hidden={!gamesMenuOpen}
-          >
-            {GAMES_ITEMS.map((item, i) => (
-              <Link
-                key={item.to}
-                to={item.to}
-                className="site-header__games-tile"
-                role="menuitem"
-                onClick={() => setGamesMenuOpen(false)}
-              >
-                <span className="site-header__games-tile-icon">{GameSegmentIcons[i]}</span>
-                <span className="site-header__games-tile-label">{item.shortLabel ?? item.label}</span>
-              </Link>
-            ))}
-          </div>
-        </div>
-
-        <div className="site-header__bottom-right">
           <NavLink
             to="/dictionary"
             className={({ isActive }) =>

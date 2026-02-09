@@ -56,6 +56,8 @@ export type UserGameSettings = {
   keepLearnedWordsInGames?: boolean;
   /** Из какого словаря брать слова в играх: общий или мой. */
   dictionarySource?: "general" | "personal";
+  /** Сложность в Puzzle Words: лёгкий (подсказки) или сложный. */
+  puzzleDifficulty?: "easy" | "hard";
 };
 
 /** Активные дни: серия дней подряд с выполнением хотя бы одного задания (по серверной дате). */

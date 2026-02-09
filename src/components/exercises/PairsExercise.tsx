@@ -12,6 +12,7 @@ import { authService } from "../../services/authService";
 import { guestPendingResultService } from "../../services/guestPendingResultService";
 import { useAuth } from "../../features/auth/AuthContext";
 import { calculateXp, formatXp } from "../../domain/xp";
+import { useIsMobile } from "../../hooks/useIsMobile";
 
 /** Результат по слову за всю игру: одна запись на слово, progressAfter считаем при показе модалки */
 type SessionWordEntry = {
@@ -300,6 +301,7 @@ const PairsExercise: React.FC = () => {
       ? personalDictionaryService.getPersonalWordsFromPool(dictionaryWords).length
       : personalDictionaryService.getPersonalWordIds().length;
   const showPersonalEmpty = dictionarySource === "personal" && personalWordsCount === 0;
+  const isMobile = useIsMobile();
 
   if (wordsLoading) {
     return (
@@ -311,25 +313,27 @@ const PairsExercise: React.FC = () => {
 
   return (
     <div className="exercise-area">
-      <div className="game-dictionary-source">
-        <span className="game-dictionary-source-label">Слова из:</span>
-        <div className="game-dictionary-source-btns">
-          <button
-            type="button"
-            className={`game-dictionary-source-btn ${dictionarySource === "general" ? "active" : ""}`}
-            onClick={() => setDictionarySource("general")}
-          >
-            Общий словарь
-          </button>
-          <button
-            type="button"
-            className={`game-dictionary-source-btn ${dictionarySource === "personal" ? "active" : ""}`}
-            onClick={() => setDictionarySource("personal")}
-          >
-            Мой словарь
-          </button>
+      {!isMobile && (
+        <div className="game-dictionary-source">
+          <span className="game-dictionary-source-label">Слова из:</span>
+          <div className="game-dictionary-source-btns">
+            <button
+              type="button"
+              className={`game-dictionary-source-btn ${dictionarySource === "general" ? "active" : ""}`}
+              onClick={() => setDictionarySource("general")}
+            >
+              Общий словарь
+            </button>
+            <button
+              type="button"
+              className={`game-dictionary-source-btn ${dictionarySource === "personal" ? "active" : ""}`}
+              onClick={() => setDictionarySource("personal")}
+            >
+              Мой словарь
+            </button>
+          </div>
         </div>
-      </div>
+      )}
       {showPersonalEmpty ? (
         <div className="game-empty-personal">
           <p>В «Мой словарь» пока нет слов.</p>
@@ -343,31 +347,43 @@ const PairsExercise: React.FC = () => {
         </div>
       ) : (
         <>
-      <div className="lesson-header">
-        <div>
-          <span className="lesson-label">Игра</span>
-          <h1 className="lesson-title">Поиск пары</h1>
+      {isMobile ? (
+        <div className="pairs-stages-dots" role="progressbar" aria-valuenow={stage} aria-valuemin={1} aria-valuemax={PAIRS_STAGES_TOTAL} aria-label={`Этап ${stage} из ${PAIRS_STAGES_TOTAL}`}>
+          {Array.from({ length: PAIRS_STAGES_TOTAL }, (_, i) => i + 1).map((s) => (
+            <span
+              key={s}
+              className={`pairs-stages-dot ${s < stage ? "pairs-stages-dot--done" : ""} ${s === stage ? "pairs-stages-dot--current" : ""}`}
+              aria-hidden
+            />
+          ))}
         </div>
-        <div className="progress">
-          <div className="progress-text">
-            <span>{`Этап ${stage} / ${PAIRS_STAGES_TOTAL}`}</span>
-            <span id="score-label">Опыт: {formatXp(sessionXp)}</span>
-            <span className="progress-stats">
-              <span className="stat-correct" aria-label="Правильные ответы">
-                ✓ {matchedCount}
-              </span>
-              <span className="stat-errors" id="errors-label" aria-label="Ошибки">
-                ✕ {totalErrors}
-              </span>
-            </span>
+      ) : (
+        <div className="lesson-header">
+          <div>
+            <span className="lesson-label">Игра</span>
+            <h1 className="lesson-title">Поиск пары</h1>
           </div>
-          <div className="progress-bar">
-            <div id="progress-fill" style={{ width: `${progressPercent}%` }} />
+          <div className="progress">
+            <div className="progress-text">
+              <span>{`Этап ${stage} / ${PAIRS_STAGES_TOTAL}`}</span>
+              <span id="score-label">Опыт: {formatXp(sessionXp)}</span>
+              <span className="progress-stats">
+                <span className="stat-correct" aria-label="Правильные ответы">
+                  ✓ {matchedCount}
+                </span>
+                <span className="stat-errors" id="errors-label" aria-label="Ошибки">
+                  ✕ {totalErrors}
+                </span>
+              </span>
+            </div>
+            <div className="progress-bar">
+              <div id="progress-fill" style={{ width: `${progressPercent}%` }} />
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
-      <div className="pairs-exercise" id="pairs-exercise">
+      <div className={`pairs-exercise ${isMobile ? "pairs-exercise--mobile" : ""}`} id="pairs-exercise">
         <div className="cards-pairs-wrapper" id="cards-grid">
           <div className="cards-column" id="cards-column-english">
           {cards
@@ -503,6 +519,12 @@ const PairsExercise: React.FC = () => {
                 }}
                 type="button"
               >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                  <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
+                  <path d="M21 3v5h-5" />
+                  <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" />
+                  <path d="M3 21v-5h5" />
+                </svg>
                 Играть снова
               </button>
               <button
@@ -510,6 +532,10 @@ const PairsExercise: React.FC = () => {
                 onClick={() => navigate("/")}
                 type="button"
               >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                  <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+                  <polyline points="9 22 9 12 15 12 15 22" />
+                </svg>
                 На главную
               </button>
             </footer>

@@ -13,7 +13,7 @@ import { useAuth } from "../../features/auth/AuthContext";
 import { calculateXp, formatXp } from "../../domain/xp";
 import { useIsMobile } from "../../hooks/useIsMobile";
 
-const DANETKA_TIMER_INITIAL_SEC = 60;
+const ONE_OF_THREE_TIMER_INITIAL_SEC = 60;
 
 type SessionWordEntry = {
   word: Word;
@@ -22,11 +22,7 @@ type SessionWordEntry = {
   hadError: boolean;
 };
 
-type QuestionData = {
-  word: Word;
-  shownTranslation: string;
-  isCorrectTranslation: boolean;
-};
+type Option = { ru: string; isCorrect: boolean };
 
 const AnimatedProgressBar: React.FC<{
   progressBefore: number;
@@ -50,37 +46,32 @@ const AnimatedProgressBar: React.FC<{
   );
 };
 
-function buildQuestion(word: Word, pool: Word[]): QuestionData {
-  const correctTranslation = word.ru;
-  const others = pool.filter((w) => w.id !== word.id && w.ru !== correctTranslation);
-  
-  // Случайно выбираем: показывать правильный перевод (50%) или неправильный (50%)
-  const showCorrect = Math.random() < 0.5;
-  
-  if (showCorrect) {
-    return {
-      word,
-      shownTranslation: correctTranslation,
-      isCorrectTranslation: true,
-    };
+function shuffle<T>(arr: T[]): T[] {
+  const out = [...arr];
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [out[i], out[j]] = [out[j], out[i]];
   }
-  
-  // Выбираем случайный неправильный перевод
-  if (others.length === 0) {
-    // Если нет других слов, показываем правильный
-    return {
-      word,
-      shownTranslation: correctTranslation,
-      isCorrectTranslation: true,
-    };
+  return out;
+}
+
+function buildOptions(correctWord: Word, pool: Word[]): Option[] {
+  const correctRu = correctWord.ru;
+  const others = pool.filter((w) => w.id !== correctWord.id && w.ru !== correctRu);
+  const wrongRu: string[] = [];
+  for (const w of others) {
+    if (wrongRu.length >= 2) break;
+    if (!wrongRu.includes(w.ru)) wrongRu.push(w.ru);
   }
-  
-  const randomOther = others[Math.floor(Math.random() * others.length)];
-  return {
-    word,
-    shownTranslation: randomOther.ru,
-    isCorrectTranslation: false,
-  };
+  while (wrongRu.length < 2 && others.length > 0) {
+    wrongRu.push(others[wrongRu.length % others.length].ru);
+    if (wrongRu.length >= 2) break;
+  }
+  const options: Option[] = [
+    { ru: correctRu, isCorrect: true },
+    ...wrongRu.slice(0, 2).map((ru) => ({ ru, isCorrect: false })),
+  ];
+  return shuffle(options);
 }
 
 const formatTimer = (seconds: number) => {
@@ -91,7 +82,7 @@ const formatTimer = (seconds: number) => {
 
 const progressType = "beginner" as const;
 
-const DanetkaExercise: React.FC = () => {
+const OneOfThreeExercise: React.FC = () => {
   const { user, refresh: refreshUser } = useAuth();
   const { words: dictionaryWords, loading: wordsLoading } = useDictionary();
   const navigate = useNavigate();
@@ -99,18 +90,20 @@ const DanetkaExercise: React.FC = () => {
   const dictionarySource: DictionarySource =
     user?.gameSettings?.dictionarySource ?? (user ? "personal" : "general");
 
-  const [currentQuestion, setCurrentQuestion] = useState<QuestionData | null>(null);
+  const [currentWord, setCurrentWord] = useState<Word | null>(null);
+  const [options, setOptions] = useState<Option[]>([]);
   const [sessionXp, setSessionXp] = useState(0);
   const [totalErrors, setTotalErrors] = useState(0);
-  const [status, setStatus] = useState("Правильный ли это перевод?");
+  const [status, setStatus] = useState("Выбери правильный перевод.");
   const [locked, setLocked] = useState(false);
   const [showNext, setShowNext] = useState(false);
   const [showResult, setShowResult] = useState(false);
   const [sessionWords, setSessionWords] = useState<SessionWordEntry[]>([]);
-  const [timeLeft, setTimeLeft] = useState(DANETKA_TIMER_INITIAL_SEC);
+  const [timeLeft, setTimeLeft] = useState(ONE_OF_THREE_TIMER_INITIAL_SEC);
   const [timerRunning, setTimerRunning] = useState(false);
   const [endedByTime, setEndedByTime] = useState(false);
-  const [userAnswer, setUserAnswer] = useState<boolean | null>(null);
+  const [correctIndex, setCorrectIndex] = useState<number | null>(null);
+  const [selectedWrongIndex, setSelectedWrongIndex] = useState<number | null>(null);
 
   const sessionXpRef = useRef(0);
   const sessionWordsRef = useRef<SessionWordEntry[]>([]);
@@ -143,12 +136,13 @@ const DanetkaExercise: React.FC = () => {
     if (poolWords.length === 0 || showResult) return;
     const word = pickNextWord();
     if (!word) return;
-    const question = buildQuestion(word, poolWords);
-    setCurrentQuestion(question);
+    setCurrentWord(word);
+    setOptions(buildOptions(word, poolWords));
     setLocked(false);
     setShowNext(false);
-    setUserAnswer(null);
-    setStatus("Правильный ли это перевод?");
+    setCorrectIndex(null);
+    setSelectedWrongIndex(null);
+    setStatus("Выбери правильный перевод.");
   }, [poolWords, showResult, pickNextWord]);
 
   const endGameByTime = useCallback(() => {
@@ -177,7 +171,7 @@ const DanetkaExercise: React.FC = () => {
         progressType,
         progressValue: w.progressAfter,
       }));
-      guestPendingResultService.addGameResult("danetka", earnedXp, wordUpdates);
+      guestPendingResultService.addGameResult("one-of-three", earnedXp, wordUpdates);
     }
   }, [refreshUser, user]);
 
@@ -195,59 +189,54 @@ const DanetkaExercise: React.FC = () => {
     return () => clearInterval(id);
   }, [timerRunning, showResult, endGameByTime]);
 
-  const handleAnswer = (answer: boolean) => {
-    if (locked || !currentQuestion) return;
+  const handleOptionClick = (index: number) => {
+    if (locked || !currentWord) return;
+    const opt = options[index];
+    if (!opt) return;
 
     const isFirstAnswer = sessionWords.length === 0;
     if (isFirstAnswer) setTimerRunning(true);
 
-    // Правильный ответ: если показан правильный перевод и пользователь нажал "Да",
-    // или показан неправильный перевод и пользователь нажал "Нет"
-    const isCorrect =
-      (currentQuestion.isCorrectTranslation && answer) ||
-      (!currentQuestion.isCorrectTranslation && !answer);
-
-    setLocked(true);
-    setUserAnswer(answer);
-
-    if (isCorrect) {
-      const progressBefore = progressService.getWordProgressValue(currentQuestion.word.id, progressType);
+    if (opt.isCorrect) {
+      setLocked(true);
+      const progressBefore = progressService.getWordProgressValue(currentWord.id, progressType);
       const xpEarned = calculateXp({
-        level: currentQuestion.word.level,
+        level: currentWord.level,
         exerciseType: "BEGINNER",
-        gameType: "DANETKA",
+        gameType: "ONE_OF_THREE",
         isCorrect: true,
       });
       setSessionXp((prev) => prev + xpEarned);
-      progressService.updateWordProgress(currentQuestion.word.id, true, progressType);
-      const progressAfter = progressService.getWordProgressValue(currentQuestion.word.id, progressType);
+      progressService.updateWordProgress(currentWord.id, true, progressType);
+      const progressAfter = progressService.getWordProgressValue(currentWord.id, progressType);
       setSessionWords((prev) => [
         ...prev,
-        { word: currentQuestion.word, progressBefore, progressAfter, hadError: false },
+        { word: currentWord, progressBefore, progressAfter, hadError: false },
       ]);
       setTimeLeft((prev) => Math.max(0, prev + 1));
-      speakWord(currentQuestion.word.en, currentQuestion.word.accent || "both");
+      speakWord(currentWord.en, currentWord.accent || "both");
       setStatus("Верно! Следующее слово…");
       const nextWord = pickNextWord();
       setTimeout(() => {
-        if (nextWord) {
-          const nextQuestion = buildQuestion(nextWord, poolWords);
-          setCurrentQuestion(nextQuestion);
-        }
+        setCurrentWord(nextWord);
+        setOptions(nextWord ? buildOptions(nextWord, poolWords) : []);
         setLocked(false);
-        setUserAnswer(null);
-        setStatus("Правильный ли это перевод?");
+        setStatus("Выбери правильный перевод.");
       }, 400);
       return;
     }
 
+    setLocked(true);
+    setSelectedWrongIndex(index);
+    const correctIdx = options.findIndex((o) => o.isCorrect);
+    setCorrectIndex(correctIdx >= 0 ? correctIdx : null);
     setTotalErrors((prev) => prev + 1);
-    const progressBefore = progressService.getWordProgressValue(currentQuestion.word.id, progressType);
-    progressService.updateWordProgress(currentQuestion.word.id, false, progressType);
-    const progressAfter = progressService.getWordProgressValue(currentQuestion.word.id, progressType);
+    const progressBefore = progressService.getWordProgressValue(currentWord.id, progressType);
+    progressService.updateWordProgress(currentWord.id, false, progressType);
+    const progressAfter = progressService.getWordProgressValue(currentWord.id, progressType);
     setSessionWords((prev) => [
       ...prev,
-      { word: currentQuestion.word, progressBefore, progressAfter, hadError: true },
+      { word: currentWord, progressBefore, progressAfter, hadError: true },
     ]);
     setTimeLeft((prev) => {
       const next = Math.max(0, prev - 1);
@@ -255,24 +244,19 @@ const DanetkaExercise: React.FC = () => {
       return next;
     });
     playErrorSound();
-    setStatus(
-      currentQuestion.isCorrectTranslation
-        ? "Неправильно. Это правильный перевод. Нажми «Далее»."
-        : "Неправильно. Это неправильный перевод. Нажми «Далее»."
-    );
+    setStatus("Правильный вариант подсвечен. Нажми «Далее».");
     setShowNext(true);
   };
 
   const goNextWord = useCallback(() => {
     const next = pickNextWord();
-    if (next) {
-      const nextQuestion = buildQuestion(next, poolWords);
-      setCurrentQuestion(nextQuestion);
-    }
+    setCurrentWord(next);
+    setOptions(next ? buildOptions(next, poolWords) : []);
     setLocked(false);
     setShowNext(false);
-    setUserAnswer(null);
-    setStatus("Правильный ли это перевод?");
+    setCorrectIndex(null);
+    setSelectedWrongIndex(null);
+    setStatus("Выбери правильный перевод.");
   }, [pickNextWord, poolWords]);
 
   useEffect(() => {
@@ -294,19 +278,18 @@ const DanetkaExercise: React.FC = () => {
     setTotalErrors(0);
     setShowNext(false);
     setLocked(false);
-    setStatus("Правильный ли это перевод?");
-    setTimeLeft(DANETKA_TIMER_INITIAL_SEC);
+    setStatus("Выбери правильный перевод.");
+    setTimeLeft(ONE_OF_THREE_TIMER_INITIAL_SEC);
     setTimerRunning(false);
     setEndedByTime(false);
-    setUserAnswer(null);
+    setCorrectIndex(null);
+    setSelectedWrongIndex(null);
     const next = pickNextWord();
-    if (next) {
-      const nextQuestion = buildQuestion(next, poolWords);
-      setCurrentQuestion(nextQuestion);
-    }
+    setCurrentWord(next);
+    setOptions(next ? buildOptions(next, poolWords) : []);
   };
 
-  const progressPercent = (timeLeft / DANETKA_TIMER_INITIAL_SEC) * 100;
+  const progressPercent = (timeLeft / ONE_OF_THREE_TIMER_INITIAL_SEC) * 100;
   const personalWordsCount =
     dictionaryWords.length > 0
       ? personalDictionaryService.getPersonalWordsFromPool(dictionaryWords).length
@@ -366,7 +349,7 @@ const DanetkaExercise: React.FC = () => {
               className="puzzle-timer"
               aria-live="polite"
               title={
-                !timerRunning && timeLeft === DANETKA_TIMER_INITIAL_SEC
+                !timerRunning && timeLeft === ONE_OF_THREE_TIMER_INITIAL_SEC
                   ? "Таймер запустится после первого ответа"
                   : undefined
               }
@@ -379,7 +362,7 @@ const DanetkaExercise: React.FC = () => {
         <div className="lesson-header">
           <div>
             <span className="lesson-label">Игра</span>
-            <h1 className="lesson-title">Данетка</h1>
+            <h1 className="lesson-title">1 из 3</h1>
           </div>
           <div className="progress">
             <div className="progress-text">
@@ -389,7 +372,7 @@ const DanetkaExercise: React.FC = () => {
                 className="puzzle-timer"
                 aria-live="polite"
                 title={
-                  !timerRunning && timeLeft === DANETKA_TIMER_INITIAL_SEC
+                  !timerRunning && timeLeft === ONE_OF_THREE_TIMER_INITIAL_SEC
                     ? "Таймер запустится после первого ответа"
                     : undefined
                 }
@@ -404,32 +387,24 @@ const DanetkaExercise: React.FC = () => {
         </div>
       )}
 
-          <div className={`danetka-exercise ${isMobile ? "danetka-exercise--mobile" : ""}`} id="danetka-exercise">
-            {currentQuestion && (
+          <div className={`danetka-exercise ${isMobile ? "danetka-exercise--mobile" : ""}`} id="one-of-three-exercise">
+            {currentWord && (
               <>
-                <p className="danetka-word" aria-label={`Слово: ${currentQuestion.word.en}`}>
-                  {currentQuestion.word.en}
+                <p className="danetka-word" aria-label={`Слово: ${currentWord.en}`}>
+                  {currentWord.en}
                 </p>
-                <p className="danetka-translation" aria-label={`Перевод: ${currentQuestion.shownTranslation}`}>
-                  {currentQuestion.shownTranslation}
-                </p>
-                <div className="danetka-yes-no-buttons" role="group" aria-label="Ответ: правильный ли перевод" key={currentQuestion.word.id}>
-                  <button
-                    type="button"
-                    className={`danetka-yes-no-btn danetka-yes-no-btn--yes ${userAnswer === true && !currentQuestion.isCorrectTranslation ? "danetka-option--wrong" : ""} ${userAnswer === true && currentQuestion.isCorrectTranslation ? "danetka-option--correct" : ""} ${locked ? "danetka-option--locked" : ""}`}
-                    onClick={() => handleAnswer(true)}
-                    disabled={locked}
-                  >
-                    Да
-                  </button>
-                  <button
-                    type="button"
-                    className={`danetka-yes-no-btn danetka-yes-no-btn--no ${userAnswer === false && currentQuestion.isCorrectTranslation ? "danetka-option--wrong" : ""} ${userAnswer === false && !currentQuestion.isCorrectTranslation ? "danetka-option--correct" : ""} ${locked ? "danetka-option--locked" : ""}`}
-                    onClick={() => handleAnswer(false)}
-                    disabled={locked}
-                  >
-                    Нет
-                  </button>
+                <div className="danetka-options" role="group" aria-label="Варианты перевода" key={currentWord.id}>
+                  {options.map((opt, index) => (
+                    <button
+                      key={`${currentWord.id}-${index}-${opt.ru}`}
+                      type="button"
+                      className={`danetka-option ${correctIndex === index ? "danetka-option--correct" : ""} ${selectedWrongIndex === index ? "danetka-option--wrong" : ""} ${locked ? "danetka-option--locked" : ""}`}
+                      onClick={() => handleOptionClick(index)}
+                      disabled={locked}
+                    >
+                      {opt.ru}
+                    </button>
+                  ))}
                 </div>
                 {showNext && (
                   <button className="puzzle-next-word-btn danetka-next" type="button" onClick={goNextWord}>
@@ -445,14 +420,14 @@ const DanetkaExercise: React.FC = () => {
               <div
                 className="modal-content puzzle-result-modal"
                 role="dialog"
-                aria-labelledby="danetka-result-title"
-                aria-describedby="danetka-result-score-block"
+                aria-labelledby="one-of-three-result-title"
+                aria-describedby="one-of-three-result-score-block"
               >
                 <header className="puzzle-result-hero">
-                  <h2 id="danetka-result-title" className="puzzle-result-title">
+                  <h2 id="one-of-three-result-title" className="puzzle-result-title">
                     {endedByTime ? "Время вышло!" : "Игра завершена"}
                   </h2>
-                  <div id="danetka-result-score-block" className="puzzle-result-score-block">
+                  <div id="one-of-three-result-score-block" className="puzzle-result-score-block">
                     <div className="puzzle-result-score-card puzzle-result-score-card--points">
                       <span className="puzzle-result-score-card-value">{formatXp(sessionXp)}</span>
                       <span className="puzzle-result-score-card-label">Опыт (XP)</span>
@@ -538,4 +513,4 @@ const DanetkaExercise: React.FC = () => {
   );
 };
 
-export default DanetkaExercise;
+export default OneOfThreeExercise;

@@ -149,6 +149,10 @@ export async function getLeaderboard(period, currentUsername) {
     const stats = user.stats || {};
     const totalXp = typeof stats.totalXp === "number" ? stats.totalXp : (stats.totalScore ?? 0) || 0;
     const xp = xpForPeriod(stats, period);
+    // Показываем только пользователей с XP > 0 для всех периодов
+    if (xp === 0) {
+      continue;
+    }
     const displayName = (user.displayName || user.username || "").trim() || user.username;
     const level = getLevelFromXp(totalXp);
     const maxStreak = maxStreaks.get(username) ?? 0;
@@ -171,14 +175,19 @@ export async function getLeaderboard(period, currentUsername) {
     const idx = list.findIndex((e) => e.username === currentUsername);
     if (idx >= 0) {
       const entry = list[idx];
-      currentUser = {
-        rank: idx + 1,
-        username: entry.username,
-        displayName: entry.displayName,
-        xp: entry.xp,
-        level: entry.level,
-        maxStreak: entry.maxStreak,
-      };
+      // Не показываем currentUser, если у него XP = 0
+      if (entry.xp === 0) {
+        currentUser = null;
+      } else {
+        currentUser = {
+          rank: idx + 1,
+          username: entry.username,
+          displayName: entry.displayName,
+          xp: entry.xp,
+          level: entry.level,
+          maxStreak: entry.maxStreak,
+        };
+      }
     }
   }
 

@@ -15,7 +15,7 @@ import {
   createSession,
   createDefaultUser,
 } from "./store.js";
-import { getWordsByLanguage, getLanguages, getWordIdsByLevel } from "./dictionaryRepo.js";
+import { getWordsByLanguage, getLanguages, getWordIdsByLevel, getDictionaryVersion } from "./dictionaryRepo.js";
 import { getActiveDays, recordActivity } from "./activeDays.js";
 import { optIn, getLeaderboard } from "./rating.js";
 
@@ -197,6 +197,12 @@ const routes = {
     const level = url.searchParams.get("level") || undefined;
     const words = await getWordsByLanguage(lang, { accent, level });
     send(res, 200, words);
+  },
+
+  "GET /api/dictionary/version": async (req, res, body, url) => {
+    const lang = url.searchParams.get("lang") || "en";
+    const version = await getDictionaryVersion(lang);
+    send(res, 200, { version });
   },
 
   "POST /api/rating/participate": async (req, res) => {

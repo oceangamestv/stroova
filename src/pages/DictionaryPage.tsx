@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import Header from "../components/common/Header";
+import { useIsMobile } from "../hooks/useIsMobile";
 import { useDictionary } from "../features/dictionary/useDictionary";
 import { dictionaryService } from "../services/dictionaryService";
 import { personalDictionaryService } from "../services/personalDictionaryService";
@@ -50,6 +51,7 @@ const InMyDictionaryIcon: React.FC<{ className?: string; title?: string }> = ({ 
 );
 
 const DictionaryPage: React.FC = () => {
+  const isMobile = useIsMobile();
   const [tab, setTab] = useState<DictionaryTab>("general");
   const [filter, setFilter] = useState<Filter>("all");
   const [searchQuery, setSearchQuery] = useState("");
@@ -206,7 +208,7 @@ const DictionaryPage: React.FC = () => {
   }
 
   return (
-    <div className="app-shell">
+    <div className={`app-shell ${isMobile ? "app-shell--dictionary-mobile" : ""}`}>
       <Header />
       {wordsError && (
         <div className="dictionary-error-banner" style={{ padding: "8px 16px", background: "#fff3cd", margin: "8px" }}>
@@ -216,22 +218,27 @@ const DictionaryPage: React.FC = () => {
       <main className="main">
         <section className={sectionClassName}>
           <div className="dictionary-header">
-            <div className="dictionary-tabs">
-              <button
-                type="button"
-                className={`dictionary-tab ${tab === "general" ? "active" : ""}`}
-                onClick={() => setTab("general")}
-              >
-                Общий словарь
-              </button>
-              <button
-                type="button"
-                className={`dictionary-tab ${tab === "personal" ? "active" : ""}`}
-                onClick={() => setTab("personal")}
-              >
-                Мой словарь
-              </button>
-            </div>
+            {!isMobile && (
+              <div className="dictionary-tabs">
+                <button
+                  type="button"
+                  className={`dictionary-tab ${tab === "general" ? "active" : ""}`}
+                  onClick={() => setTab("general")}
+                >
+                  Общий словарь
+                </button>
+                <button
+                  type="button"
+                  className={`dictionary-tab ${tab === "personal" ? "active" : ""}`}
+                  onClick={() => {
+                    setTab("personal");
+                    setFilter("all");
+                  }}
+                >
+                  Мой словарь
+                </button>
+              </div>
+            )}
             <h1 className="dictionary-title">
               {tab === "general" ? "Общий словарь" : "Мой словарь"}
             </h1>
@@ -569,6 +576,31 @@ const DictionaryPage: React.FC = () => {
           )}
         </section>
       </main>
+      {isMobile && (
+        <div className="dictionary-tabs-bar" role="tablist" aria-label="Выбор словаря">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={tab === "general"}
+            className={`dictionary-tab-bar-btn ${tab === "general" ? "dictionary-tab-bar-btn--active" : ""}`}
+            onClick={() => setTab("general")}
+          >
+            <span className="dictionary-tab-bar-btn-text">Общий словарь</span>
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={tab === "personal"}
+            className={`dictionary-tab-bar-btn ${tab === "personal" ? "dictionary-tab-bar-btn--active" : ""}`}
+            onClick={() => {
+              setTab("personal");
+              setFilter("all");
+            }}
+          >
+            <span className="dictionary-tab-bar-btn-text">Мой словарь</span>
+          </button>
+        </div>
+      )}
       <footer className="footer">STroova</footer>
     </div>
   );

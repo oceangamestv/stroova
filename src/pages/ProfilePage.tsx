@@ -14,6 +14,39 @@ import { getDisplayStats, isStatsCorrupted, sanitizeStatsForSave } from "../util
 import { formatXp } from "../domain/xp";
 import { getProgressInLevel, LEVELS_TOTAL } from "../domain/levels";
 
+/** Иконка: две карточки (поиск пары) */
+const IconPairs: React.FC<{ className?: string }> = ({ className }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+    <rect x="3" y="4" width="10" height="14" rx="1.5" />
+    <rect x="11" y="6" width="10" height="14" rx="1.5" />
+  </svg>
+);
+
+/** Иконка: пазл */
+const IconPuzzle: React.FC<{ className?: string }> = ({ className }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+    <rect x="5" y="9" width="14" height="10" rx="1.5" />
+    <path d="M10 9V6a2 2 0 0 1 4 0v3M12 4v2" />
+  </svg>
+);
+
+/** Иконка: викторина (галочка) */
+const IconDanetka: React.FC<{ className?: string }> = ({ className }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+    <circle cx="12" cy="12" r="10" />
+    <path d="M8 12l2 2 4-4" />
+  </svg>
+);
+
+/** Иконка: выбор из вариантов (три точки) */
+const IconOneOfThree: React.FC<{ className?: string }> = ({ className }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+    <circle cx="8" cy="12" r="2" />
+    <circle cx="12" cy="12" r="2" />
+    <circle cx="16" cy="12" r="2" />
+  </svg>
+);
+
 const VOICE_DEFAULT = "";
 
 const DAY_LABELS = ["Вс", "Пн", "Вт", "Ср", "Чт", "Пт", "Сб"];
@@ -25,10 +58,9 @@ function getLast7Days(): { date: string; label: string; shortLabel: string; dayO
     d.setDate(d.getDate() - i);
     const date = d.toISOString().slice(0, 10);
     const dayOfWeek = d.getDay();
-    const dayNum = d.getDate();
     out.push({
       date,
-      label: `${DAY_LABELS[dayOfWeek]} ${dayNum}`,
+      label: `${DAY_LABELS[dayOfWeek]} ${d.getDate()}`,
       shortLabel: DAY_LABELS[dayOfWeek],
       dayOfWeek,
     });
@@ -36,7 +68,6 @@ function getLast7Days(): { date: string; label: string; shortLabel: string; dayO
   return out;
 }
 
-/** Округляет максимум вверх до «красивого» шага для оси Y (как в Duolingo). */
 function niceYMax(value: number): number {
   if (value <= 0) return 100;
   const magnitude = 10 ** Math.floor(Math.log10(value));
@@ -49,7 +80,6 @@ function niceYMax(value: number): number {
   return Math.ceil(value / (magnitude * step)) * magnitude * step;
 }
 
-/** Отображаемое имя: никнейм или логин. */
 function getDisplayName(user: { displayName?: string; username: string } | null): string {
   return user?.displayName ?? user?.username ?? "";
 }
@@ -96,6 +126,7 @@ const ProfilePage: React.FC = () => {
   }, [user?.username]);
 
   const currentDisplayName = getDisplayName(user);
+  const streakDays = user?.activeDays?.streakDays ?? 0;
 
   const dictionarySource: "general" | "personal" =
     user?.gameSettings?.dictionarySource ?? "personal";
@@ -158,98 +189,132 @@ const ProfilePage: React.FC = () => {
   return (
     <div className="app-shell">
       <Header />
-      <main className="main">
-        <div className="profile-page">
-          <div className="profile-hero">
-            <div className="profile-avatar" aria-hidden>
-              <span className="profile-avatar-inner">{currentDisplayName.slice(0, 2).toUpperCase()}</span>
+      <main className="main main--top">
+        <div className="profile-card">
+          {/* Герой: аватар + имя + уровень + серия */}
+          <header className="profile-card__hero">
+            <div className="profile-card__avatar" aria-hidden>
+              <span className="profile-card__avatar-text">{currentDisplayName.slice(0, 2).toUpperCase()}</span>
             </div>
-            <div className="profile-identity">
-              <h1 className="profile-username">{currentDisplayName}</h1>
+            <div className="profile-card__identity">
+              <h1 className="profile-card__name">{currentDisplayName}</h1>
+              <div className="profile-card__meta">
+                <span className="profile-card__level">
+                  Уровень <strong>{progress.level}</strong>
+                </span>
+                {streakDays > 0 && (
+                  <span className="profile-card__streak" title="Дней подряд">
+                    🔥 {streakDays}
+                  </span>
+                )}
+              </div>
             </div>
-            <div className="profile-level-badge">
-              <span className="profile-level-num">{progress.level}</span>
-              <span className="profile-level-label">уровень</span>
-            </div>
+          </header>
+
+          {/* Статистика: общая и по играм */}
+          <div className="profile-card__stats-grid">
+            {/* Общая статистика */}
+            <section className="profile-card__section profile-card__section--tile" aria-labelledby="profile-overall-heading">
+              <h2 id="profile-overall-heading" className="profile-card__section-title">Общая статистика</h2>
+              <div className="profile-card__overall-stats">
+                <div className="profile-card__overall-stat">
+                  <span className="profile-card__overall-stat-icon">🎯</span>
+                  <div className="profile-card__overall-stat-content">
+                    <span className="profile-card__overall-stat-value">{formatXp(xp)}</span>
+                    <span className="profile-card__overall-stat-label">Опыт</span>
+                  </div>
+                </div>
+                <div className="profile-card__overall-stat">
+                  <span className="profile-card__overall-stat-icon">⭐</span>
+                  <div className="profile-card__overall-stat-content">
+                    <span className="profile-card__overall-stat-value">{formatXp(stats.bestScore)}</span>
+                    <span className="profile-card__overall-stat-label">Рекорд</span>
+                  </div>
+                </div>
+              </div>
+              <div className="profile-card__progress">
+                <div className="profile-card__progress-head">
+                  <span>
+                    {progress.level >= LEVELS_TOTAL ? "Макс. уровень" : "До след. уровня"}
+                  </span>
+                  <span className="profile-card__progress-nums">
+                    {progress.level >= LEVELS_TOTAL
+                      ? "—"
+                      : `${formatXp(progress.currentXpInLevel)} / ${formatXp(progress.xpNeededForNext)}`}
+                  </span>
+                </div>
+                <div className="profile-card__progress-bar">
+                  <div
+                    className="profile-card__progress-fill"
+                    style={{
+                      width: `${progress.level >= LEVELS_TOTAL ? 100 : progress.progressFraction * 100}%`,
+                    }}
+                  />
+                </div>
+              </div>
+            </section>
+
+            {/* Статистика по играм */}
+            <section className="profile-card__section profile-card__section--tile" aria-labelledby="profile-games-heading">
+              <h2 id="profile-games-heading" className="profile-card__section-title">По играм</h2>
+              <div className="profile-card__games-list">
+                <div className="profile-card__game-item">
+                  <div className="profile-card__game-icon">
+                    <IconPairs className="profile-card__game-icon-svg" />
+                  </div>
+                  <span className="profile-card__game-name">Поиск пары</span>
+                  <span className="profile-card__game-count">{stats.pairsCompleted}</span>
+                </div>
+                <div className="profile-card__game-item">
+                  <div className="profile-card__game-icon">
+                    <IconPuzzle className="profile-card__game-icon-svg" />
+                  </div>
+                  <span className="profile-card__game-name">Puzzle Words</span>
+                  <span className="profile-card__game-count">{stats.puzzlesCompleted}</span>
+                </div>
+                <div className="profile-card__game-item">
+                  <div className="profile-card__game-icon">
+                    <IconDanetka className="profile-card__game-icon-svg" />
+                  </div>
+                  <span className="profile-card__game-name">Данетка</span>
+                  <span className="profile-card__game-count">0</span>
+                </div>
+                <div className="profile-card__game-item">
+                  <div className="profile-card__game-icon">
+                    <IconOneOfThree className="profile-card__game-icon-svg" />
+                  </div>
+                  <span className="profile-card__game-name">1 из 3</span>
+                  <span className="profile-card__game-count">0</span>
+                </div>
+              </div>
+            </section>
           </div>
 
-          <section className="profile-section profile-stats">
-            <h2 className="profile-section-title">Статистика</h2>
-            <div className="profile-stats-grid">
-              <div className="profile-stat-card">
-                <span className="profile-stat-icon">🎯</span>
-                <span className="profile-stat-value">{formatXp(xp)}</span>
-                <span className="profile-stat-label">Опыт (XP)</span>
-              </div>
-              <div className="profile-stat-card">
-                <span className="profile-stat-icon">🃏</span>
-                <span className="profile-stat-value">{stats.pairsCompleted}</span>
-                <span className="profile-stat-label">Игр «Поиск пары»</span>
-              </div>
-              <div className="profile-stat-card">
-                <span className="profile-stat-icon">🧩</span>
-                <span className="profile-stat-value">{stats.puzzlesCompleted}</span>
-                <span className="profile-stat-label">Игр «Puzzle»</span>
-              </div>
-              <div className="profile-stat-card profile-stat-card--best">
-                <span className="profile-stat-icon">⭐</span>
-                <span className="profile-stat-value">{formatXp(stats.bestScore)}</span>
-                <span className="profile-stat-label">Лучший результат</span>
-              </div>
+          {/* График недели */}
+          <section className="profile-card__section" aria-labelledby="profile-graph-heading">
+            <div className="profile-card__graph-head">
+              <h2 id="profile-graph-heading" className="profile-card__section-title">Неделя</h2>
+              <span className="profile-card__graph-total">{formatXp(weekTotalXp)} XP</span>
             </div>
-            <div className="profile-level-progress">
-              <div className="profile-level-progress-head">
-                <span>
-                  {progress.level >= LEVELS_TOTAL ? "Максимальный уровень" : "До следующего уровня"}
-                </span>
-                <span className="profile-level-progress-nums">
-                  {progress.level >= LEVELS_TOTAL
-                    ? "—"
-                    : `${formatXp(progress.currentXpInLevel)} / ${formatXp(progress.xpNeededForNext)} XP`}
-                </span>
-              </div>
-              <div className="profile-level-progress-bar">
-                <div
-                  className="profile-level-progress-fill"
-                  style={{
-                    width: `${progress.level >= LEVELS_TOTAL ? 100 : progress.progressFraction * 100}%`,
-                  }}
-                />
-              </div>
-            </div>
-          </section>
-
-          <section className="profile-section profile-graph">
-            <div className="profile-graph-header">
-              <h2 className="profile-section-title profile-graph-title">Опыт за неделю</h2>
-              <div className="profile-graph-legend">
-                <span className="profile-graph-legend-dot" aria-hidden />
-                <span className="profile-graph-legend-label">{formatXp(weekTotalXp)} XP</span>
-              </div>
-            </div>
-            <div className="profile-week-chart profile-week-chart--line">
-              <svg className="profile-week-chart-svg" viewBox="0 0 700 200" preserveAspectRatio="xMidYMid meet" aria-hidden>
+            <div className="profile-card__chart">
+              <svg className="profile-card__chart-svg" viewBox="0 0 700 200" preserveAspectRatio="xMidYMid meet" aria-hidden>
                 <defs>
                   <linearGradient id="profile-xp-line-gradient" x1="0%" y1="0%" x2="0%" y2="100%">
-                    <stop offset="0%" className="profile-chart-gradient-top" stopOpacity="0.35" />
-                    <stop offset="100%" className="profile-chart-gradient-bottom" stopOpacity="0" />
+                    <stop offset="0%" className="profile-card__chart-stop-top" stopOpacity="0.35" />
+                    <stop offset="100%" className="profile-card__chart-stop-bottom" stopOpacity="0" />
                   </linearGradient>
                 </defs>
-                {/* Grid */}
-                <g className="profile-week-chart-grid">
+                <g className="profile-card__chart-grid">
                   {yTicks.slice(0, -1).map((tick) => {
                     const y = 32 + (1 - tick / yMax) * 136;
-                    return (
-                      <line key={tick} x1={52} y1={y} x2={684} y2={y} />
-                    );
+                    return <line key={tick} x1={52} y1={y} x2={684} y2={y} />;
                   })}
                   {[0, 1, 2, 3, 4, 5, 6].map((i) => {
                     const x = 52 + (i / 6) * 632;
                     return <line key={i} x1={x} y1={32} x2={x} y2={168} />;
                   })}
                 </g>
-                {/* Y-axis labels */}
-                <g className="profile-week-chart-axis-y" aria-hidden>
+                <g className="profile-card__chart-axis-y" aria-hidden>
                   {yTicks.map((tick) => {
                     const y = 32 + (1 - tick / yMax) * 136;
                     return (
@@ -259,8 +324,7 @@ const ProfilePage: React.FC = () => {
                     );
                   })}
                 </g>
-                {/* X-axis labels */}
-                <g className="profile-week-chart-axis-x" aria-hidden>
+                <g className="profile-card__chart-axis-x" aria-hidden>
                   {weekData.map((d, i) => {
                     const x = 52 + (i / 6) * 632;
                     return (
@@ -270,10 +334,9 @@ const ProfilePage: React.FC = () => {
                     );
                   })}
                 </g>
-                {/* Area fill under line */}
                 <path
-                  className="profile-week-chart-area"
-                  d={ (() => {
+                  className="profile-card__chart-area"
+                  d={(() => {
                     const w = 632;
                     const h = 136;
                     const ox = 52;
@@ -286,9 +349,8 @@ const ProfilePage: React.FC = () => {
                     return `${pts.join(" ")} L ${ox + w} ${oy} L ${ox} ${oy} Z`;
                   })()}
                 />
-                {/* Line */}
                 <polyline
-                  className="profile-week-chart-line"
+                  className="profile-card__chart-line"
                   points={weekData
                     .map((d, i) => {
                       const x = 52 + (i / 6) * 632;
@@ -297,8 +359,7 @@ const ProfilePage: React.FC = () => {
                     })
                     .join(" ")}
                 />
-                {/* Data points */}
-                <g className="profile-week-chart-points">
+                <g className="profile-card__chart-points">
                   {weekData.map((d, i) => {
                     const x = 52 + (i / 6) * 632;
                     const y = 32 + (1 - d.xp / yMax) * 136;
@@ -308,7 +369,7 @@ const ProfilePage: React.FC = () => {
                         cx={x}
                         cy={y}
                         r={5}
-                        className="profile-week-chart-dot"
+                        className="profile-card__chart-dot"
                         aria-hidden
                       />
                     );
@@ -318,62 +379,63 @@ const ProfilePage: React.FC = () => {
             </div>
           </section>
 
-          <section className="profile-section profile-voice">
-            <h2 className="profile-section-title">Голос озвучивания</h2>
-            <p className="profile-section-desc">Голос для слов в упражнениях и словаре.</p>
-            <div className="profile-voice-row">
-              <select
-                id="profile-voice"
-                value={voiceUri}
-                onChange={handleVoiceChange}
-                className="profile-voice-select"
-              >
-                <option value={VOICE_DEFAULT}>По умолчанию (системный)</option>
-                {voiceOptions.map((v) => (
-                  <option key={v.voiceURI} value={v.voiceURI}>
-                    {v.name}
-                  </option>
-                ))}
-              </select>
-              <button
-                type="button"
-                className="profile-btn profile-btn--secondary"
-                onClick={handlePreviewVoice}
-                disabled={isPlayingPreview}
-              >
-                {isPlayingPreview ? "…" : "🔊"} Прослушать
-              </button>
+          {/* Настройки: голос + словарь */}
+          <section className="profile-card__section" aria-labelledby="profile-settings-heading">
+            <h2 id="profile-settings-heading" className="profile-card__section-title">Настройки</h2>
+            <div className="profile-card__settings">
+              <div className="profile-card__setting">
+                <label htmlFor="profile-voice" className="profile-card__setting-label">Голос</label>
+                <div className="profile-card__setting-control">
+                  <select
+                    id="profile-voice"
+                    value={voiceUri}
+                    onChange={handleVoiceChange}
+                    className="profile-card__select"
+                  >
+                    <option value={VOICE_DEFAULT}>По умолчанию</option>
+                    {voiceOptions.map((v) => (
+                      <option key={v.voiceURI} value={v.voiceURI}>
+                        {v.name}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    className="profile-card__btn profile-card__btn--secondary"
+                    onClick={handlePreviewVoice}
+                    disabled={isPlayingPreview}
+                  >
+                    {isPlayingPreview ? "…" : "🔊"}
+                  </button>
+                </div>
+                {previewWord && (
+                  <span className="profile-card__preview">Пример: <em>{previewWord}</em></span>
+                )}
+              </div>
+              <div className="profile-card__setting">
+                <label htmlFor="profile-dictionary-source" className="profile-card__setting-label">Словарь в играх</label>
+                <select
+                  id="profile-dictionary-source"
+                  value={dictionarySource}
+                  onChange={handleDictionarySourceChange}
+                  className="profile-card__select"
+                >
+                  <option value="personal">Мой словарь</option>
+                  <option value="general">Общий словарь</option>
+                </select>
+              </div>
             </div>
-            {previewWord && (
-              <span className="profile-voice-preview">Пример: <em>{previewWord}</em></span>
-            )}
           </section>
 
-          <section className="profile-section profile-dictionary">
-            <h2 className="profile-section-title">Словарь в играх</h2>
-            <p className="profile-section-desc">Из какого словаря по умолчанию брать слова в упражнениях.</p>
-            <div className="profile-voice-row">
-              <select
-                id="profile-dictionary-source"
-                value={dictionarySource}
-                onChange={handleDictionarySourceChange}
-                className="profile-voice-select"
-              >
-                <option value="personal">Мой словарь</option>
-                <option value="general">Общий словарь</option>
-              </select>
-            </div>
-          </section>
-
-          <section className="profile-section profile-actions">
+          <footer className="profile-card__footer">
             <button
               type="button"
-              className="profile-logout-btn"
+              className="profile-card__logout"
               onClick={handleLogout}
             >
               Выйти из аккаунта
             </button>
-          </section>
+          </footer>
         </div>
       </main>
       <footer className="footer">STroova</footer>

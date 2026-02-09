@@ -26,6 +26,9 @@ function getGameMultiplier(
   if (gameType === "DANETKA") {
     return GAME_MULTIPLIERS.DANETKA;
   }
+  if (gameType === "ONE_OF_THREE") {
+    return GAME_MULTIPLIERS.ONE_OF_THREE;
+  }
   return 1.0;
 }
 

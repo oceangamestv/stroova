@@ -4,6 +4,7 @@ import DictionaryPage from "../pages/DictionaryPage";
 import ProfilePage from "../pages/ProfilePage";
 import LoginPage from "../pages/LoginPage";
 import RatingsPage from "../pages/RatingsPage";
+import AboutPage from "../pages/AboutPage";
 import { AuthProvider, useAuth } from "../features/auth/AuthContext";
 import ThemeProvider from "../features/theme/ThemeProvider";
 import { authAdapter } from "../data/adapters/authAdapter";
@@ -28,10 +29,12 @@ const routeConfig = [
   },
   { path: "/settings", element: <Navigate to="/profile" replace /> },
   { path: "/rating", element: <RatingsPage /> },
+  { path: "/about", element: <AboutPage /> },
   { path: "/", element: <HomeOrHub /> },
   { path: "/pairs", element: <GameRoute /> },
   { path: "/puzzle", element: <GameRoute /> },
   { path: "/danetka", element: <GameRoute /> },
+  { path: "/one-of-three", element: <GameRoute /> },
   { path: "*", element: <Navigate to="/" replace /> },
 ];
 

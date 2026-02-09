@@ -21,7 +21,7 @@ export const WORD_LEVELS: readonly WordLevel[] = [
 export type ExerciseType = "BEGINNER" | "ADVANCED";
 
 /** Тип игры. */
-export type GameType = "PAIR_MATCH" | "PUZZLE" | "DANETKA";
+export type GameType = "PAIR_MATCH" | "PUZZLE" | "DANETKA" | "ONE_OF_THREE";
 
 /** Сложность игры «пазлы»: лёгкий (варианты видны) или сложный (ввод с клавиатуры). */
 export type PuzzleDifficulty = "EASY" | "HARD";

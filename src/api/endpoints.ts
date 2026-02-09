@@ -44,6 +44,10 @@ export const dictionaryApi = {
     const q = search.toString();
     return api.get<Word[]>(`/dictionary/words${q ? `?${q}` : ""}`);
   },
+  getVersion: (lang?: string) => {
+    const q = lang ? `?lang=${encodeURIComponent(lang)}` : "";
+    return api.get<{ version: string }>(`/dictionary/version${q}`);
+  },
 };
 
 export const ratingApi = {

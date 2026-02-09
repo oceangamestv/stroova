@@ -367,6 +367,11 @@ body::after {
 }
 
 @media (max-width: 768px) {
+  /* В мобильной версии верхняя шапка (логотип, навигация) не показывается */
+  .site-header {
+    display: none;
+  }
+
   .site-header__nav,
   .site-header__user {
     display: none;
@@ -725,6 +730,24 @@ body::after {
 
   .app-shell {
     padding-bottom: calc(60px + env(safe-area-inset-bottom));
+  }
+
+  .app-shell--dictionary-mobile .main {
+    padding-bottom: calc(56px + 60px + env(safe-area-inset-bottom));
+  }
+
+  .dictionary-tabs-bar {
+    bottom: calc(60px + env(safe-area-inset-bottom));
+    border-radius: 14px 14px 0 0;
+    padding: 8px 10px;
+    padding-left: max(10px, env(safe-area-inset-left));
+    padding-right: max(10px, env(safe-area-inset-right));
+  }
+
+  .dictionary-tab-bar-btn {
+    min-height: 44px;
+    font-size: 0.6rem;
+    padding: 5px 6px 6px;
   }
 
   .app-shell--game-only {
@@ -1205,24 +1228,256 @@ body::after {
   margin-left: auto;
 }
 
-/* --- Game hub (мобильная главная: список игр с описаниями) --- */
-.game-hub {
-  width: 100%;
-  max-width: 560px;
-  margin: 0 auto;
-  padding: 16px 0 32px;
+.game-only-header__back--icon-only {
+  padding: 8px;
+}
+.game-only-header__back--icon-only svg {
+  width: 24px;
+  height: 24px;
 }
 
-.game-hub__title {
-  margin: 0 0 8px;
+/* --- Экран перед игрой (описание, правила, настройки) --- */
+.game-intro-card {
+  max-width: 520px;
+}
+
+.game-intro {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.game-intro__title {
+  margin: 0;
   font-size: 1.5rem;
   font-weight: 800;
   color: var(--text);
   transition: color var(--transition-theme);
 }
 
+.game-intro__description {
+  margin: 0;
+  font-size: 1rem;
+  line-height: 1.4;
+  color: var(--text-soft);
+  transition: color var(--transition-theme);
+}
+
+.game-intro__rules,
+.game-intro__settings {
+  text-align: left;
+}
+
+.game-intro__rules-title,
+.game-intro__settings-title {
+  margin: 0 0 8px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--text);
+  transition: color var(--transition-theme);
+}
+
+.game-intro__rules-list {
+  margin: 0 0 0 1.2em;
+  padding: 0;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  color: var(--text-soft);
+  transition: color var(--transition-theme);
+}
+
+.game-intro__rules-list li {
+  margin-bottom: 4px;
+}
+
+.game-intro__setting {
+  margin-bottom: 12px;
+}
+.game-intro__setting:last-of-type {
+  margin-bottom: 0;
+}
+.game-intro__setting-label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text);
+  transition: color var(--transition-theme);
+}
+
+.game-intro__start {
+  width: 100%;
+  margin-top: 8px;
+  padding: 14px 20px;
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+/* На мобильном кнопки настроек на всю ширину, без пустого пространства справа */
+@media (max-width: 768px) {
+  .game-intro .game-intro__setting {
+    width: 100%;
+  }
+  .game-intro .game-dictionary-source-btns {
+    width: 100%;
+    display: flex;
+  }
+  .game-intro .game-dictionary-source-btn {
+    flex: 1;
+    min-width: 0;
+  }
+}
+
+/* --- Поиск пары: этапы кружками (мобильный) --- */
+.pairs-stages-dots {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  flex-shrink: 0;
+  padding: 8px 0 16px;
+}
+
+/* --- Puzzle: строка состояния на мобильном (слов, опыт, таймер) --- */
+.puzzle-mobile-status {
+  flex-shrink: 0;
+  padding: 8px 0 16px;
+}
+
+.puzzle-mobile-status-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  transition: color var(--transition-theme);
+}
+
+.puzzle-mobile-status-row .puzzle-timer {
+  color: var(--accent, #f59e0b);
+  white-space: nowrap;
+  margin-left: auto;
+}
+
+.pairs-stages-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--bg-elevated);
+  border: 2px solid var(--border-subtle);
+  transition: background-color var(--transition-fast), border-color var(--transition-fast);
+}
+
+.pairs-stages-dot--done {
+  background: var(--accent);
+  border-color: var(--accent-strong);
+}
+
+.pairs-stages-dot--current {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-soft);
+}
+
+/* --- Поиск пары мобильный: крупнее карточки, мягкие рамки, акцент на словах --- */
+@media (max-width: 768px) {
+  .pairs-exercise--mobile .cards-pairs-wrapper {
+    gap: 16px;
+  }
+
+  .pairs-exercise--mobile .cards-column {
+    gap: 14px;
+  }
+
+  .pairs-exercise--mobile .card {
+    min-height: 72px;
+    padding: 18px 14px;
+    font-size: 1.15rem;
+    border: 1px solid var(--border-subtle);
+    box-shadow: none;
+  }
+
+  .pairs-exercise--mobile .card-label {
+    font-size: clamp(14px, 4cqi, 22px);
+    font-weight: 800;
+  }
+
+  .pairs-exercise--mobile .card--english,
+  .pairs-exercise--mobile .card--russian {
+    border-left-width: 2px;
+    border-style: solid;
+  }
+
+  .pairs-exercise--mobile .card--selected {
+    border-color: var(--accent);
+    background: var(--accent-soft);
+    box-shadow: 0 0 0 1px var(--accent);
+  }
+
+  .pairs-exercise--mobile .card--wrong {
+    border-color: var(--danger);
+    background: rgba(255, 68, 68, 0.08);
+    box-shadow: none;
+  }
+
+  .pairs-exercise--mobile .card--matched {
+    border-color: var(--border-subtle);
+    background: var(--bg-elevated);
+    opacity: 0.85;
+  }
+
+  .pairs-exercise--mobile .card-tag,
+  .pairs-exercise--mobile .card-accent {
+    font-size: 10px;
+    opacity: 0.85;
+  }
+}
+
+/* --- Game hub (мобильная главная: список игр с описаниями) --- */
+@keyframes game-hub-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes game-hub-title-glow {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.85; }
+}
+
+.game-hub {
+  width: 100%;
+  max-width: 560px;
+  margin: 0 auto;
+  padding: 20px 0 40px;
+}
+
+.game-hub__header {
+  margin-bottom: 28px;
+}
+
+.game-hub__title {
+  margin: 0 0 8px;
+  font-size: clamp(1.5rem, 4vw, 1.85rem);
+  font-weight: 800;
+  color: var(--text);
+  letter-spacing: -0.02em;
+  transition: color var(--transition-theme);
+  animation: game-hub-title-glow 3s ease-in-out infinite;
+}
+
 .game-hub__subtitle {
-  margin: 0 0 24px;
+  margin: 0;
   font-size: 0.95rem;
   color: var(--text-soft);
   transition: color var(--transition-theme);
@@ -1234,34 +1489,83 @@ body::after {
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 18px;
+}
+
+.game-hub__item {
+  animation: game-hub-fade-up 0.45s ease-out backwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .game-hub__title {
+    animation: none;
+  }
+  .game-hub__item {
+    animation: none;
+  }
 }
 
 .game-hub__card {
-  display: block;
+  display: flex;
+  align-items: flex-start;
+  gap: 18px;
   width: 100%;
   padding: 20px;
   text-align: left;
   background: var(--card);
   border: 2px solid var(--border-subtle);
-  border-radius: var(--radius-md, 8px);
+  border-radius: 12px;
   box-shadow: var(--shadow-soft);
   text-decoration: none;
   color: var(--text);
-  transition: background-color var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast), transform var(--transition-fast);
+  transition: border-color 0.2s ease, box-shadow 0.25s ease, transform 0.2s ease, background-color var(--transition-fast);
 }
 
 .game-hub__card:hover {
   border-color: var(--accent);
-  box-shadow: 0 4px 16px rgba(255, 193, 7, 0.2);
+  box-shadow: 0 6px 24px rgba(255, 193, 7, 0.22);
+  transform: translateY(-2px);
+}
+
+.game-hub__card:active {
+  transform: translateY(0);
 }
 
 [data-theme="dark"] .game-hub__card:hover {
-  box-shadow: 0 4px 20px rgba(255, 193, 7, 0.25);
+  box-shadow: 0 6px 28px rgba(255, 193, 7, 0.28);
+}
+
+.game-hub__card-icon {
+  flex-shrink: 0;
+  width: 52px;
+  height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--accent-soft);
+  border-radius: 12px;
+  color: var(--accent-strong);
+  transition: transform 0.2s ease, background 0.2s ease, color 0.2s ease;
+}
+
+.game-hub__card:hover .game-hub__card-icon {
+  transform: scale(1.05);
+  background: rgba(255, 193, 7, 0.25);
+  color: var(--accent-strong);
+}
+
+.game-hub__card-icon-svg {
+  width: 28px;
+  height: 28px;
+}
+
+.game-hub__card-body {
+  flex: 1;
+  min-width: 0;
 }
 
 .game-hub__card-title {
-  margin: 0 0 8px;
+  margin: 0 0 6px;
   font-size: 1.15rem;
   font-weight: 700;
   color: var(--text);
@@ -1269,11 +1573,543 @@ body::after {
 }
 
 .game-hub__card-desc {
-  margin: 0;
-  font-size: 0.9rem;
-  line-height: 1.4;
+  margin: 0 0 10px;
+  font-size: 0.88rem;
+  line-height: 1.45;
   color: var(--text-soft);
   transition: color var(--transition-theme);
+}
+
+.game-hub__card-cta {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--accent-strong);
+  transition: color var(--transition-theme), transform 0.2s ease;
+}
+
+.game-hub__card:hover .game-hub__card-cta {
+  transform: translateX(2px);
+}
+
+/* --- Profile card (новый дизайн) --- */
+.profile-card {
+  width: 100%;
+  max-width: 560px;
+  margin: 0 auto;
+  padding: 0;
+  background: var(--card);
+  border: 2px solid var(--border-strong);
+  box-shadow: 0 4px 0 rgba(0, 0, 0, 0.15);
+  position: relative;
+  transition: background-color var(--transition-theme), border-color var(--transition-theme);
+}
+
+.profile-card::before {
+  content: "";
+  position: absolute;
+  top: -2px;
+  left: -2px;
+  right: -2px;
+  height: 4px;
+  background: linear-gradient(90deg, var(--accent), var(--accent-secondary));
+  opacity: 0.9;
+}
+
+[data-theme="dark"] .profile-card {
+  box-shadow: 0 4px 0 rgba(0, 0, 0, 0.4);
+}
+
+.profile-card__hero {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--border-subtle);
+  flex-wrap: wrap;
+  transition: border-color var(--transition-theme);
+}
+
+.profile-card__avatar {
+  width: 56px;
+  height: 56px;
+  border-radius: 12px;
+  background: linear-gradient(145deg, var(--accent), var(--accent-strong));
+  border: 2px solid var(--border-strong);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.profile-card__avatar-text {
+  font-size: 18px;
+  font-weight: 800;
+  color: #000;
+  letter-spacing: -0.02em;
+}
+
+.profile-card__identity {
+  flex: 1;
+  min-width: 0;
+}
+
+.profile-card__name {
+  margin: 0 0 4px;
+  font-size: clamp(1.2rem, 3vw, 1.45rem);
+  font-weight: 800;
+  color: var(--text);
+  letter-spacing: 0.02em;
+  transition: color var(--transition-theme);
+}
+
+.profile-card__meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 0.8rem;
+  color: var(--text-soft);
+  transition: color var(--transition-theme);
+}
+
+.profile-card__level strong {
+  color: var(--text);
+  transition: color var(--transition-theme);
+}
+
+.profile-card__streak {
+  font-weight: 600;
+  color: var(--text);
+  transition: color var(--transition-theme);
+}
+
+.profile-card__stats-grid {
+  display: flex;
+  flex-direction: column;
+  border-bottom: 1px solid var(--border-subtle);
+  transition: border-color var(--transition-theme);
+}
+
+.profile-card__section {
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--border-subtle);
+  transition: border-color var(--transition-theme);
+}
+
+.profile-card__section--tile {
+  border-right: none;
+}
+
+.profile-card__section--tile:last-child {
+  border-bottom: none;
+}
+
+.profile-card__section:last-of-type {
+  border-bottom: none;
+}
+
+.profile-card__section-title {
+  margin: 0 0 14px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-soft);
+  transition: color var(--transition-theme);
+}
+
+.profile-card__stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.profile-card__stat {
+  padding: 12px 8px;
+  background: var(--card-soft);
+  border: 2px solid var(--border-subtle);
+  border-radius: 10px;
+  text-align: center;
+  transition: background-color var(--transition-theme), border-color var(--transition-theme);
+}
+
+.profile-card__stat--best {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.profile-card__stat-value {
+  display: block;
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: var(--text);
+  margin-bottom: 2px;
+  transition: color var(--transition-theme);
+}
+
+.profile-card__stat-label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-soft);
+  transition: color var(--transition-theme);
+}
+
+.profile-card__progress {
+  margin-top: 0;
+}
+
+.profile-card__progress-head {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.75rem;
+  color: var(--text-soft);
+  margin-bottom: 6px;
+  transition: color var(--transition-theme);
+}
+
+.profile-card__progress-nums {
+  font-weight: 700;
+  color: var(--text);
+  transition: color var(--transition-theme);
+}
+
+.profile-card__progress-bar {
+  height: 10px;
+  background: var(--card-soft);
+  border: 2px solid var(--border-subtle);
+  border-radius: 6px;
+  overflow: hidden;
+  transition: background-color var(--transition-theme), border-color var(--transition-theme);
+}
+
+.profile-card__progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent), var(--accent-strong));
+  border-radius: 4px;
+  transition: width 0.4s ease;
+}
+
+/* Общая статистика */
+.profile-card__overall-stats {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.profile-card__overall-stat {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  background: var(--card-soft);
+  border: 2px solid var(--border-subtle);
+  border-radius: 8px;
+  transition: background-color var(--transition-theme), border-color var(--transition-theme);
+}
+
+.profile-card__overall-stat-icon {
+  font-size: 1.3rem;
+  flex-shrink: 0;
+}
+
+.profile-card__overall-stat-content {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 2px;
+}
+
+.profile-card__overall-stat-value {
+  font-size: 1rem;
+  font-weight: 800;
+  color: var(--text);
+  transition: color var(--transition-theme);
+}
+
+.profile-card__overall-stat-label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-soft);
+  transition: color var(--transition-theme);
+}
+
+/* Статистика по играм */
+.profile-card__games-list {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+
+.profile-card__game-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  background: var(--card-soft);
+  border: 2px solid var(--border-subtle);
+  border-radius: 8px;
+  transition: background-color var(--transition-theme), border-color var(--transition-theme);
+  min-width: 0;
+}
+
+.profile-card__game-icon {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--accent-soft);
+  border-radius: 6px;
+  color: var(--accent-strong);
+  flex-shrink: 0;
+  transition: background-color var(--transition-theme), color var(--transition-theme);
+}
+
+.profile-card__game-icon-svg {
+  width: 16px;
+  height: 16px;
+}
+
+.profile-card__game-name {
+  flex: 1;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text);
+  transition: color var(--transition-theme);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.profile-card__game-count {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--text);
+  transition: color var(--transition-theme);
+  flex-shrink: 0;
+}
+
+.profile-card__graph-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.profile-card__graph-total {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text);
+  transition: color var(--transition-theme);
+}
+
+.profile-card__chart {
+  display: block;
+  padding: 0;
+}
+
+.profile-card__chart-svg {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  height: auto;
+  min-height: 160px;
+}
+
+.profile-card__chart-grid line {
+  stroke: var(--border-subtle);
+  stroke-width: 1;
+  transition: stroke var(--transition-theme);
+}
+
+.profile-card__chart-axis-y text,
+.profile-card__chart-axis-x text {
+  font-size: 10px;
+  font-weight: 600;
+  fill: var(--text-soft);
+  transition: fill var(--transition-theme);
+}
+
+.profile-card__chart-area {
+  fill: url(#profile-xp-line-gradient);
+}
+
+.profile-card__chart-stop-top {
+  stop-color: var(--accent-secondary);
+}
+
+.profile-card__chart-stop-bottom {
+  stop-color: var(--accent-secondary);
+}
+
+.profile-card__chart-line {
+  fill: none;
+  stroke: var(--xp-line-color, var(--accent-secondary));
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: stroke var(--transition-theme);
+}
+
+.profile-card__chart-dot {
+  fill: var(--xp-line-color, var(--accent-secondary));
+  stroke: var(--card);
+  stroke-width: 2;
+  transition: fill var(--transition-theme), stroke var(--transition-theme);
+}
+
+.profile-card__settings {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.profile-card__setting {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.profile-card__setting-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-soft);
+  transition: color var(--transition-theme);
+}
+
+.profile-card__setting-control {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.profile-card__select {
+  flex: 1;
+  min-width: 160px;
+  padding: 10px 12px;
+  font-size: 0.9rem;
+  border: 2px solid var(--border-strong);
+  background: var(--bg);
+  color: var(--text);
+  border-radius: 8px;
+  transition: border-color 0.2s, background-color var(--transition-theme), color var(--transition-theme);
+}
+
+.profile-card__select:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.profile-card__btn {
+  padding: 10px 14px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  border: 2px solid var(--border-strong);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s, color 0.2s;
+}
+
+.profile-card__btn--secondary {
+  background: var(--card-soft);
+  color: var(--text);
+}
+
+.profile-card__btn--secondary:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.profile-card__preview {
+  font-size: 0.8rem;
+  color: var(--text-soft);
+  transition: color var(--transition-theme);
+}
+
+.profile-card__preview em {
+  font-style: normal;
+  font-weight: 600;
+  color: var(--text);
+  transition: color var(--transition-theme);
+}
+
+.profile-card__footer {
+  padding: 16px 24px 20px;
+  border-top: 1px solid var(--border-subtle);
+  transition: border-color var(--transition-theme);
+}
+
+.profile-card__logout {
+  display: inline-block;
+  padding: 10px 18px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--danger);
+  background: transparent;
+  border: 2px solid var(--danger);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s, box-shadow 0.2s;
+}
+
+.profile-card__logout:hover {
+  background: rgba(255, 68, 68, 0.12);
+  box-shadow: 0 2px 8px rgba(255, 68, 68, 0.25);
+}
+
+[data-theme="dark"] .profile-card__logout:hover {
+  background: rgba(255, 68, 68, 0.2);
+}
+
+@media (max-width: 480px) {
+  .profile-card__hero {
+    padding: 16px 18px;
+  }
+  .profile-card__section {
+    padding: 16px 18px;
+  }
+  .profile-card__overall-stats {
+    grid-template-columns: 1fr;
+    gap: 8px;
+    margin-bottom: 14px;
+  }
+  .profile-card__overall-stat {
+    padding: 10px;
+  }
+  .profile-card__overall-stat-value {
+    font-size: 0.95rem;
+  }
+  .profile-card__games-list {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+  .profile-card__game-item {
+    padding: 8px;
+  }
+  .profile-card__game-icon {
+    width: 24px;
+    height: 24px;
+  }
+  .profile-card__game-icon-svg {
+    width: 14px;
+    height: 14px;
+  }
+  .profile-card__game-name {
+    font-size: 0.8rem;
+  }
+  .profile-card__game-count {
+    font-size: 0.85rem;
+  }
+  .profile-card__footer {
+    padding: 14px 18px 18px;
+  }
 }
 
 /* --- Settings / Profile page --- */
@@ -3275,6 +4111,37 @@ body::after {
   outline: none;
 }
 
+/* Мобильная версия: скрыть визуально поле ввода, но оставить активным для клавиатуры */
+@media (max-width: 768px) {
+  .puzzle-hard-input-wrap--mobile {
+    position: absolute;
+    top: -9999px;
+    left: -9999px;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+    pointer-events: none;
+  }
+  .puzzle-hard-input-wrap--mobile .puzzle-hard-input-inner--mobile {
+    min-height: 1px;
+    padding: 0;
+    border: none;
+    background: transparent;
+  }
+  .puzzle-hard-input-wrap--mobile .puzzle-hard-input--mobile {
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    font-size: 1px;
+    border: none;
+    background: transparent;
+    color: transparent;
+  }
+  .puzzle-hard-input-wrap--mobile .puzzle-hard-input--mobile:focus {
+    outline: none;
+  }
+}
+
 .puzzle-next-word-btn {
   padding: 16px 40px;
   font-size: 16px;
@@ -3350,6 +4217,21 @@ body::after {
   line-height: 1.3;
 }
 
+.danetka-translation {
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--text-soft);
+  margin: 0;
+  text-align: center;
+  line-height: 1.4;
+  padding: 12px 20px;
+  background: var(--card);
+  border: 2px solid var(--border-subtle);
+  border-radius: 8px;
+  max-width: 500px;
+  width: 100%;
+}
+
 .danetka-options {
   display: flex;
   flex-direction: column;
@@ -3414,6 +4296,46 @@ body::after {
   margin-top: 8px;
 }
 
+.danetka-yes-no-buttons {
+  display: flex;
+  gap: 16px;
+  width: 100%;
+  max-width: 360px;
+  justify-content: center;
+}
+
+.danetka-yes-no-btn {
+  flex: 1;
+  padding: 20px 32px;
+  font-size: 20px;
+  font-weight: 700;
+  background: var(--card);
+  border: 3px solid var(--border-strong);
+  border-radius: 0;
+  color: var(--text);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  text-align: center;
+  min-width: 120px;
+}
+
+.danetka-yes-no-btn:hover:not(.danetka-option--locked) {
+  background: var(--accent-soft);
+  border-color: var(--accent-strong);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-soft);
+}
+
+.danetka-yes-no-btn--yes:hover:not(.danetka-option--locked) {
+  background: rgba(76, 175, 80, 0.15);
+  border-color: #4caf50;
+}
+
+.danetka-yes-no-btn--no:hover:not(.danetka-option--locked) {
+  background: rgba(244, 67, 54, 0.15);
+  border-color: #f44336;
+}
+
 /* ---------- Puzzle result modal ---------- */
 .puzzle-result-modal-backdrop {
   align-items: center;
@@ -3433,8 +4355,8 @@ body::after {
 
 .puzzle-result-hero {
   padding: 28px 28px 24px;
-  background: linear-gradient(180deg, var(--accent-soft) 0%, transparent 100%);
-  border-bottom: 2px solid var(--border-strong);
+  background: var(--card);
+  border-bottom: 1px solid var(--border-subtle);
   text-align: center;
 }
 
@@ -3449,25 +4371,33 @@ body::after {
 }
 
 .puzzle-result-score-block {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 12px;
+  display: table;
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--card);
+  table-layout: fixed;
 }
 
 .puzzle-result-score-card {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 14px 10px;
+  display: table-cell;
+  text-align: center;
+  vertical-align: middle;
+  padding: 16px 12px;
+  border-right: 1px solid var(--border-strong);
   background: var(--card);
-  border: 2px solid var(--border-strong);
-  border-radius: 0;
-  min-height: 64px;
+  position: relative;
+  width: 33.333%;
+}
+
+.puzzle-result-score-card:last-child {
+  border-right: none;
 }
 
 .puzzle-result-score-card--points {
-  border-color: var(--accent);
   background: var(--accent-soft);
 }
 
@@ -3484,18 +4414,20 @@ body::after {
 }
 
 .puzzle-result-score-card-value {
-  font-size: 28px;
+  display: block;
+  font-size: 26px;
   font-weight: 900;
-  line-height: 1.1;
+  line-height: 1.2;
+  margin-bottom: 4px;
 }
 
 .puzzle-result-score-card-label {
+  display: block;
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--text-soft);
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  margin-top: 4px;
 }
 
 .puzzle-result-words-section {
@@ -3503,17 +4435,17 @@ body::after {
   min-height: 0;
   display: flex;
   flex-direction: column;
-  padding: 20px 28px;
+  padding: 16px 20px;
   overflow: hidden;
 }
 
 .puzzle-result-words-heading {
-  margin: 0 0 10px;
-  font-size: 12px;
+  margin: 0 0 12px;
+  font-size: 11px;
   font-weight: 700;
   color: var(--text-soft);
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.1em;
 }
 
 .puzzle-result-words-grid {
@@ -3522,76 +4454,129 @@ body::after {
   padding: 0;
   overflow-y: auto;
   overflow-x: hidden;
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(140px, 100%), 1fr));
+  display: flex;
+  flex-direction: column;
   gap: 8px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--accent) var(--border-subtle);
+}
+
+/* Кастомный скролл для WebKit браузеров */
+.puzzle-result-words-grid::-webkit-scrollbar {
+  width: 8px;
+}
+
+.puzzle-result-words-grid::-webkit-scrollbar-track {
+  background: var(--border-subtle);
+  border-radius: 4px;
+}
+
+.puzzle-result-words-grid::-webkit-scrollbar-thumb {
+  background: var(--accent);
+  border-radius: 4px;
+  transition: background var(--transition-fast);
+}
+
+.puzzle-result-words-grid::-webkit-scrollbar-thumb:hover {
+  background: var(--accent-strong);
+}
+
+[data-theme="dark"] .puzzle-result-words-grid::-webkit-scrollbar-thumb {
+  background: rgba(255, 193, 7, 0.6);
+}
+
+[data-theme="dark"] .puzzle-result-words-grid::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 193, 7, 0.8);
 }
 
 .puzzle-result-word-tile {
   display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 8px 10px;
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
   background: var(--card-soft);
-  border: 2px solid var(--border-subtle);
-  border-radius: 0;
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
   min-width: 0;
-  transition: background-color var(--transition-theme), border-color var(--transition-theme);
+  transition: all var(--transition-fast);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.puzzle-result-word-tile:hover {
+  background: var(--card);
+  border-color: var(--border-strong);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  transform: translateY(-1px);
 }
 
 .puzzle-result-word-tile--success {
   border-left: 3px solid var(--accent);
+  background: rgba(255, 193, 7, 0.05);
 }
 
 .puzzle-result-word-tile--error {
   border-left: 3px solid var(--danger);
+  background: rgba(244, 67, 54, 0.05);
+}
+
+[data-theme="dark"] .puzzle-result-word-tile--success {
+  background: rgba(255, 193, 7, 0.08);
+}
+
+[data-theme="dark"] .puzzle-result-word-tile--error {
+  background: rgba(244, 67, 54, 0.08);
 }
 
 .puzzle-result-word-tile-info {
   display: flex;
   flex-direction: column;
-  gap: 0;
+  gap: 2px;
   min-width: 0;
+  flex: 1;
 }
 
 .puzzle-result-word-tile-en {
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 700;
   color: var(--text);
-  line-height: 1.2;
+  line-height: 1.3;
+  word-break: break-word;
 }
 
 .puzzle-result-word-tile-ru {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--text-soft);
-  line-height: 1.2;
+  line-height: 1.3;
+  word-break: break-word;
 }
 
 .puzzle-result-word-tile-progress {
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
-  gap: 2px;
+  align-items: flex-end;
+  gap: 4px;
+  flex-shrink: 0;
 }
 
 .puzzle-result-word-tile-percent {
   font-size: 10px;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--text-soft);
+  white-space: nowrap;
 }
 
 .puzzle-result-progress-track {
-  width: 100%;
-  max-width: 64px;
-  height: 6px;
+  width: 60px;
+  height: 4px;
   background: var(--border-subtle);
-  border-radius: 0;
+  border-radius: 2px;
   overflow: hidden;
 }
 
 .puzzle-result-progress-fill {
   height: 100%;
-  border-radius: 0;
+  border-radius: 2px;
   transition: width 0.35s ease-out;
 }
 
@@ -3632,54 +4617,143 @@ body::after {
 
 .puzzle-result-btn {
   width: 100%;
+  display: flex;
+  align-items: center;
   justify-content: center;
+  gap: 10px;
+  background: var(--accent);
+  color: #000000;
+  border: none;
+  border-radius: 12px;
+  font-weight: 700;
+  font-size: 16px;
+  padding: 16px 24px;
+  transition: all var(--transition-fast);
+  box-shadow: 0 2px 8px rgba(255, 193, 7, 0.25);
+  position: relative;
+  overflow: hidden;
+}
+
+.puzzle-result-btn::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+  transition: left 0.5s;
+}
+
+.puzzle-result-btn:hover {
+  background: var(--accent-strong);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(255, 193, 7, 0.4);
+}
+
+.puzzle-result-btn:hover::before {
+  left: 100%;
+}
+
+.puzzle-result-btn:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 6px rgba(255, 193, 7, 0.3);
+}
+
+.puzzle-result-btn svg {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
 }
 
 .puzzle-result-btn--secondary {
-  background: transparent;
+  background: var(--card);
   border: 2px solid var(--border-strong);
   color: var(--text);
+  font-weight: 600;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
 }
 
 .puzzle-result-btn--secondary:hover {
   background: var(--bg-elevated);
+  border-color: var(--accent);
+  color: var(--accent);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(255, 193, 7, 0.2);
+}
+
+.puzzle-result-btn--secondary::before {
+  display: none;
+}
+
+/* Улучшенная читаемость для светлой темы */
+.puzzle-result-btn--secondary {
+  color: #1a1a1a;
 }
 
 [data-theme="dark"] .puzzle-result-btn--secondary {
   border-color: var(--border-subtle);
+  background: var(--card-soft);
+  color: var(--text);
 }
 
-@media (min-width: 380px) {
-  .puzzle-result-words-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
+[data-theme="dark"] .puzzle-result-btn--secondary:hover {
+  border-color: var(--accent);
+  background: rgba(255, 193, 7, 0.1);
+  color: var(--accent);
 }
 
 @media (min-width: 520px) {
+  .puzzle-result-words-section {
+    padding: 20px 28px;
+  }
+
   .puzzle-result-words-grid {
-    grid-template-columns: repeat(3, 1fr);
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+  }
+
+  .puzzle-result-word-tile {
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 12px 14px;
+  }
+
+  .puzzle-result-word-tile-progress {
+    align-items: flex-start;
+    width: 100%;
+  }
+
+  .puzzle-result-progress-track {
+    width: 100%;
+    max-width: none;
   }
 }
 
 @media (min-width: 700px) {
   .puzzle-result-words-grid {
-    grid-template-columns: repeat(5, 1fr);
+    grid-template-columns: repeat(3, 1fr);
   }
 }
 
 @media (max-width: 360px) {
   .puzzle-result-score-block {
-    grid-template-columns: 1fr;
+    display: table;
+    border-radius: 6px;
   }
 
   .puzzle-result-score-card {
-    flex-direction: row;
-    justify-content: space-between;
-    padding: 10px 14px;
+    display: table-cell;
+    padding: 12px 8px;
+  }
+
+  .puzzle-result-score-card-value {
+    font-size: 22px;
   }
 
   .puzzle-result-score-card-label {
-    margin-top: 0;
+    font-size: 9px;
   }
 }
 
@@ -3755,6 +4829,22 @@ body::after {
   background: var(--bg-elevated);
   border-color: var(--border-subtle);
   transition: background-color var(--transition-theme), border-color var(--transition-theme);
+}
+
+/* Использованные буквы остаются на месте (не удаляются из DOM) */
+.puzzle-letter--used {
+  opacity: 0.2;
+  cursor: default;
+  pointer-events: none;
+  background: var(--bg-elevated);
+  border-color: var(--border-subtle);
+  transform: none !important;
+  transition: background-color var(--transition-theme), border-color var(--transition-theme);
+}
+.puzzle-letter--used:hover {
+  transform: none !important;
+  border-color: var(--border-subtle) !important;
+  box-shadow: none !important;
 }
 
 .puzzle-answer-panel {
@@ -3940,6 +5030,11 @@ body::after {
 .dictionary-tab.active {
   background: var(--accent);
   color: #000000;
+}
+
+/* Нижняя панель переключения словаря (мобильная): над нижним меню, в одном стиле */
+.dictionary-tabs-bar {
+  display: none;
 }
 
 .dictionary-header {
@@ -5395,6 +6490,37 @@ body::after {
     gap: 20px;
   }
 
+  /* Мобильная версия Puzzle: убрать лишние отступы, центрировать контент */
+  .puzzle-exercise--mobile {
+    gap: 16px;
+  }
+
+  /* Мобильная версия Данетки: увеличить кнопки, улучшить читаемость */
+  .danetka-exercise--mobile {
+    gap: 20px;
+  }
+  .danetka-exercise--mobile .danetka-word {
+    font-size: clamp(24px, 6vw, 32px);
+  }
+  .danetka-exercise--mobile .danetka-translation {
+    font-size: clamp(18px, 4.5vw, 22px);
+    padding: 10px 16px;
+  }
+  .danetka-exercise--mobile .danetka-option {
+    padding: 20px 24px;
+    font-size: 1.1rem;
+    min-height: 56px;
+  }
+  .danetka-exercise--mobile .danetka-yes-no-buttons {
+    flex-direction: column;
+    gap: 12px;
+  }
+  .danetka-exercise--mobile .danetka-yes-no-btn {
+    padding: 18px 24px;
+    font-size: 1.1rem;
+    min-height: 56px;
+  }
+
   .puzzle-learning-area {
     gap: 20px;
   }
@@ -5455,12 +6581,15 @@ body::after {
   }
 
   .puzzle-result-modal-backdrop {
-    padding: 16px;
+    padding: 0;
     align-items: flex-end;
   }
 
   .puzzle-result-modal {
-    max-height: 85vh;
+    max-height: 90vh;
+    max-width: 100%;
+    border-radius: 16px 16px 0 0;
+    margin: 0;
   }
 
   .puzzle-result-hero {
@@ -5469,14 +6598,70 @@ body::after {
 
   .puzzle-result-title {
     font-size: 18px;
+    margin-bottom: 12px;
+  }
+
+  .puzzle-result-score-block {
+    border-radius: 6px;
+  }
+
+  .puzzle-result-score-card {
+    padding: 12px 8px;
+  }
+
+  .puzzle-result-score-card-value {
+    font-size: 22px;
+    margin-bottom: 3px;
+  }
+
+  .puzzle-result-score-card-label {
+    font-size: 9px;
   }
 
   .puzzle-result-words-section {
-    padding: 16px 20px;
+    padding: 12px 16px;
+  }
+
+  .puzzle-result-words-heading {
+    font-size: 10px;
+    margin-bottom: 10px;
+  }
+
+  .puzzle-result-word-tile {
+    padding: 10px 12px;
+    gap: 10px;
+  }
+
+  .puzzle-result-word-tile-en {
+    font-size: 13px;
+  }
+
+  .puzzle-result-word-tile-ru {
+    font-size: 11px;
+  }
+
+  .puzzle-result-progress-track {
+    width: 50px;
+  }
+
+  .puzzle-result-word-tile-percent {
+    font-size: 9px;
   }
 
   .puzzle-result-footer {
-    padding: 16px 20px 20px;
+    padding: 16px;
+    gap: 8px;
+  }
+
+  .puzzle-result-btn {
+    padding: 14px 20px;
+    font-size: 15px;
+    gap: 8px;
+  }
+
+  .puzzle-result-btn svg {
+    width: 18px;
+    height: 18px;
   }
 
   .puzzle-rules-content {
@@ -5601,6 +6786,75 @@ body::after {
     padding: 10px 12px;
   }
 
+  /* Нижняя панель «Общий словарь / Мой словарь» над навигацией, в стиле нижнего меню */
+  .app-shell--dictionary-mobile .main {
+    padding-bottom: calc(56px + 64px + env(safe-area-inset-bottom));
+  }
+
+  .dictionary-tabs-bar {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: calc(64px + env(safe-area-inset-bottom));
+    z-index: 89;
+    padding: 10px 12px;
+    padding-left: max(12px, env(safe-area-inset-left));
+    padding-right: max(12px, env(safe-area-inset-right));
+    background: var(--card);
+    border: 2px solid var(--border-subtle);
+    border-bottom: none;
+    border-radius: 16px 16px 0 0;
+    box-shadow: 0 -6px 24px rgba(0, 0, 0, 0.08);
+    transition: background-color var(--transition-theme), border-color var(--transition-theme), box-shadow var(--transition-theme);
+    transform: translateZ(0);
+    -webkit-transform: translateZ(0);
+  }
+
+  [data-theme="dark"] .dictionary-tabs-bar {
+    border-color: var(--border-strong);
+    box-shadow: 0 -6px 24px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 193, 7, 0.06);
+  }
+
+  .dictionary-tab-bar-btn {
+    min-height: 48px;
+    padding: 6px 8px 8px;
+    font-size: 0.65rem;
+    font-weight: 700;
+    border: 2px solid transparent;
+    border-radius: 14px;
+    background: var(--bg-elevated);
+    color: var(--text-soft);
+    cursor: pointer;
+    transition: background-color var(--transition-fast), color var(--transition-fast), box-shadow var(--transition-fast);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+  }
+
+  .dictionary-tab-bar-btn:hover {
+    background: var(--accent-soft);
+    color: var(--text);
+  }
+
+  .dictionary-tab-bar-btn--active {
+    background: var(--accent);
+    color: #000;
+    border-color: rgba(0, 0, 0, 0.15);
+    box-shadow: 0 3px 12px rgba(255, 193, 7, 0.4);
+  }
+
+  .dictionary-tab-bar-btn-text {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 100%;
+    line-height: 1.1;
+  }
+
   .dictionary-toolbar {
     flex-direction: column;
     align-items: stretch;
@@ -5687,18 +6941,21 @@ body::after {
   }
 
   .puzzle-result-score-block {
-    grid-template-columns: 1fr;
-    gap: 8px;
+    display: table;
+    border-radius: 6px;
   }
 
   .puzzle-result-score-card {
-    flex-direction: row;
-    justify-content: space-between;
-    padding: 12px 14px;
+    display: table-cell;
+    padding: 12px 10px;
+  }
+
+  .puzzle-result-score-card-value {
+    font-size: 20px;
   }
 
   .puzzle-result-score-card-label {
-    margin-top: 0;
+    font-size: 9px;
   }
 
   .auth-card {
@@ -5792,6 +7049,14 @@ body::after {
   margin: 0;
   color: var(--text-soft);
   font-size: 15px;
+}
+
+.rating-empty-message {
+  margin: 2rem 0;
+  color: var(--text-soft);
+  font-size: 15px;
+  text-align: center;
+  padding: 2rem;
 }
 
 .rating-block {
