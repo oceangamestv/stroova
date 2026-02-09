@@ -3,6 +3,7 @@ import react from "@vitejs/plugin-react";
 
 export default defineConfig({
   appType: "spa",
+  base: "./", // для корректной загрузки в Capacitor (Android/iOS)
   plugins: [
     react(),
     // Гарантируем, что маршруты SPA (/dictionary, /profile и т.д.) отдают index.html,

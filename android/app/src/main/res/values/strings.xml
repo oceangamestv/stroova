@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">STroova</string>
+    <string name="title_activity_main">STroova</string>
+    <string name="package_name">ru.stroova.app</string>
+    <string name="custom_url_scheme">ru.stroova.app</string>
+</resources>

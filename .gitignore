@@ -3,3 +3,26 @@
 
 # Данные сервера (учётки и прогресс) — не коммитить
 server/data.json
+
+# Зависимости и сборка
+node_modules/
+dist/
+
+# Vite
+.vite/
+
+# Capacitor / Android (сборки и артефакты)
+android/app/build/
+android/build/
+android/.gradle/
+android/capacitor/build/
+*.apk
+*.aab
+
+# IDE
+.idea/
+*.iml
+
+# Логи и кэш
+*.log
+.cache/

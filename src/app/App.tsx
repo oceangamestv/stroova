@@ -1,6 +1,5 @@
 import React, { useEffect } from "react";
 import { useRoutes, useLocation, Navigate } from "react-router-dom";
-import ExercisesPage from "../pages/ExercisesPage";
 import DictionaryPage from "../pages/DictionaryPage";
 import ProfilePage from "../pages/ProfilePage";
 import LoginPage from "../pages/LoginPage";
@@ -8,6 +7,7 @@ import RatingsPage from "../pages/RatingsPage";
 import { AuthProvider, useAuth } from "../features/auth/AuthContext";
 import ThemeProvider from "../features/theme/ThemeProvider";
 import { authAdapter } from "../data/adapters/authAdapter";
+import { HomeOrHub, GameRoute } from "./RouteWrappers";
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user } = useAuth();
@@ -28,10 +28,10 @@ const routeConfig = [
   },
   { path: "/settings", element: <Navigate to="/profile" replace /> },
   { path: "/rating", element: <RatingsPage /> },
-  { path: "/", element: <ExercisesPage /> },
-  { path: "/pairs", element: <ExercisesPage /> },
-  { path: "/puzzle", element: <ExercisesPage /> },
-  { path: "/danetka", element: <ExercisesPage /> },
+  { path: "/", element: <HomeOrHub /> },
+  { path: "/pairs", element: <GameRoute /> },
+  { path: "/puzzle", element: <GameRoute /> },
+  { path: "/danetka", element: <GameRoute /> },
   { path: "*", element: <Navigate to="/" replace /> },
 ];
 

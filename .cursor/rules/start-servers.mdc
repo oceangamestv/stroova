@@ -1,0 +1,19 @@
+---
+description: Запуск фронта и API — поднимать оба сервера сразу
+alwaysApply: true
+---
+
+# Запуск проекта STroova
+
+Когда пользователь просит **поднять сервер**, **запустить приложение** или **запустить всё** — поднимать **оба** процесса:
+
+1. **Фронт (Vite):** `npm run dev` — порт 5173  
+2. **API (бэкенд):** `node server/index.js` — порт 3000  
+
+Оба запускать в фоне (background). В PowerShell использовать `;` между командами, не `&&`.
+
+Пример:
+- Терминал 1 (фронт): `Set-Location d:\Cursor; npm run dev` — is_background: true, при необходимости required_permissions: ["all"] (если в песочнице была ошибка spawn EPERM).
+- Терминал 2 (API): `Set-Location d:\Cursor; node server/index.js` — is_background: true, required_permissions: ["full_network"].
+
+После запуска сообщить пользователю оба адреса: http://localhost:5173 и http://localhost:3000/api .

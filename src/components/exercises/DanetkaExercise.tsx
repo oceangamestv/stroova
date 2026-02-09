@@ -462,6 +462,13 @@ const DanetkaExercise: React.FC = () => {
                   <button className="primary-btn puzzle-result-btn" onClick={restartGame} type="button">
                     Играть снова
                   </button>
+                  <button
+                    className="primary-btn puzzle-result-btn puzzle-result-btn--secondary"
+                    onClick={() => navigate("/")}
+                    type="button"
+                  >
+                    На главную
+                  </button>
                 </footer>
               </div>
             </div>
