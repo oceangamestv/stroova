@@ -1,0 +1,12 @@
+{
+  "name": "STroova",
+  "short_name": "STroova",
+  "description": "Изучение языков: словарь и упражнения",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0a0e1a",
+  "theme_color": "#ffc107",
+  "orientation": "portrait-primary",
+  "scope": "/",
+  "lang": "ru"
+}
