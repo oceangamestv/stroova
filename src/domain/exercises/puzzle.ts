@@ -52,7 +52,8 @@ export const placeLetterInSlot = (
   state: PuzzleState,
   letter: string,
   slotIndex: number,
-  difficulty: PuzzleDifficulty
+  difficulty: PuzzleDifficulty,
+  clickedLetterIndex?: number
 ) => {
   if (state.slots[slotIndex] !== null) return state;
   const nextSlots = [...state.slots];
@@ -63,18 +64,36 @@ export const placeLetterInSlot = (
   if (letter === correctLetter) {
     nextSlotsState[slotIndex] = "correct";
     if (difficulty === "easy") {
-      const correctLetterItem = state.letters.find(
-        (item) => item.letter === correctLetter && !item.used
-      );
-      if (correctLetterItem) correctLetterItem.used = true;
+      // Если передан индекс кликнутой буквы, помечаем именно её
+      if (clickedLetterIndex !== undefined) {
+        const clickedLetterItem = state.letters.find((item) => item.index === clickedLetterIndex);
+        if (clickedLetterItem && !clickedLetterItem.used) {
+          clickedLetterItem.used = true;
+        }
+      } else {
+        // Fallback для клавиатуры: находим первую неиспользованную букву с таким символом
+        const letterItem = state.letters.find(
+          (item) => item.letter === letter && !item.used
+        );
+        if (letterItem) letterItem.used = true;
+      }
     }
   } else {
     nextSlotsState[slotIndex] = "wrong";
     if (difficulty === "easy") {
-      const correctLetterItem = state.letters.find(
-        (item) => item.letter === correctLetter && !item.used
-      );
-      if (correctLetterItem) correctLetterItem.used = true;
+      // Если передан индекс кликнутой буквы, помечаем именно её
+      if (clickedLetterIndex !== undefined) {
+        const clickedLetterItem = state.letters.find((item) => item.index === clickedLetterIndex);
+        if (clickedLetterItem && !clickedLetterItem.used) {
+          clickedLetterItem.used = true;
+        }
+      } else {
+        // Fallback для клавиатуры: находим первую неиспользованную букву с таким символом
+        const letterItem = state.letters.find(
+          (item) => item.letter === letter && !item.used
+        );
+        if (letterItem) letterItem.used = true;
+      }
     }
   }
 

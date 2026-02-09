@@ -73,12 +73,27 @@ export async function getWordIdsByLevel(langCode, level) {
 }
 
 /**
- * Получить версию словаря (хэш) для проверки изменений.
- * Версия вычисляется как хэш от всех записей словаря для данного языка.
+ * Получить версию словаря для проверки изменений.
+ * Версия хранится в таблице languages и обновляется при изменении словаря.
  * @param {string} langCode — код языка (например 'en')
- * @returns {Promise<string>} — версия словаря (хэш)
+ * @returns {Promise<string>} — версия словаря
  */
 export async function getDictionaryVersion(langCode) {
+  const langResult = await pool.query(
+    "SELECT version FROM languages WHERE code = $1",
+    [langCode]
+  );
+  if (langResult.rows.length === 0) return "";
+  return langResult.rows[0].version || "";
+}
+
+/**
+ * Обновить версию словаря для данного языка.
+ * Версия вычисляется как MAX(id) + COUNT(*) для быстрого определения изменений.
+ * @param {string} langCode — код языка (например 'en')
+ * @returns {Promise<string>} — новая версия словаря
+ */
+export async function updateDictionaryVersion(langCode) {
   const langResult = await pool.query(
     "SELECT id FROM languages WHERE code = $1",
     [langCode]
@@ -86,19 +101,25 @@ export async function getDictionaryVersion(langCode) {
   if (langResult.rows.length === 0) return "";
   const languageId = langResult.rows[0].id;
   
-  // Получаем все записи словаря для вычисления хэша
+  // Быстрое вычисление версии: MAX(id) + COUNT(*)
   const res = await pool.query(
-    `SELECT id, en, ru, accent, level,
-            frequency_rank, rarity, register,
-            ipa_uk, ipa_us, example, example_ru
+    `SELECT 
+       COALESCE(MAX(id), 0) as max_id,
+       COUNT(*) as count
      FROM dictionary_entries
-     WHERE language_id = $1
-     ORDER BY id`,
+     WHERE language_id = $1`,
     [languageId]
   );
   
-  // Вычисляем хэш от всех записей
-  const dataString = JSON.stringify(res.rows);
-  const hash = crypto.createHash("sha256").update(dataString).digest("hex");
-  return hash.substring(0, 16); // Используем первые 16 символов для краткости
+  const maxId = res.rows[0].max_id || 0;
+  const count = res.rows[0].count || 0;
+  const version = `${maxId}_${count}`;
+  
+  // Сохраняем версию в таблице languages
+  await pool.query(
+    "UPDATE languages SET version = $1 WHERE code = $2",
+    [version, langCode]
+  );
+  
+  return version;
 }

@@ -1176,6 +1176,12 @@ body::after {
   overflow-y: auto;
 }
 
+/* В сложном режиме пазлов на мобильной версии выравнивание сверху */
+.app-shell--game-only .game-only-main:has(.puzzle-hard-input-wrap) {
+  align-items: flex-start;
+  padding-top: 12px;
+}
+
 .game-only-header {
   display: flex;
   align-items: center;
@@ -1384,51 +1390,64 @@ body::after {
   box-shadow: 0 0 0 2px var(--accent-soft);
 }
 
-/* --- Поиск пары мобильный: крупнее карточки, мягкие рамки, акцент на словах --- */
+/* --- Поиск пары мобильный: крупные карточки и шрифт, в стиле lesson-card --- */
 @media (max-width: 768px) {
   .pairs-exercise--mobile .cards-pairs-wrapper {
-    gap: 16px;
+    gap: 20px;
   }
 
   .pairs-exercise--mobile .cards-column {
-    gap: 14px;
+    gap: 16px;
   }
 
   .pairs-exercise--mobile .card {
-    min-height: 72px;
-    padding: 18px 14px;
-    font-size: 1.15rem;
-    border: 1px solid var(--border-subtle);
-    box-shadow: none;
+    min-height: 80px;
+    padding: 20px 16px;
+    font-size: 1.2rem;
+    border: 4px solid var(--border-strong);
+    box-shadow: 0 4px 0 rgba(0, 0, 0, 0.2);
+    background: var(--card-soft);
+  }
+
+  [data-theme="dark"] .pairs-exercise--mobile .card {
+    box-shadow: 0 4px 0 rgba(0, 0, 0, 0.5);
   }
 
   .pairs-exercise--mobile .card-label {
-    font-size: clamp(14px, 4cqi, 22px);
+    font-size: clamp(16px, 5cqi, 24px);
     font-weight: 800;
   }
 
   .pairs-exercise--mobile .card--english,
   .pairs-exercise--mobile .card--russian {
-    border-left-width: 2px;
+    border-left-width: 4px;
     border-style: solid;
   }
 
   .pairs-exercise--mobile .card--selected {
     border-color: var(--accent);
     background: var(--accent-soft);
-    box-shadow: 0 0 0 1px var(--accent);
+    box-shadow: 0 0 0 3px rgba(255, 193, 7, 0.35),
+      0 6px 0 rgba(0, 0, 0, 0.3);
   }
 
   .pairs-exercise--mobile .card--wrong {
     border-color: var(--danger);
-    background: rgba(255, 68, 68, 0.08);
-    box-shadow: none;
+    background: var(--danger);
+    color: #fff;
+    box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.25);
   }
 
   .pairs-exercise--mobile .card--matched {
     border-color: var(--border-subtle);
     background: var(--bg-elevated);
-    opacity: 0.85;
+    opacity: 0.55;
+    filter: grayscale(0.4);
+    color: var(--text-soft);
+  }
+
+  [data-theme="dark"] .pairs-exercise--mobile .card--matched {
+    opacity: 0.4;
   }
 
   .pairs-exercise--mobile .card-tag,
@@ -1919,7 +1938,7 @@ body::after {
   width: 100%;
   max-width: 100%;
   height: auto;
-  min-height: 160px;
+  min-height: 280px;
 }
 
 .profile-card__chart-grid line {
@@ -1930,7 +1949,7 @@ body::after {
 
 .profile-card__chart-axis-y text,
 .profile-card__chart-axis-x text {
-  font-size: 10px;
+  font-size: 14px;
   font-weight: 600;
   fill: var(--text-soft);
   transition: fill var(--transition-theme);
@@ -2612,7 +2631,7 @@ body::after {
   transition: width 0.4s ease;
 }
 
-/* Duolingo-style line chart: header + legend */
+/* Line chart: header + legend */
 .profile-graph-header {
   display: flex;
   align-items: center;
@@ -3013,7 +3032,7 @@ body::after {
   }
 }
 
-/* Обёртка игровой зоны (общий стиль для пазлов и поиска пар) */
+/* Обёртка игровой зоны: в одном стиле с lesson-card, профилем и меню */
 .pairs-exercise {
   display: flex;
   flex-direction: column;
@@ -3022,27 +3041,33 @@ body::after {
   position: relative;
   background: var(--card);
   padding: 40px;
-  border-radius: 8px;
+  border-radius: var(--radius-lg);
   overflow: hidden;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-  transition: background-color var(--transition-theme), box-shadow var(--transition-theme);
+  box-shadow: 0 4px 0 rgba(0, 0, 0, 0.2);
+  border: 4px solid var(--border-strong);
+  transition: background-color var(--transition-theme), border-color var(--transition-theme), box-shadow var(--transition-theme);
 }
 
 [data-theme="dark"] .pairs-exercise {
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5), 0 0 30px rgba(255, 193, 7, 0.1);
+  box-shadow: 0 4px 0 rgba(0, 0, 0, 0.5), 0 0 20px rgba(255, 193, 7, 0.2);
 }
 
 .pairs-exercise::before {
   content: "";
   position: absolute;
-  top: -50%;
-  right: -20%;
-  width: 400px;
-  height: 400px;
-  background: linear-gradient(135deg, rgba(255, 193, 7, 0.15), rgba(255, 193, 7, 0.05));
-  clip-path: polygon(50% 0%, 0% 100%, 100% 100%);
-  z-index: 0;
+  top: -4px;
+  left: -4px;
+  right: -4px;
+  bottom: -4px;
+  background: linear-gradient(135deg, #ffc107, #2196f3);
+  z-index: -1;
+  opacity: 0.1;
   pointer-events: none;
+  transition: opacity var(--transition-theme);
+}
+
+[data-theme="dark"] .pairs-exercise::before {
+  opacity: 0.15;
 }
 
 .pairs-exercise::after {
@@ -3057,13 +3082,14 @@ body::after {
   z-index: 0;
   pointer-events: none;
   transform: rotate(180deg);
+  transition: background var(--transition-theme);
 }
 
 /* Обёртка для упражнения "Поиск пар": слева EN, справа RU */
 .cards-pairs-wrapper {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 20px;
+  gap: 24px;
   align-items: start;
   position: relative;
   z-index: 1;
@@ -3073,16 +3099,16 @@ body::after {
 .cards-column {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 16px;
   min-width: 0;
 }
 
-.cards-column--english .card {
-  border-left: 4px solid #ffc107;
+#cards-column-english .card {
+  border-left: 4px solid var(--accent);
 }
 
-.cards-column--russian .card {
-  border-left: 4px solid #2196f3;
+#cards-column-russian .card {
+  border-left: 4px solid var(--accent-secondary);
 }
 
 .errors-label {
@@ -3094,55 +3120,53 @@ body::after {
   display: none;
 }
 
-/* На мобильных сохраняем 2 колонки (EN | RU), шрифт в карточках подстраивается через .card-label */
+/* Карточки слов: в стиле lesson-card/профиля — крупнее блоки и шрифт */
 
 .card {
   position: relative;
-  border-radius: 0;
-  padding: 16px;
-  background: rgba(255, 255, 255, 0.85);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  border-radius: var(--radius-md);
+  padding: 20px 18px;
+  background: var(--card-soft);
   cursor: pointer;
   text-align: center;
-  font-size: 20px;
+  font-size: 1.25rem;
   font-weight: 700;
-  border: 3px solid var(--border-strong);
+  border: 4px solid var(--border-strong);
   color: var(--text);
-  min-height: 72px;
+  min-height: 88px;
   display: flex;
   align-items: center;
   justify-content: center;
-  line-height: 1.3;
+  line-height: 1.35;
   user-select: none;
   transform: translateY(0);
-  transition: all var(--transition-theme), transform var(--transition-fast), box-shadow var(--transition-fast);
-  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.2);
+  transition: background-color var(--transition-theme), border-color var(--transition-theme), color var(--transition-theme), transform var(--transition-fast), box-shadow var(--transition-fast);
+  box-shadow: 0 4px 0 rgba(0, 0, 0, 0.2);
   container-type: inline-size;
   container-name: card;
   min-width: 0;
 }
 
-/* Текст слова подстраивается под ширину карточки (уменьшается, если не влезает) */
+/* Текст слова: крупнее, подстраивается под ширину карточки */
 .card-label {
   display: block;
   overflow: hidden;
   text-overflow: ellipsis;
   max-width: 100%;
-  font-size: clamp(11px, 12cqi, 22px);
+  font-size: clamp(14px, 14cqi, 26px);
+  font-weight: 800;
 }
 
 [data-theme="dark"] .card {
-  background: rgba(26, 31, 46, 0.85);
-  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.5);
+  background: var(--card-soft);
+  box-shadow: 0 4px 0 rgba(0, 0, 0, 0.5);
 }
 
 .card:hover {
   transform: translateY(-4px);
   box-shadow: 0 6px 0 rgba(0, 0, 0, 0.3);
-  background: rgba(255, 193, 7, 0.9);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  background: var(--accent-soft);
+  border-color: var(--accent);
 }
 
 .card--english {
@@ -3154,68 +3178,70 @@ body::after {
 }
 
 .card--selected {
-  border-color: #ffc107;
-  background: rgba(255, 193, 7, 0.9);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  color: #000000;
-  box-shadow: 0 0 0 3px rgba(255, 193, 7, 0.3),
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--text);
+  box-shadow: 0 0 0 3px rgba(255, 193, 7, 0.35),
     0 6px 0 rgba(0, 0, 0, 0.3);
 }
 
-/* Выбранная карточка в тёмной теме: сохраняем подсветку как при наведении */
 [data-theme="dark"] .card--selected {
-  background: rgba(255, 193, 7, 0.9);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  color: #000000;
-  border-color: #ffc107;
-  box-shadow: 0 0 0 3px rgba(255, 193, 7, 0.3),
+  background: var(--accent-soft);
+  color: var(--text);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(255, 193, 7, 0.35),
     0 6px 0 rgba(0, 0, 0, 0.5);
 }
 
 .card--matched {
-  background: rgba(255, 193, 7, 0.6);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  border-color: #000000;
-  color: #000000;
+  background: var(--bg-elevated);
+  border-color: var(--border-subtle);
+  color: var(--text-soft);
   cursor: default;
-  opacity: 0.7;
-  box-shadow: 0 0 0 3px rgba(255, 193, 7, 0.2),
-    0 0 0 5px rgba(33, 150, 243, 0.2),
-    0 6px 0 rgba(0, 0, 0, 0.2);
+  opacity: 0.55;
+  filter: grayscale(0.4);
+  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.15),
+    0 0 0 2px var(--accent-secondary);
   position: relative;
+}
+
+[data-theme="dark"] .card--matched {
+  background: var(--bg-elevated);
+  opacity: 0.4;
+  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.5),
+    0 0 0 2px var(--accent-secondary);
 }
 
 .card--matched::before {
   content: "";
   position: absolute;
-  top: -3px;
-  left: -3px;
-  right: -3px;
-  bottom: -3px;
-  border: 2px solid #2196f3;
+  top: -4px;
+  left: -4px;
+  right: -4px;
+  bottom: -4px;
+  border: 2px solid var(--accent-secondary);
   opacity: 0.4;
+  border-radius: inherit;
   animation: pulse-glow 2s ease-in-out infinite;
 }
 
 .card--disabled {
-  opacity: 0.3;
+  opacity: 0.35;
   cursor: default;
-  background: rgba(245, 245, 245, 0.85);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  background: var(--card-soft);
 }
 
 .card--wrong {
-  background: rgba(0, 0, 0, 0.9);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  border-color: #000000;
+  background: var(--danger);
+  border-color: var(--danger);
   color: #ffffff;
-  box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.3),
-    0 6px 0 rgba(0, 0, 0, 0.3);
+  box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.25),
+    0 6px 0 rgba(0, 0, 0, 0.4);
+}
+
+[data-theme="dark"] .card--wrong {
+  box-shadow: 0 0 0 3px rgba(255, 68, 68, 0.3),
+    0 6px 0 rgba(0, 0, 0, 0.5);
 }
 
 .card-tag {
@@ -3863,6 +3889,141 @@ body::after {
   transition: background-color var(--transition-theme), border-color var(--transition-theme);
 }
 
+/* Адаптивные размеры для квадратов в зависимости от длины слова */
+.puzzle-slots--adaptive.puzzle-slots--length-1 .puzzle-slot-container {
+  max-width: 120px;
+}
+
+.puzzle-slots--adaptive.puzzle-slots--length-2 .puzzle-slot-container {
+  max-width: 100px;
+}
+
+.puzzle-slots--adaptive.puzzle-slots--length-3 .puzzle-slot-container {
+  max-width: 90px;
+}
+
+.puzzle-slots--adaptive.puzzle-slots--length-4 .puzzle-slot-container {
+  max-width: 80px;
+}
+
+.puzzle-slots--adaptive.puzzle-slots--length-5 .puzzle-slot-container {
+  max-width: 72px;
+}
+
+.puzzle-slots--adaptive.puzzle-slots--length-6 .puzzle-slot-container {
+  max-width: 65px;
+}
+
+.puzzle-slots--adaptive.puzzle-slots--length-7 .puzzle-slot-container {
+  max-width: 58px;
+}
+
+/* Адаптивный размер шрифта в квадратах */
+.puzzle-slots--adaptive.puzzle-slots--length-8 .puzzle-slot,
+.puzzle-slots--adaptive.puzzle-slots--length-9 .puzzle-slot,
+.puzzle-slots--adaptive.puzzle-slots--length-10 .puzzle-slot {
+  font-size: min(24px, 28cqw);
+}
+
+.puzzle-slots--adaptive.puzzle-slots--length-6 .puzzle-slot,
+.puzzle-slots--adaptive.puzzle-slots--length-7 .puzzle-slot {
+  font-size: min(28px, 30cqw);
+}
+
+.puzzle-slots--adaptive.puzzle-slots--length-5 .puzzle-slot {
+  font-size: min(32px, 33cqw);
+}
+
+/* Режим для длинных слов (текст без квадратов) */
+.puzzle-slots--long-word {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 4px;
+  min-height: auto;
+  padding: 24px 16px;
+  line-height: 1.5;
+}
+
+.puzzle-slot-text {
+  display: inline-block;
+  min-width: 1.2em;
+  text-align: center;
+  font-size: clamp(28px, 5vw, 40px);
+  font-weight: 900;
+  color: var(--text);
+  transition: all var(--transition-fast);
+  padding: 4px 2px;
+  border-bottom: 3px solid transparent;
+  position: relative;
+}
+
+.puzzle-slot-text--empty {
+  color: var(--text-soft);
+  border-bottom-color: var(--border-strong);
+  opacity: 0.5;
+}
+
+.puzzle-slot-text--filled {
+  color: var(--text);
+  border-bottom-color: var(--border-strong);
+}
+
+.puzzle-slot-text--correct {
+  color: #000000;
+  background: var(--accent);
+  border-bottom-color: var(--accent);
+  padding: 4px 6px;
+  border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(255, 193, 7, 0.4);
+}
+
+[data-theme="dark"] .puzzle-slot-text--correct {
+  box-shadow: 0 2px 8px rgba(255, 193, 7, 0.5);
+}
+
+.puzzle-slot-text--wrong {
+  color: #ffffff;
+  background: var(--danger);
+  border-bottom-color: var(--danger);
+  padding: 4px 6px;
+  border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+[data-theme="dark"] .puzzle-slot-text--wrong {
+  background: #ff4444;
+  box-shadow: 0 2px 8px rgba(255, 68, 68, 0.4);
+}
+
+.puzzle-long-word-correct {
+  width: 100%;
+  margin-top: 16px;
+  padding: 12px 16px;
+  background: rgba(255, 193, 7, 0.1);
+  border: 2px solid var(--accent);
+  border-radius: 8px;
+  text-align: center;
+  font-size: clamp(16px, 4vw, 20px);
+  color: var(--text);
+}
+
+.puzzle-long-word-correct strong {
+  color: var(--accent);
+  font-weight: 900;
+}
+
+/* Для слов длиннее 8 букв уменьшаем размер шрифта */
+.puzzle-slots--medium-long .puzzle-slot-text {
+  font-size: clamp(22px, 4vw, 32px);
+}
+
+/* Для очень длинных слов (более 10 букв) ещё больше уменьшаем размер шрифта */
+.puzzle-slots--very-long .puzzle-slot-text {
+  font-size: clamp(18px, 3.5vw, 26px);
+}
+
 .puzzle-slots::before {
   content: "";
   position: absolute;
@@ -3893,6 +4054,19 @@ body::after {
   position: relative;
   padding-bottom: 48px;
   box-sizing: border-box;
+}
+
+/* Адаптивные размеры для квадратов в зависимости от длины слова (до 10 букв) */
+.puzzle-slots--adaptive.puzzle-slots--length-8 .puzzle-slot-container {
+  max-width: 52px;
+}
+
+.puzzle-slots--adaptive.puzzle-slots--length-9 .puzzle-slot-container {
+  max-width: 48px;
+}
+
+.puzzle-slots--adaptive.puzzle-slots--length-10 .puzzle-slot-container {
+  max-width: 44px;
 }
 
 .puzzle-slot {
@@ -6454,6 +6628,12 @@ body::after {
     width: 100%;
   }
 
+  /* В сложном режиме пазлов на мобильной версии выравнивание сверху */
+  .app-shell--game-only .game-only-main:has(.puzzle-hard-input-wrap) {
+    align-items: flex-start;
+    padding-top: 8px;
+  }
+
   .lesson-title {
     font-size: clamp(20px, 5vw, 28px);
   }
@@ -6467,16 +6647,19 @@ body::after {
     height: 12px;
   }
 
-  /* Игры: поиск пары */
+  /* Игры: поиск пары — компактнее на очень малых экранах, но блоки и шрифт читаемые */
   .pairs-exercise {
-    padding: 20px 16px;
-    gap: 20px;
+    padding: 24px 18px;
+    gap: 24px;
   }
 
-  /* Поиск пары: 2 колонки сохранены, шрифт в карточках — через .card-label (container query) */
   .pairs-exercise .card {
-    min-height: 52px;
-    padding: 14px 10px;
+    min-height: 72px;
+    padding: 18px 14px;
+  }
+
+  .pairs-exercise .card-label {
+    font-size: clamp(14px, 12cqi, 22px);
   }
 
   .card-tag,
@@ -6540,6 +6723,51 @@ body::after {
   .puzzle-slots {
     padding: 16px 12px 20px;
     min-height: 100px;
+  }
+
+  /* Мобильные стили для адаптивных квадратов */
+  .puzzle-slots--adaptive.puzzle-slots--length-8 .puzzle-slot-container,
+  .puzzle-slots--adaptive.puzzle-slots--length-9 .puzzle-slot-container,
+  .puzzle-slots--adaptive.puzzle-slots--length-10 .puzzle-slot-container {
+    max-width: 42px;
+  }
+
+  .puzzle-slots--adaptive.puzzle-slots--length-6 .puzzle-slot-container,
+  .puzzle-slots--adaptive.puzzle-slots--length-7 .puzzle-slot-container {
+    max-width: 50px;
+  }
+
+  .puzzle-slots--adaptive.puzzle-slots--length-5 .puzzle-slot-container {
+    max-width: 55px;
+  }
+
+  .puzzle-slots--adaptive.puzzle-slots--length-4 .puzzle-slot-container {
+    max-width: 60px;
+  }
+
+  /* Мобильные стили для длинных слов */
+  .puzzle-slots--long-word {
+    padding: 20px 12px;
+    gap: 3px;
+  }
+
+  .puzzle-slot-text {
+    font-size: clamp(24px, 6vw, 36px);
+    padding: 3px 1px;
+  }
+
+  .puzzle-slots--medium-long .puzzle-slot-text {
+    font-size: clamp(20px, 5vw, 28px);
+  }
+
+  .puzzle-slots--very-long .puzzle-slot-text {
+    font-size: clamp(18px, 4.5vw, 24px);
+  }
+
+  .puzzle-long-word-correct {
+    padding: 10px 12px;
+    font-size: clamp(14px, 3.5vw, 18px);
+    margin-top: 12px;
   }
 
   .puzzle-letters {

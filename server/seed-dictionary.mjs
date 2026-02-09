@@ -12,6 +12,7 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import { pool, initDb } from "./db.js";
+import { updateDictionaryVersion } from "./dictionaryRepo.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DEFAULT_CSV = path.resolve(__dirname, "data", "dictionary_A0_A2_2000_unique_freq_register.csv");
@@ -131,6 +132,11 @@ async function seedFromCsv(client, filePath) {
     "SELECT setval(pg_get_serial_sequence('dictionary_entries', 'id'), COALESCE((SELECT MAX(id) FROM dictionary_entries), 1))"
   );
   console.log(`  Вставлено: ${inserted} слов.`);
+  
+  // Обновляем версию словаря после seed
+  const version = await updateDictionaryVersion("en");
+  console.log(`  Версия словаря обновлена: ${version}`);
+  
   return inserted;
 }
 
@@ -180,6 +186,10 @@ async function seedFromTs(client) {
   );
   const total = A0_DICTIONARY.length + A1_DICTIONARY.length + A2_DICTIONARY.length;
   console.log(`Итого: ${total} слов.`);
+  
+  // Обновляем версию словаря после seed
+  const version = await updateDictionaryVersion("en");
+  console.log(`Версия словаря обновлена: ${version}`);
 }
 
 async function seed() {

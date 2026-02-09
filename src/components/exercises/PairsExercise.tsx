@@ -88,6 +88,8 @@ const PairsExercise: React.FC = () => {
 
   useEffect(() => {
     if (wordsLoading || dictionaryWords.length === 0) return;
+    // Сбрасываем выбранную карточку сразу при изменении этапа
+    setSelectedIndex(null);
     if (prevStageRef.current !== stage) {
       justChangedStageRef.current = true;
       prevStageRef.current = stage;
@@ -101,7 +103,6 @@ const PairsExercise: React.FC = () => {
     );
     setStageWords(words);
     setCards(buildPairsCards(words));
-    setSelectedIndex(null);
     setMatchedCount(0);
     setWordsWithErrorThisStage(new Set());
     setStatus(`Этап ${stage} из ${PAIRS_STAGES_TOTAL}. Найди пары.`);
@@ -230,12 +231,16 @@ const PairsExercise: React.FC = () => {
     }
     const currentStage = stage;
     stageCompletedRef.current = currentStage;
+    // Сбрасываем выбранную карточку при завершении этапа
+    setSelectedIndex(null);
     if (process.env.NODE_ENV === "development") {
       console.debug("[Pairs] stage completed", { currentStage, sessionXp: sessionXpRef.current });
     }
 
     if (currentStage < PAIRS_STAGES_TOTAL) {
       stageTransitionTimeoutRef.current = setTimeout(() => {
+        // Дополнительно сбрасываем перед переходом на следующий этап
+        setSelectedIndex(null);
         setStage((prev) => {
           if (prev === currentStage && prev < PAIRS_STAGES_TOTAL) {
             if (process.env.NODE_ENV === "development") {
@@ -246,7 +251,7 @@ const PairsExercise: React.FC = () => {
           return prev;
         });
         stageTransitionTimeoutRef.current = null;
-      }, 1000);
+      }, 300);
     } else {
       // Последний этап завершен
       setShowResult(true);
@@ -397,7 +402,6 @@ const PairsExercise: React.FC = () => {
                 onClick={() => handleCardClick(card.index)}
                 type="button"
               >
-                <span className="card-tag">EN</span>
                 {card.accent !== "both" && (
                   <span className="card-accent">
                     {card.accent === "UK" ? "🇬🇧 UK" : "🇺🇸 US"}
@@ -419,7 +423,6 @@ const PairsExercise: React.FC = () => {
                 onClick={() => handleCardClick(card.index)}
                 type="button"
               >
-                <span className="card-tag">RU</span>
                 <span className="card-label">{card.label}</span>
               </button>
             ))}

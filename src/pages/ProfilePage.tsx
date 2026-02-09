@@ -297,7 +297,7 @@ const ProfilePage: React.FC = () => {
               <span className="profile-card__graph-total">{formatXp(weekTotalXp)} XP</span>
             </div>
             <div className="profile-card__chart">
-              <svg className="profile-card__chart-svg" viewBox="0 0 700 200" preserveAspectRatio="xMidYMid meet" aria-hidden>
+              <svg className="profile-card__chart-svg" viewBox="0 0 700 300" preserveAspectRatio="xMidYMid meet" aria-hidden>
                 <defs>
                   <linearGradient id="profile-xp-line-gradient" x1="0%" y1="0%" x2="0%" y2="100%">
                     <stop offset="0%" className="profile-card__chart-stop-top" stopOpacity="0.35" />
@@ -306,19 +306,19 @@ const ProfilePage: React.FC = () => {
                 </defs>
                 <g className="profile-card__chart-grid">
                   {yTicks.slice(0, -1).map((tick) => {
-                    const y = 32 + (1 - tick / yMax) * 136;
+                    const y = 40 + (1 - tick / yMax) * 200;
                     return <line key={tick} x1={52} y1={y} x2={684} y2={y} />;
                   })}
                   {[0, 1, 2, 3, 4, 5, 6].map((i) => {
                     const x = 52 + (i / 6) * 632;
-                    return <line key={i} x1={x} y1={32} x2={x} y2={168} />;
+                    return <line key={i} x1={x} y1={40} x2={x} y2={240} />;
                   })}
                 </g>
                 <g className="profile-card__chart-axis-y" aria-hidden>
                   {yTicks.map((tick) => {
-                    const y = 32 + (1 - tick / yMax) * 136;
+                    const y = 40 + (1 - tick / yMax) * 200;
                     return (
-                      <text key={tick} x={48} y={y + 4} textAnchor="end">
+                      <text key={tick} x={48} y={y + 5} textAnchor="end">
                         {tick >= 1000 ? `${tick / 1000}k` : tick}
                       </text>
                     );
@@ -328,7 +328,7 @@ const ProfilePage: React.FC = () => {
                   {weekData.map((d, i) => {
                     const x = 52 + (i / 6) * 632;
                     return (
-                      <text key={d.date} x={x} y={188} textAnchor="middle">
+                      <text key={d.date} x={x} y={270} textAnchor="middle">
                         {d.shortLabel}
                       </text>
                     );
@@ -338,31 +338,70 @@ const ProfilePage: React.FC = () => {
                   className="profile-card__chart-area"
                   d={(() => {
                     const w = 632;
-                    const h = 136;
+                    const h = 200;
                     const ox = 52;
-                    const oy = 32 + h;
-                    const pts = weekData.map((d, i) => {
-                      const x = ox + (i / 6) * w;
-                      const y = oy - (d.xp / yMax) * h;
-                      return `${i === 0 ? "M" : "L"} ${x} ${y}`;
-                    });
-                    return `${pts.join(" ")} L ${ox + w} ${oy} L ${ox} ${oy} Z`;
+                    const oy = 40 + h;
+                    const points = weekData.map((d, i) => ({
+                      x: ox + (i / 6) * w,
+                      y: oy - (d.xp / yMax) * h,
+                    }));
+                    
+                    // Создаем плавную кривую Безье для области
+                    let path = `M ${points[0].x} ${points[0].y}`;
+                    for (let i = 0; i < points.length - 1; i++) {
+                      const p0 = points[Math.max(0, i - 1)];
+                      const p1 = points[i];
+                      const p2 = points[i + 1];
+                      const p3 = points[Math.min(points.length - 1, i + 2)];
+                      
+                      const cp1x = p1.x + (p2.x - p0.x) / 6;
+                      const cp1y = p1.y + (p2.y - p0.y) / 6;
+                      const cp2x = p2.x - (p3.x - p1.x) / 6;
+                      const cp2y = p2.y - (p3.y - p1.y) / 6;
+                      
+                      path += ` C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${p2.x} ${p2.y}`;
+                    }
+                    path += ` L ${ox + w} ${oy} L ${ox} ${oy} Z`;
+                    return path;
                   })()}
                 />
-                <polyline
+                <path
                   className="profile-card__chart-line"
-                  points={weekData
-                    .map((d, i) => {
-                      const x = 52 + (i / 6) * 632;
-                      const y = 32 + (1 - d.xp / yMax) * 136;
-                      return `${x},${y}`;
-                    })
-                    .join(" ")}
+                  d={(() => {
+                    const w = 632;
+                    const h = 200;
+                    const ox = 52;
+                    const oy = 40 + h;
+                    const points = weekData.map((d, i) => ({
+                      x: ox + (i / 6) * w,
+                      y: oy - (d.xp / yMax) * h,
+                    }));
+                    
+                    // Создаем плавную кривую Безье для линии
+                    if (points.length === 0) return "";
+                    if (points.length === 1) return `M ${points[0].x} ${points[0].y}`;
+                    
+                    let path = `M ${points[0].x} ${points[0].y}`;
+                    for (let i = 0; i < points.length - 1; i++) {
+                      const p0 = points[Math.max(0, i - 1)];
+                      const p1 = points[i];
+                      const p2 = points[i + 1];
+                      const p3 = points[Math.min(points.length - 1, i + 2)];
+                      
+                      const cp1x = p1.x + (p2.x - p0.x) / 6;
+                      const cp1y = p1.y + (p2.y - p0.y) / 6;
+                      const cp2x = p2.x - (p3.x - p1.x) / 6;
+                      const cp2y = p2.y - (p3.y - p1.y) / 6;
+                      
+                      path += ` C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${p2.x} ${p2.y}`;
+                    }
+                    return path;
+                  })()}
                 />
                 <g className="profile-card__chart-points">
                   {weekData.map((d, i) => {
                     const x = 52 + (i / 6) * 632;
-                    const y = 32 + (1 - d.xp / yMax) * 136;
+                    const y = 40 + (1 - d.xp / yMax) * 200;
                     return (
                       <circle
                         key={d.date}

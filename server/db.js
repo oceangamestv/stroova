@@ -39,7 +39,8 @@ CREATE TABLE IF NOT EXISTS sessions (
 CREATE TABLE IF NOT EXISTS languages (
   id SERIAL PRIMARY KEY,
   code VARCHAR(10) UNIQUE NOT NULL,
-  name VARCHAR(100) NOT NULL
+  name VARCHAR(100) NOT NULL,
+  version VARCHAR(32) DEFAULT NULL
 );
 
 -- Словарь: слова по языкам (например «словарь английского» = language_id = 1)
@@ -99,6 +100,7 @@ export async function initDb() {
   try {
     await client.query(INIT_SQL);
     await client.query("ALTER TABLE user_active_days ADD COLUMN IF NOT EXISTS max_streak INT NOT NULL DEFAULT 0");
+    await client.query("ALTER TABLE languages ADD COLUMN IF NOT EXISTS version VARCHAR(32) DEFAULT NULL");
     await client.query(SEED_LANGUAGE_SQL);
   } finally {
     client.release();

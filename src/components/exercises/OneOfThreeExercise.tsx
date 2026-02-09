@@ -58,15 +58,30 @@ function shuffle<T>(arr: T[]): T[] {
 function buildOptions(correctWord: Word, pool: Word[]): Option[] {
   const correctRu = correctWord.ru;
   const others = pool.filter((w) => w.id !== correctWord.id && w.ru !== correctRu);
+  
+  // Перемешиваем массив других слов для случайного выбора
+  const shuffledOthers = shuffle(others);
+  
   const wrongRu: string[] = [];
-  for (const w of others) {
+  // Берем первые два уникальных перевода из перемешанного массива
+  for (const w of shuffledOthers) {
     if (wrongRu.length >= 2) break;
     if (!wrongRu.includes(w.ru)) wrongRu.push(w.ru);
   }
-  while (wrongRu.length < 2 && others.length > 0) {
-    wrongRu.push(others[wrongRu.length % others.length].ru);
-    if (wrongRu.length >= 2) break;
+  
+  // Если не хватило уникальных вариантов, добавляем случайные из оставшихся
+  while (wrongRu.length < 2 && shuffledOthers.length > 0) {
+    const randomIndex = Math.floor(Math.random() * shuffledOthers.length);
+    const randomRu = shuffledOthers[randomIndex].ru;
+    if (!wrongRu.includes(randomRu)) {
+      wrongRu.push(randomRu);
+    }
+    // Защита от бесконечного цикла: если все варианты уже добавлены, выходим
+    if (wrongRu.length >= 2 || shuffledOthers.every(w => wrongRu.includes(w.ru))) {
+      break;
+    }
   }
+  
   const options: Option[] = [
     { ru: correctRu, isCorrect: true },
     ...wrongRu.slice(0, 2).map((ru) => ({ ru, isCorrect: false })),

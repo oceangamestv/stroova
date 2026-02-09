@@ -7,7 +7,7 @@ export default defineConfig({
   plugins: [
     react(),
     // Гарантируем, что маршруты SPA (/dictionary, /profile и т.д.) отдают index.html,
-    // а не файлы из корня (dictionary.html), чтобы после F5 показывалось приложение, а не статика.
+    // чтобы после F5 показывалось приложение, а не 404.
     {
       name: "spa-fallback-routes",
       configureServer(server) {

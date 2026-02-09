@@ -7,6 +7,7 @@ import "dotenv/config";
 
 import http from "http";
 import crypto from "crypto";
+import zlib from "zlib";
 import { initDb } from "./db.js";
 import {
   getUser,
@@ -32,13 +33,37 @@ function randomToken() {
 
 function send(res, status, body) {
   const data = typeof body === "object" ? JSON.stringify(body) : body;
-  res.writeHead(status, {
+  const dataBuffer = Buffer.from(data, "utf8");
+  
+  // Проверяем, поддерживает ли клиент gzip
+  const acceptEncoding = res.req?.headers["accept-encoding"] || "";
+  const supportsGzip = acceptEncoding.includes("gzip") && dataBuffer.length > 1024; // Сжимаем только ответы >1KB
+  
+  const headers = {
     "Content-Type": "application/json",
     "Access-Control-Allow-Origin": CORS_ORIGIN,
     "Access-Control-Allow-Methods": "GET, POST, PATCH, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type, Authorization",
-  });
-  res.end(data);
+  };
+  
+  if (supportsGzip) {
+    try {
+      const compressed = zlib.gzipSync(dataBuffer);
+      headers["Content-Encoding"] = "gzip";
+      headers["Content-Length"] = compressed.length;
+      res.writeHead(status, headers);
+      res.end(compressed);
+    } catch (err) {
+      // Если сжатие не удалось, отправляем без сжатия
+      headers["Content-Length"] = dataBuffer.length;
+      res.writeHead(status, headers);
+      res.end(dataBuffer);
+    }
+  } else {
+    headers["Content-Length"] = dataBuffer.length;
+    res.writeHead(status, headers);
+    res.end(dataBuffer);
+  }
 }
 
 function parseBody(req) {

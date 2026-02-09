@@ -216,12 +216,12 @@ const PuzzleExercise: React.FC = () => {
     return () => clearInterval(id);
   }, [timerRunning, showResult, endGameByTime]);
 
-  const applyLetter = (letter: string) => {
+  const applyLetter = (letter: string, letterIndex?: number) => {
     if (!state || locked) return;
     const emptySlotIndex = state.slots.findIndex((slot) => slot === null);
     if (emptySlotIndex === -1) return;
 
-    const updated = placeLetterInSlot(state, letter, emptySlotIndex, difficulty);
+    const updated = placeLetterInSlot(state, letter, emptySlotIndex, difficulty, letterIndex);
     setState({ ...updated, letters: [...updated.letters] });
 
     const complete = isPuzzleComplete(updated);
@@ -358,9 +358,13 @@ const PuzzleExercise: React.FC = () => {
       if (difficulty === "easy") {
         const letterItem = state.letters.find((item) => item.letter === letter && !item.used);
         if (!letterItem) return;
+        // При использовании клавиатуры используем индекс найденной буквы
+        applyLetter(letter, letterItem.index);
+      } else {
+        if (key === " ") event.preventDefault();
+        applyLetter(letter);
       }
-      if (key === " ") event.preventDefault();
-      applyLetter(letter);
+      if (key === " " && difficulty !== "easy") event.preventDefault();
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
@@ -373,6 +377,9 @@ const PuzzleExercise: React.FC = () => {
       : (state?.letters.length ?? 0);
   const showLettersPanel =
     difficulty === "easy" && hasEmptySlot && visibleLetterCount > 0;
+  
+  // Длина слова для стилизации
+  const wordLength = state?.word.length ?? 0;
 
   const personalWordsCount =
     dictionaryWords.length > 0
@@ -515,27 +522,28 @@ const PuzzleExercise: React.FC = () => {
         </div>
 
         <div className="puzzle-slots-wrapper" id="puzzle-slots-wrapper">
-          <div className="puzzle-slots" id="puzzle-slots">
+          <div className={`puzzle-slots puzzle-slots--long-word ${wordLength > 8 ? "puzzle-slots--medium-long" : ""} ${wordLength > 10 ? "puzzle-slots--very-long" : ""}`} id="puzzle-slots">
             {state?.slots.map((letter, index) => (
-              <div className="puzzle-slot-container" key={`slot-${index}`}>
-                <div
-                  className={`puzzle-slot ${letter ? "filled" : ""} ${
-                    state.slotsState[index] === "correct"
-                      ? "correct"
-                      : state.slotsState[index] === "wrong"
-                        ? "wrong"
-                        : ""
-                  }`}
-                >
-                  {letter === " " ? "␣" : letter || ""}
-                </div>
-                {state.slotsState[index] === "wrong" && (
-                  <div className="puzzle-slot-hint">
-                    {state.word[index] === " " ? "␣" : state.word[index]}
-                  </div>
-                )}
-              </div>
+              <span
+                key={`slot-${index}`}
+                className={`puzzle-slot-text ${
+                  state.slotsState[index] === "correct"
+                    ? "puzzle-slot-text--correct"
+                    : state.slotsState[index] === "wrong"
+                      ? "puzzle-slot-text--wrong"
+                      : letter
+                        ? "puzzle-slot-text--filled"
+                        : "puzzle-slot-text--empty"
+                }`}
+              >
+                {letter === " " ? "␣" : letter || " "}
+              </span>
             ))}
+            {state?.slotsState?.some((s) => s === "wrong") && state?.word && (
+              <div className="puzzle-long-word-correct">
+                Правильно: <strong>{state.word}</strong>
+              </div>
+            )}
           </div>
           {showNext && (
             <button className="puzzle-next-word-btn" type="button" onClick={goNextWord}>
@@ -591,7 +599,7 @@ const PuzzleExercise: React.FC = () => {
                   key={`letter-${item.index}-${item.letter}`}
                   className={`puzzle-letter ${isUsed ? "puzzle-letter--used" : ""}`}
                   type="button"
-                  onClick={() => !isUsed && applyLetter(item.letter)}
+                  onClick={() => !isUsed && applyLetter(item.letter, item.index)}
                   disabled={isUsed}
                   aria-disabled={isUsed}
                 >

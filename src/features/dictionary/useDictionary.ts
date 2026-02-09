@@ -71,54 +71,85 @@ export function useDictionary(lang = "en"): UseDictionaryResult {
   const [error, setError] = useState<string | null>(null);
 
   const fetchWords = async (force = false) => {
-    setLoading(true);
     setError(null);
 
-    try {
-      // Если не принудительная загрузка, проверяем версию
-      if (!force) {
-        const cachedVersion = getCachedVersion(lang);
-        const cachedWords = getCachedWords(lang);
-
-        if (cachedVersion && cachedWords && cachedWords.length > 0) {
+    // Если не принудительная загрузка и есть кэш - показываем кэш сразу
+    if (!force) {
+      const cachedWords = getCachedWords(lang);
+      const cachedVersion = getCachedVersion(lang);
+      
+      if (cachedWords && cachedWords.length > 0) {
+        // Показываем кэш сразу для мгновенного отображения
+        setWords(cachedWords);
+        setLoading(false);
+        
+        // Проверяем версию параллельно (не блокируем UI)
+        if (cachedVersion) {
+          dictionaryApi.getVersion(lang)
+            .then(({ version: serverVersion }) => {
+              if (serverVersion !== cachedVersion) {
+                // Версия изменилась - загружаем новые слова
+                setLoading(true);
+                return Promise.all([
+                  dictionaryApi.getWords({ lang }),
+                  dictionaryApi.getVersion(lang),
+                ]);
+              }
+              return null;
+            })
+            .then((results) => {
+              if (results) {
+                const [data, versionData] = results;
+                if (Array.isArray(data) && data.length > 0) {
+                  setWords(data);
+                  setCachedWords(lang, data);
+                  setCachedVersion(lang, versionData.version);
+                }
+              }
+            })
+            .catch((versionError) => {
+              // Если проверка версии не удалась, оставляем кэш
+              console.warn("Не удалось проверить версию словаря:", versionError);
+            })
+            .finally(() => {
+              setLoading(false);
+            });
+        } else {
+          // Если версии нет в кэше, загружаем слова и версию
+          setLoading(true);
           try {
-            // Проверяем версию на сервере
-            const { version: serverVersion } = await dictionaryApi.getVersion(lang);
+            const [data, versionData] = await Promise.all([
+              dictionaryApi.getWords({ lang }),
+              dictionaryApi.getVersion(lang),
+            ]);
             
-            if (serverVersion === cachedVersion) {
-              // Версия совпадает - используем кэш
-              setWords(cachedWords);
-              setLoading(false);
-              return;
+            if (Array.isArray(data) && data.length > 0) {
+              setWords(data);
+              setCachedWords(lang, data);
+              setCachedVersion(lang, versionData.version);
             }
-            // Версия изменилась - загружаем новые слова
-          } catch (versionError) {
-            // Если проверка версии не удалась, используем кэш как fallback
-            console.warn("Не удалось проверить версию словаря, используем кэш:", versionError);
-            if (cachedWords && cachedWords.length > 0) {
-              setWords(cachedWords);
-              setLoading(false);
-              return;
-            }
+          } catch (fetchError) {
+            console.warn("Не удалось загрузить словарь:", fetchError);
+          } finally {
+            setLoading(false);
           }
         }
+        return;
       }
+    }
 
-      // Загружаем слова с сервера
-      const data = await dictionaryApi.getWords({ lang });
+    // Если нет кэша или принудительная загрузка - загружаем с сервера
+    setLoading(true);
+    try {
+      const [data, versionData] = await Promise.all([
+        dictionaryApi.getWords({ lang }),
+        dictionaryApi.getVersion(lang),
+      ]);
       
       if (Array.isArray(data) && data.length > 0) {
         setWords(data);
         setCachedWords(lang, data);
-        
-        // Получаем и сохраняем версию параллельно (не блокируем UI)
-        dictionaryApi.getVersion(lang)
-          .then(({ version }) => {
-            setCachedVersion(lang, version);
-          })
-          .catch((versionError) => {
-            console.warn("Не удалось получить версию словаря:", versionError);
-          });
+        setCachedVersion(lang, versionData.version);
       } else {
         setWords(A0_DICTIONARY);
       }
