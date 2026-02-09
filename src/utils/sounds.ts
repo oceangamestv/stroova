@@ -9,6 +9,9 @@ let kokoroInitialized = false;
 /** URI или name выбранного голоса из настроек; null = по умолчанию по акценту */
 let preferredVoiceUri: string | null = null;
 
+// Кэш для уже сгенерированного аудио: ключ = `${word}|${voice}|${accent}`, значение = AudioBuffer
+const audioCache = new Map<string, AudioBuffer>();
+
 // Локальные голоса Kokoro TTS (2 женских, 2 мужских с высокими рейтингами)
 const KOKORO_VOICES = {
   US_FEMALE: "af_heart", // Американский женский - один из лучших
@@ -21,14 +24,22 @@ if ("speechSynthesis" in window) {
   speechSynthesisRef = window.speechSynthesis;
 }
 
-/** Инициализация Kokoro TTS (ленивая загрузка) */
+/** Проверяет доступность WebGPU */
+const isWebGPUSupported = (): boolean => {
+  return typeof navigator !== "undefined" && "gpu" in navigator;
+};
+
+/** Инициализация Kokoro TTS с поддержкой WebGPU */
 const initializeKokoro = async (): Promise<boolean> => {
   if (kokoroInitialized || kokoroInitializing) return kokoroInitialized;
   
   try {
     kokoroInitializing = true;
+    // Используем WebGPU если доступно, иначе WASM (быстрее чем CPU)
+    const device = isWebGPUSupported() ? "webgpu" : "wasm";
     kokoroTTS = await KokoroTTS.from_pretrained("onnx-community/Kokoro-82M-v1.0-ONNX", {
-      dtype: "q8", // Используем квантованную версию для быстрой загрузки (~86MB)
+      dtype: "q8", // Квантованная версия для быстрой загрузки (~86MB)
+      device: device as "webgpu" | "wasm",
     });
     kokoroInitialized = true;
     return true;
@@ -97,7 +108,32 @@ const getKokoroVoice = (accent: "UK" | "US" | "both"): string => {
   return KOKORO_VOICES.US_FEMALE; // По умолчанию US женский
 };
 
-/** Воспроизведение через Kokoro TTS */
+/** Воспроизводит AudioBuffer через Web Audio API */
+const playAudioBuffer = (audioBuffer: AudioBuffer, rate?: number): void => {
+  try {
+    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    const source = audioContext.createBufferSource();
+    const gainNode = audioContext.createGain();
+    
+    source.buffer = audioBuffer;
+    source.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+    
+    if (rate !== undefined) {
+      source.playbackRate.value = rate;
+    }
+    
+    source.start(0);
+    
+    source.onended = () => {
+      audioContext.close();
+    };
+  } catch (error) {
+    console.error("Error playing audio:", error);
+  }
+};
+
+/** Воспроизведение через Kokoro TTS с кэшированием */
 const speakWithKokoro = async (
   word: string,
   accent: "UK" | "US" | "both" = "both",
@@ -113,44 +149,44 @@ const speakWithKokoro = async (
   }
 
   try {
-    // Используем переданный голос или выбираем по акценту
+    // Определяем голос
     let voice = voiceOverride;
     if (!voice || !voice.startsWith("kokoro:")) {
       voice = getKokoroVoice(accent);
     } else {
-      // Извлекаем имя голоса из формата "kokoro:af_heart"
       voice = voice.replace("kokoro:", "");
     }
     
-    const audio = await kokoroTTS.generate(word, { voice });
+    // Проверяем кэш
+    const cacheKey = `${word.toLowerCase()}|${voice}|${accent}`;
+    const cachedBuffer = audioCache.get(cacheKey);
     
-    // Конвертируем RawAudio в Blob и воспроизводим через Web Audio API
-    const audioBlob = await audio.toBlob();
-    const audioUrl = URL.createObjectURL(audioBlob);
-    
-    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-    const response = await fetch(audioUrl);
-    const arrayBuffer = await response.arrayBuffer();
-    const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
-    
-    const source = audioContext.createBufferSource();
-    const gainNode = audioContext.createGain();
-    
-    source.buffer = audioBuffer;
-    source.connect(gainNode);
-    gainNode.connect(audioContext.destination);
-    
-    // Применяем скорость (rate) через изменение playbackRate
-    if (rate !== undefined) {
-      source.playbackRate.value = rate;
+    if (cachedBuffer) {
+      // Используем кэшированное аудио - моментальное воспроизведение
+      playAudioBuffer(cachedBuffer, rate);
+      return;
     }
     
-    source.start(0);
+    // Генерируем новое аудио
+    const audio = await kokoroTTS.generate(word, { voice });
+    const audioBlob = await audio.toBlob();
     
-    source.onended = () => {
-      URL.revokeObjectURL(audioUrl);
-      audioContext.close();
-    };
+    // Декодируем и кэшируем
+    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    const arrayBuffer = await audioBlob.arrayBuffer();
+    const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+    
+    // Сохраняем в кэш
+    audioCache.set(cacheKey, audioBuffer);
+    
+    // Ограничиваем размер кэша (максимум 100 записей)
+    if (audioCache.size > 100) {
+      const firstKey = audioCache.keys().next().value;
+      audioCache.delete(firstKey);
+    }
+    
+    // Воспроизводим
+    playAudioBuffer(audioBuffer, rate);
   } catch (error) {
     console.error("Error speaking with Kokoro TTS:", error);
   }
@@ -166,7 +202,10 @@ export const speakWord = async (
   
   // Используем Kokoro TTS, если выбран голос Kokoro или системные голоса недоступны
   if (useKokoro || !hasSystemVoices()) {
-    await speakWithKokoro(word, accent, rate, preferredVoiceUri || undefined);
+    // Выполняем асинхронно без блокировки UI
+    speakWithKokoro(word, accent, rate, preferredVoiceUri || undefined).catch((error) => {
+      console.error("Error in speakWithKokoro:", error);
+    });
     return;
   }
   
@@ -214,8 +253,12 @@ export const initializeVoices = async () => {
     speechSynthesisRef.addEventListener("voiceschanged", () => {});
   }
   
-  // Предзагружаем Kokoro TTS в фоне, если системные голоса недоступны
-  if (!hasSystemVoices()) {
+  // Проверяем, нужно ли предзагрузить Kokoro
+  const useKokoro = preferredVoiceUri && preferredVoiceUri.startsWith("kokoro:");
+  const shouldPreloadKokoro = useKokoro || !hasSystemVoices();
+  
+  if (shouldPreloadKokoro) {
+    // Предзагружаем модель при старте приложения
     initializeKokoro().catch(() => {
       // Игнорируем ошибки при предзагрузке
     });

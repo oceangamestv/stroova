@@ -1,6 +1,7 @@
 import React from "react";
 import { Link } from "react-router-dom";
 import Header from "../components/common/Header";
+import { useIsMobile } from "../hooks/useIsMobile";
 
 /** Иконка: две карточки (поиск пары) */
 const IconPairs: React.FC<{ className?: string }> = ({ className }) => (
@@ -68,15 +69,19 @@ const GAMES = [
  * Гейм-хаб: список игр с описаниями. Показывается на мобильной главной (/).
  */
 const GameHubPage: React.FC = () => {
+  const isMobile = useIsMobile();
+  
   return (
     <div className="app-shell">
       <Header />
       <main className="main">
         <section className="game-hub" aria-label="Выбор игры">
-          <div className="game-hub__header">
-            <h1 className="game-hub__title">Игры</h1>
-            <p className="game-hub__subtitle">Выберите игру и нажмите, чтобы начать.</p>
-          </div>
+          {!isMobile && (
+            <div className="game-hub__header">
+              <h1 className="game-hub__title">Игры</h1>
+              <p className="game-hub__subtitle">Выберите игру и нажмите, чтобы начать.</p>
+            </div>
+          )}
           <ul className="game-hub__list" role="list">
             {GAMES.map((game, index) => (
               <li key={game.to} className="game-hub__item" style={{ animationDelay: `${index * 80}ms` }}>

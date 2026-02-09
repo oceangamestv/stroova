@@ -6,6 +6,7 @@ import { dictionaryService } from "../services/dictionaryService";
 import { personalDictionaryService } from "../services/personalDictionaryService";
 import { progressService } from "../services/progressService";
 import { speakWord as speakWordUtil } from "../utils/sounds";
+import { useAuth } from "../features/auth/AuthContext";
 import type { Word, WordProgressMap, Level } from "../data/contracts/types";
 
 type DictionaryTab = "general" | "personal";
@@ -69,6 +70,7 @@ const DictionaryPage: React.FC = () => {
   const settingsRef = useRef<HTMLDivElement | null>(null);
 
   const { words: generalWords, loading: wordsLoading, error: wordsError } = useDictionary();
+  const { user } = useAuth();
   const [personalIds, setPersonalIds] = useState<number[]>(() =>
     personalDictionaryService.getPersonalWordIds()
   );
@@ -76,6 +78,12 @@ const DictionaryPage: React.FC = () => {
     const set = new Set(personalIds);
     return generalWords.filter((w) => set.has(w.id));
   }, [generalWords, personalIds]);
+
+  // Обновляем personalIds когда загружается пользователь или изменяются его данные
+  useEffect(() => {
+    const ids = personalDictionaryService.getPersonalWordIds();
+    setPersonalIds(ids);
+  }, [user]);
 
   const dictionary = tab === "general" ? generalWords : personalWords;
   const [progress, setProgress] = useState<WordProgressMap>(
