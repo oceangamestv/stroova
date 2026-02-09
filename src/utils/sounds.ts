@@ -1,4 +1,6 @@
 import { KokoroTTS } from "kokoro-js";
+import { loadAudio, saveAudio } from "./audioStorage";
+import type { Word } from "../data/contracts/types";
 
 let speechSynthesisRef: SpeechSynthesis | null = null;
 let currentUtterance: SpeechSynthesisUtterance | null = null;
@@ -9,8 +11,8 @@ let kokoroInitialized = false;
 /** URI или name выбранного голоса из настроек; null = по умолчанию по акценту */
 let preferredVoiceUri: string | null = null;
 
-// Кэш для уже сгенерированного аудио: ключ = `${word}|${voice}|${accent}`, значение = AudioBuffer
-const audioCache = new Map<string, AudioBuffer>();
+// Единый AudioContext для воспроизведения (не закрываем его)
+let globalAudioContext: AudioContext | null = null;
 
 // Локальные голоса Kokoro TTS (2 женских, 2 мужских с высокими рейтингами)
 const KOKORO_VOICES = {
@@ -24,9 +26,25 @@ if ("speechSynthesis" in window) {
   speechSynthesisRef = window.speechSynthesis;
 }
 
+/** Получает или создает глобальный AudioContext */
+const getAudioContext = (): AudioContext => {
+  if (!globalAudioContext) {
+    globalAudioContext = new (window.AudioContext || window.webkitAudioContext)();
+  }
+  // Возобновляем контекст если он приостановлен
+  if (globalAudioContext.state === "suspended") {
+    globalAudioContext.resume();
+  }
+  return globalAudioContext;
+};
+
 /** Проверяет доступность WebGPU */
 const isWebGPUSupported = (): boolean => {
-  return typeof navigator !== "undefined" && "gpu" in navigator;
+  try {
+    return typeof navigator !== "undefined" && "gpu" in navigator && typeof navigator.gpu !== "undefined";
+  } catch {
+    return false;
+  }
 };
 
 /** Инициализация Kokoro TTS с поддержкой WebGPU */
@@ -108,46 +126,143 @@ const getKokoroVoice = (accent: "UK" | "US" | "both"): string => {
   return KOKORO_VOICES.US_FEMALE; // По умолчанию US женский
 };
 
-/** Воспроизводит AudioBuffer через Web Audio API */
-const playAudioBuffer = (audioBuffer: AudioBuffer, rate?: number): void => {
+/** Воспроизводит AudioBuffer через Web Audio API или HTMLAudioElement */
+const playAudioBuffer = async (audioBuffer: AudioBuffer, rate?: number): Promise<void> => {
   try {
-    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-    const source = audioContext.createBufferSource();
-    const gainNode = audioContext.createGain();
-    
-    source.buffer = audioBuffer;
-    source.connect(gainNode);
-    gainNode.connect(audioContext.destination);
-    
-    if (rate !== undefined) {
-      source.playbackRate.value = rate;
+    // Пробуем использовать Web Audio API
+    try {
+      const audioContext = getAudioContext();
+      const source = audioContext.createBufferSource();
+      const gainNode = audioContext.createGain();
+      
+      source.buffer = audioBuffer;
+      source.connect(gainNode);
+      gainNode.connect(audioContext.destination);
+      
+      if (rate !== undefined) {
+        source.playbackRate.value = rate;
+      }
+      
+      // Устанавливаем нормальную громкость
+      gainNode.gain.value = 1.0;
+      
+      source.start(0);
+      return;
+    } catch (webAudioError) {
+      // Если Web Audio API не работает, используем HTMLAudioElement
+      console.warn("Web Audio API failed, using HTMLAudioElement:", webAudioError);
     }
     
-    source.start(0);
+    // Fallback: используем HTMLAudioElement (более надежно в Telegram и других WebView)
+    const audioContext = getAudioContext();
+    const wavBlob = await audioBufferToWav(audioBuffer);
+    const audioUrl = URL.createObjectURL(wavBlob);
     
-    source.onended = () => {
-      audioContext.close();
-    };
+    const audio = new Audio(audioUrl);
+    if (rate !== undefined) {
+      audio.playbackRate = rate;
+    }
+    audio.volume = 1.0;
+    
+    await new Promise<void>((resolve, reject) => {
+      audio.onended = () => {
+        URL.revokeObjectURL(audioUrl);
+        resolve();
+      };
+      audio.onerror = () => {
+        URL.revokeObjectURL(audioUrl);
+        reject(new Error("Audio playback failed"));
+      };
+      audio.play().catch(reject);
+    });
   } catch (error) {
     console.error("Error playing audio:", error);
   }
 };
 
-/** Воспроизведение через Kokoro TTS с кэшированием */
+/** Конвертирует AudioBuffer в WAV Blob */
+const audioBufferToWav = async (buffer: AudioBuffer): Promise<Blob> => {
+  const length = buffer.length;
+  const numberOfChannels = buffer.numberOfChannels;
+  const sampleRate = buffer.sampleRate;
+  const arrayBuffer = new ArrayBuffer(44 + length * numberOfChannels * 2);
+  const view = new DataView(arrayBuffer);
+  
+  // WAV header
+  const writeString = (offset: number, string: string) => {
+    for (let i = 0; i < string.length; i++) {
+      view.setUint8(offset + i, string.charCodeAt(i));
+    }
+  };
+  
+  writeString(0, "RIFF");
+  view.setUint32(4, 36 + length * numberOfChannels * 2, true);
+  writeString(8, "WAVE");
+  writeString(12, "fmt ");
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true);
+  view.setUint16(22, numberOfChannels, true);
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate * numberOfChannels * 2, true);
+  view.setUint16(32, numberOfChannels * 2, true);
+  view.setUint16(34, 16, true);
+  writeString(36, "data");
+  view.setUint32(40, length * numberOfChannels * 2, true);
+  
+  // Convert float32 to int16
+  let offset = 44;
+  for (let i = 0; i < length; i++) {
+    for (let channel = 0; channel < numberOfChannels; channel++) {
+      const sample = Math.max(-1, Math.min(1, buffer.getChannelData(channel)[i]));
+      view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7FFF, true);
+      offset += 2;
+    }
+  }
+  
+  return new Blob([arrayBuffer], { type: "audio/wav" });
+};
+
+/** Генерирует и сохраняет аудио для слова */
+const generateAndSaveAudio = async (
+  word: string,
+  voice: string,
+  accent: string
+): Promise<AudioBuffer | null> => {
+  if (!kokoroTTS) {
+    const initialized = await initializeKokoro();
+    if (!initialized || !kokoroTTS) {
+      console.warn("Kokoro TTS not available");
+      return null;
+    }
+  }
+
+  try {
+    // Генерируем аудио
+    const audio = await kokoroTTS.generate(word, { voice });
+    const audioBlob = await audio.toBlob();
+    
+    // Декодируем
+    const audioContext = getAudioContext();
+    const arrayBuffer = await audioBlob.arrayBuffer();
+    const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+    
+    // Сохраняем в IndexedDB
+    await saveAudio(word, voice, accent, arrayBuffer);
+    
+    return audioBuffer;
+  } catch (error) {
+    console.error("Error generating audio:", error);
+    return null;
+  }
+};
+
+/** Воспроизведение через Kokoro TTS с использованием IndexedDB */
 const speakWithKokoro = async (
   word: string,
   accent: "UK" | "US" | "both" = "both",
   rate?: number,
   voiceOverride?: string
 ): Promise<void> => {
-  if (!kokoroTTS) {
-    const initialized = await initializeKokoro();
-    if (!initialized || !kokoroTTS) {
-      console.warn("Kokoro TTS not available");
-      return;
-    }
-  }
-
   try {
     // Определяем голос
     let voice = voiceOverride;
@@ -157,36 +272,22 @@ const speakWithKokoro = async (
       voice = voice.replace("kokoro:", "");
     }
     
-    // Проверяем кэш
-    const cacheKey = `${word.toLowerCase()}|${voice}|${accent}`;
-    const cachedBuffer = audioCache.get(cacheKey);
+    // Пытаемся загрузить из IndexedDB
+    const cachedArrayBuffer = await loadAudio(word, voice, accent);
     
-    if (cachedBuffer) {
-      // Используем кэшированное аудио - моментальное воспроизведение
-      playAudioBuffer(cachedBuffer, rate);
+    if (cachedArrayBuffer) {
+      // Найдено в IndexedDB - декодируем и воспроизводим мгновенно
+      const audioContext = getAudioContext();
+      const audioBuffer = await audioContext.decodeAudioData(cachedArrayBuffer);
+      await playAudioBuffer(audioBuffer, rate);
       return;
     }
     
-    // Генерируем новое аудио
-    const audio = await kokoroTTS.generate(word, { voice });
-    const audioBlob = await audio.toBlob();
-    
-    // Декодируем и кэшируем
-    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-    const arrayBuffer = await audioBlob.arrayBuffer();
-    const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
-    
-    // Сохраняем в кэш
-    audioCache.set(cacheKey, audioBuffer);
-    
-    // Ограничиваем размер кэша (максимум 100 записей)
-    if (audioCache.size > 100) {
-      const firstKey = audioCache.keys().next().value;
-      audioCache.delete(firstKey);
+    // Не найдено - генерируем, сохраняем и воспроизводим
+    const audioBuffer = await generateAndSaveAudio(word, voice, accent);
+    if (audioBuffer) {
+      await playAudioBuffer(audioBuffer, rate);
     }
-    
-    // Воспроизводим
-    playAudioBuffer(audioBuffer, rate);
   } catch (error) {
     console.error("Error speaking with Kokoro TTS:", error);
   }
@@ -228,7 +329,7 @@ export const speakWord = async (
 
 export const playErrorSound = () => {
   try {
-    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    const audioContext = getAudioContext();
     const oscillator = audioContext.createOscillator();
     const gainNode = audioContext.createGain();
     oscillator.connect(gainNode);
@@ -239,9 +340,6 @@ export const playErrorSound = () => {
     gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.2);
     oscillator.start(audioContext.currentTime);
     oscillator.stop(audioContext.currentTime + 0.2);
-    oscillator.onended = () => {
-      audioContext.close();
-    };
   } catch {
     // ignore
   }
@@ -262,6 +360,51 @@ export const initializeVoices = async () => {
     initializeKokoro().catch(() => {
       // Игнорируем ошибки при предзагрузке
     });
+  }
+};
+
+/** Предгенерация аудио для всего словаря */
+export const pregenerateDictionaryAudio = async (
+  words: Word[],
+  onProgress?: (current: number, total: number) => void
+): Promise<void> => {
+  if (!kokoroTTS) {
+    const initialized = await initializeKokoro();
+    if (!initialized || !kokoroTTS) {
+      console.warn("Kokoro TTS not available for pregeneration");
+      return;
+    }
+  }
+
+  let processed = 0;
+  const total = words.length;
+
+  // Генерируем по одному слову за раз, чтобы не перегружать браузер
+  for (const word of words) {
+    try {
+      const accent = word.accent || "both";
+      const voice = getKokoroVoice(accent);
+      
+      // Проверяем, есть ли уже в IndexedDB
+      const exists = await loadAudio(word.en, voice, accent);
+      if (exists) {
+        processed++;
+        onProgress?.(processed, total);
+        continue;
+      }
+      
+      // Генерируем и сохраняем
+      await generateAndSaveAudio(word.en, voice, accent);
+      processed++;
+      onProgress?.(processed, total);
+      
+      // Небольшая задержка между словами, чтобы не перегружать систему
+      await new Promise(resolve => setTimeout(resolve, 50));
+    } catch (error) {
+      console.error(`Error pregenerating audio for word "${word.en}":`, error);
+      processed++;
+      onProgress?.(processed, total);
+    }
   }
 };
 
