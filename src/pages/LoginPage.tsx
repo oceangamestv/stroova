@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../features/auth/AuthContext";
+import { API_BASE_URL } from "../api/config";
 
 type Mode = "login" | "register";
 
@@ -13,12 +14,40 @@ const LoginPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [lockoutUntil, setLockoutUntil] = useState<number | null>(null);
   const [lockoutSecondsLeft, setLockoutSecondsLeft] = useState<number | null>(null);
+  const [apiDebug, setApiDebug] = useState<{ url: string; status: string }>({ url: "", status: "" });
   const { user, login, register } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
     if (user) navigate("/", { replace: true });
   }, [user, navigate]);
+
+  useEffect(() => {
+    const base = (API_BASE_URL || "").trim();
+    if (!base) {
+      setApiDebug({ url: "(относительный /api)", status: "" });
+      return;
+    }
+    setApiDebug((prev) => ({ ...prev, url: base }));
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`${base.replace(/\/$/, "")}/me`, {
+          method: "GET",
+          headers: { "Content-Type": "application/json" },
+        });
+        if (cancelled) return;
+        setApiDebug((prev) => ({ ...prev, status: `Ответ: ${res.status}` }));
+      } catch (e) {
+        if (cancelled) return;
+        const msg = e instanceof Error ? e.message : String(e);
+        setApiDebug((prev) => ({ ...prev, status: `Ошибка: ${msg}` }));
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     if (lockoutUntil == null) return;
@@ -178,6 +207,14 @@ const LoginPage: React.FC = () => {
                   ? "Войти"
                   : "Зарегистрироваться"}
           </button>
+
+          {(apiDebug.url || apiDebug.status) && (
+            <div className="auth-debug" style={{ marginTop: "1rem", padding: "0.75rem", fontSize: "0.8rem", color: "var(--text-soft)", background: "var(--bg-elevated)", borderRadius: "8px", wordBreak: "break-all" }}>
+              <div><strong>Отладка API</strong></div>
+              <div>URL: {apiDebug.url || "—"}</div>
+              {apiDebug.status && <div>Связь: {apiDebug.status}</div>}
+            </div>
+          )}
         </form>
       </div>
     </div>

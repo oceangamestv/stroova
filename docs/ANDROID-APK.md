@@ -95,6 +95,30 @@ APK: `android\app\build\outputs\apk\debug\app-debug.apk`.
 | `npm run android:open` | Открыть проект в Android Studio |
 | `npx cap run android` | Запуск на подключённом устройстве или эмуляторе (при установленном Android SDK) |
 
+## Иконка приложения
+
+Сейчас в приложении стоит стандартная иконка Capacitor. Чтобы поставить свою (например, логотип из `public/logo.png`):
+
+### Способ 1: Android Studio (удобнее всего)
+
+1. Откройте проект: `npm run android:open`.
+2. В левом дереве: **app** → правый клик по папке **res** → **New** → **Image Asset**.
+3. В окне **Asset Type** оставьте **Launcher Icons (Adaptive and Legacy)**.
+4. В поле **Path** нажмите на иконку папки и выберите ваш файл (например `d:\Cursor\public\logo.png`). Иконка должна быть квадратной, лучше не меньше 512×512 px.
+5. При необходимости подгоните **Trim** и **Padding** (отступы).
+6. Нажмите **Next**, затем **Finish**. Android Studio сгенерирует все размеры и заменит `ic_launcher`, `ic_launcher_round` и foreground для адаптивной иконки.
+7. Пересоберите APK (Build → Generate App Bundles or APKs → Build APK(s)).
+
+### Способ 2: Генератор в браузере
+
+1. Зайдите на [icon.kitchen](https://icon.kitchen) или [appicon.co](https://appicon.co).
+2. Загрузите квадратную картинку (например `public/logo.png`, 512×512 или больше).
+3. Скачайте архив с иконками для Android.
+4. Распакуйте и скопируйте содержимое папок **mipmap-hdpi**, **mipmap-mdpi**, **mipmap-xhdpi**, **mipmap-xxhdpi**, **mipmap-xxxhdpi** в `android/app/src/main/res/`, подменяя файлы `ic_launcher.png`, `ic_launcher_round.png`, `ic_launcher_foreground.png` (если в архиве есть такие имена; иначе замените то, что соответствует иконке лаунчера).
+5. Пересоберите APK.
+
+Иконка задаётся в `AndroidManifest.xml` как `@mipmap/ic_launcher` (обычная) и `@mipmap/ic_launcher_round` (круглая); после замены файлов в `res` менять манифест не нужно.
+
 ## Размер APK
 
 В APK **не попадают** предгенерированные WAV (~3777 файлов, ~500 МБ): перед `cap copy` папка `dist/audio` удаляется скриптом `scripts/remove-audio-for-android.cjs`. Без неё APK получается в разы меньше (десятки МБ). Озвучка слов в приложении при отсутствии локальных файлов не проигрывается; при желании можно добавить на бэкенд endpoint вида `/api/audio/:voice/:slug.wav` и подставлять в приложении запрос к серверу.

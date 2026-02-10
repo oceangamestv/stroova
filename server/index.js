@@ -352,7 +352,8 @@ async function start() {
   await initDb();
   server.listen(PORT, () => {
     console.log(`STroova API: http://localhost:${PORT}/api`);
-    console.log(`CORS: ${CORS_ORIGIN}`);
+    console.log(`CORS_ORIGIN: ${CORS_ORIGIN}`);
+    console.log(`CORS origins (${CORS_ORIGINS.length}): ${CORS_ORIGINS.join(", ")}`);
     console.log(`DB: PostgreSQL`);
   });
 }

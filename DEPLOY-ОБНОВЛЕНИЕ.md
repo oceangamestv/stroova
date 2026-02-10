@@ -46,16 +46,16 @@ git reset --hard origin/main
 
 ### Шаг D. Проверить файл .env
 
-Должны быть все четыре переменные (подставь свой пароль БД вместо `ТВОЙ_ПАРОЛЬ_БД`):
+Должны быть все переменные (подставь свой пароль БД вместо `ТВОЙ_ПАРОЛЬ_БД`). **CORS_ORIGIN** — через запятую, без пробелов: сначала сайт(ы), затем origin мобильного приложения (Capacitor):
 
 ```
-VITE_API_URL=https://5b5a1af3caf3.vps.myjino.ru/api
+VITE_API_URL=https://stroova.ru/api
 PORT=3000
-CORS_ORIGIN=https://5b5a1af3caf3.vps.myjino.ru
+CORS_ORIGIN=https://stroova.ru,https://5b5a1af3caf3.vps.myjino.ru,capacitor://localhost,http://localhost
 DATABASE_URL=postgresql://stroova:ТВОЙ_ПАРОЛЬ_БД@localhost:5432/stroova
 ```
 
-Проверка: `cat .env`. Если чего-то нет — открыть `nano .env` и дописать/исправить, сохранить (Ctrl+O, Enter), выйти (Ctrl+X).
+Проверка: `cat .env`. Если чего-то нет — открыть `nano .env` и дописать/исправить, сохранить (Ctrl+O, Enter), выйти (Ctrl+X). После правки .env обязательно перезапустить API (см. обычное обновление ниже).
 
 ### Шаг E. Установить зависимости и собрать фронт заново
 
@@ -165,6 +165,10 @@ pm2 restart stroova-api
 ### 4. Проверка
 
 Открой сайт в браузере и убедись, что всё работает. Логи API: `pm2 logs stroova-api` (выход — Ctrl+C).
+
+**CORS для мобильного приложения:** в логах при старте API должны быть строки:
+- `CORS_ORIGIN: https://stroova.ru,...`
+- `CORS origins (4): https://stroova.ru, ...` (число = сколько origin в списке). Если видишь только один origin — в `.env` на сервере в `CORS_ORIGIN` не хватает запятой и остальных значений. Исправь `.env`, выполни `pm2 restart stroova-api` и снова посмотри логи.
 
 **Шпаргалка — команды по порядку:**
 
