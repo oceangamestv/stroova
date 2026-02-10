@@ -10,23 +10,36 @@
 
 ## Быстрая сборка APK
 
-### 1. Указать URL бэкенда
+### 1. URL бэкенда
 
-Перед сборкой в корне проекта создайте или отредактируйте `.env`:
+- **Боевой APK:** URL задаётся в `.env.production` (по умолчанию `https://stroova.ru/api`). При необходимости замените на ваш домен.
+- **Тестовый APK с локальным сервером:** используется `.env.development` (`http://localhost:3000/api`). Сборка: `npm run android:sync:local`. На устройстве в одной сети с компьютером может понадобиться подставить IP компа вместо `localhost`.
+
+### 1.1. CORS на сервере (обязательно для работы приложения)
+
+Мобильное приложение шлёт запросы с `Origin: capacitor://localhost`. На **сервере** (где крутится API) в `.env` нужно разрешить этот origin:
 
 ```env
-VITE_API_URL=https://stroova.ru/api
+CORS_ORIGIN=https://stroova.ru,capacitor://localhost,http://localhost
 ```
 
-(Или ваш реальный домен с путём `/api`.)
+(первый — ваш сайт, остальные — Capacitor Android/iOS). Без этого браузер в приложении блокирует ответы API.
 
 ### 2. Собрать веб-приложение и синхронизировать с Android
+
+**Боевой сервер** (для публикации / теста с продакшен-API):
 
 ```powershell
 npm run android:sync
 ```
 
-Эта команда выполняет `npm run build` и копирует результат в папку `android/`.
+**Локальный сервер** (для теста на устройстве с API на вашем компе, `http://localhost:3000/api`):
+
+```powershell
+npm run android:sync:local
+```
+
+Команда выполняет сборку (с соответствующим URL из `.env.production` или `.env.development`) и копирует результат в папку `android/`.
 
 ### 3. Собрать APK
 
@@ -77,14 +90,19 @@ APK: `android\app\build\outputs\apk\debug\app-debug.apk`.
 
 | Команда | Описание |
 |--------|----------|
-| `npm run android:sync` | Сборка фронта и копирование в `android/` |
+| `npm run android:sync` | Сборка с боевым API и копирование в `android/` |
+| `npm run android:sync:local` | Сборка с локальным API (localhost) и копирование в `android/` |
 | `npm run android:open` | Открыть проект в Android Studio |
 | `npx cap run android` | Запуск на подключённом устройстве или эмуляторе (при установленном Android SDK) |
+
+## Размер APK
+
+В APK **не попадают** предгенерированные WAV (~3777 файлов, ~500 МБ): перед `cap copy` папка `dist/audio` удаляется скриптом `scripts/remove-audio-for-android.cjs`. Без неё APK получается в разы меньше (десятки МБ). Озвучка слов в приложении при отсутствии локальных файлов не проигрывается; при желании можно добавить на бэкенд endpoint вида `/api/audio/:voice/:slug.wav` и подставлять в приложении запрос к серверу.
 
 ## Структура
 
 - **capacitor.config.ts** — настройки Capacitor (appId: `ru.stroova.app`, webDir: `dist`)
-- **android/** — нативный Android-проект; после `cap copy` в `android/app/src/main/assets/public` попадает собранный фронт
+- **android/** — нативный Android-проект; после `cap copy` в `android/app/src/main/assets/public` попадает собранный фронт (без папки `audio`)
 - **vite.config.ts** — для мобильной сборки используется `base: "./"`, чтобы ресурсы корректно подгружались в WebView
 
 ## Если Gradle пишет «Could not read script capacitor.settings.gradle»

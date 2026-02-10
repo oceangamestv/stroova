@@ -25,6 +25,14 @@ import { optIn, getLeaderboard } from "./rating.js";
 
 const PORT = Number(process.env.PORT) || 3000;
 const CORS_ORIGIN = process.env.CORS_ORIGIN || "http://localhost:5173";
+/** Список разрешённых origin (сайт + Capacitor Android/iOS) */
+const CORS_ORIGINS = CORS_ORIGIN.split(",").map((s) => s.trim()).filter(Boolean);
+
+function getAllowedOrigin(req) {
+  const origin = req?.headers?.origin;
+  if (origin && CORS_ORIGINS.includes(origin)) return origin;
+  return CORS_ORIGINS[0] || "*";
+}
 
 function hashPassword(password) {
   return crypto.createHash("sha256").update(password, "utf8").digest("hex");
@@ -35,16 +43,18 @@ function randomToken() {
 }
 
 function send(res, status, body) {
+  const req = res.req;
+  const allowOrigin = getAllowedOrigin(req);
   const data = typeof body === "object" ? JSON.stringify(body) : body;
   const dataBuffer = Buffer.from(data, "utf8");
   
   // Проверяем, поддерживает ли клиент gzip
-  const acceptEncoding = res.req?.headers["accept-encoding"] || "";
+  const acceptEncoding = req?.headers["accept-encoding"] || "";
   const supportsGzip = acceptEncoding.includes("gzip") && dataBuffer.length > 1024; // Сжимаем только ответы >1KB
   
   const headers = {
     "Content-Type": "application/json",
-    "Access-Control-Allow-Origin": CORS_ORIGIN,
+    "Access-Control-Allow-Origin": allowOrigin,
     "Access-Control-Allow-Methods": "GET, POST, PATCH, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type, Authorization",
   };
@@ -306,8 +316,9 @@ function normalizeUserForResponse(user, activeDays) {
 
 const server = http.createServer(async (req, res) => {
   if (req.method === "OPTIONS") {
+    const allowOrigin = getAllowedOrigin(req);
     res.writeHead(204, {
-      "Access-Control-Allow-Origin": CORS_ORIGIN,
+      "Access-Control-Allow-Origin": allowOrigin,
       "Access-Control-Allow-Methods": "GET, POST, PATCH, OPTIONS",
       "Access-Control-Allow-Headers": "Content-Type, Authorization",
     });

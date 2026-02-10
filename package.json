@@ -13,7 +13,9 @@
     "update-ipa": "node server/update-ipa-from-dictionary.mjs",
     "generate-audio": "node server/generate-audio.mjs",
     "telegram-bot": "node server/telegram-bot.js",
-    "android:sync": "npm run build && npx cap copy",
+    "build:local": "vite build --mode development",
+    "android:sync": "npm run build && node scripts/remove-audio-for-android.cjs && npx cap copy",
+    "android:sync:local": "npm run build:local && node scripts/remove-audio-for-android.cjs && npx cap copy",
     "android:open": "npx cap open android"
   },
   "dependencies": {
