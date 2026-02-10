@@ -1,0 +1,33 @@
+# Пример конфига Nginx для STroova.
+# Скопировать на сервер: /etc/nginx/sites-available/stroova
+# После правок: sudo nginx -t && sudo systemctl reload nginx
+
+server {
+    server_name 5b5a1af3caf3.vps.myjino.ru stroova.ru www.stroova.ru;
+    root /root/stroova/dist;
+    index index.html;
+
+    # CORS для озвучки в мобильном приложении (загрузка WAV с сервера)
+    location /audio/ {
+        add_header Access-Control-Allow-Origin *;
+    }
+
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    location /api {
+        proxy_pass http://127.0.0.1:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    listen 443 ssl;
+    ssl_certificate /etc/letsencrypt/live/stroova.ru/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/stroova.ru/privkey.pem;
+    include /etc/letsencrypt/options-ssl-nginx.conf;
+    ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
+}
