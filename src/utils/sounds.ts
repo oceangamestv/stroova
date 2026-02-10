@@ -172,13 +172,27 @@ export const getPreGeneratedAudioUrl = (voice: string, wordEn: string): string =
   return `/audio/${folder}/${slug}.wav`;
 };
 
-/** Воспроизведение предгенерированного файла по английскому слову. */
+/** Базовый URL сайта (без /api) для загрузки озвучки с сервера в мобильном приложении. */
+function getAudioBaseUrl(): string {
+  try {
+    const env = (typeof import.meta !== "undefined" && (import.meta as ImportMeta & { env?: { VITE_API_URL?: string } }).env) || {};
+    const apiUrl = (env.VITE_API_URL || "").trim();
+    if (!apiUrl) return "";
+    return apiUrl.replace(/\/api\/?$/i, "").replace(/\/$/, "");
+  } catch {
+    return "";
+  }
+}
+
+/** Воспроизведение предгенерированного файла по английскому слову. В браузере — относительный /audio/... (тот же домен). В приложении — абсолютный URL сервера. */
 const tryPlayPreGenerated = async (
   wordEn: string,
   voice: string,
   rate?: number
 ): Promise<boolean> => {
-  const url = getPreGeneratedAudioUrl(voice, wordEn);
+  const path = getPreGeneratedAudioUrl(voice, wordEn);
+  const base = getAudioBaseUrl();
+  const url = base ? `${base}${path}` : path;
   try {
     const res = await fetch(url);
     if (!res.ok) return false;
@@ -192,7 +206,7 @@ const tryPlayPreGenerated = async (
   }
 };
 
-/** Озвучивает слово: только предгенерированные файлы (Bella / Michael). */
+/** Озвучивает слово: предгенерированные файлы (Bella/Michael) с сайта или с сервера. */
 export const speakWord = async (
   word: string,
   _accent: "UK" | "US" | "both" = "both",
