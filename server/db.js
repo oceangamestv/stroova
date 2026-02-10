@@ -35,6 +35,13 @@ CREATE TABLE IF NOT EXISTS sessions (
   login_time TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- Защита от подбора пароля: после 3 неверных попыток — блокировка на 60 секунд
+CREATE TABLE IF NOT EXISTS login_lockouts (
+  username VARCHAR(255) PRIMARY KEY,
+  failed_attempts INT NOT NULL DEFAULT 0,
+  locked_until TIMESTAMPTZ
+);
+
 -- Языки для словарей (английский, в будущем — другие)
 CREATE TABLE IF NOT EXISTS languages (
   id SERIAL PRIMARY KEY,

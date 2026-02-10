@@ -255,29 +255,18 @@ body::after {
     transition: background-color var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast);
   }
 
-  .site-header--sidebar .site-header__link--sidebar:hover {
-    background: var(--accent-soft);
-    border-color: var(--accent);
-    box-shadow: 0 2px 8px rgba(255, 193, 7, 0.2);
+  .site-header--sidebar .site-header__link--sidebar:hover,
+  .site-header--sidebar .site-header__link--sidebar.site-header__link--game:hover {
+    background: rgba(33, 150, 243, 0.2);
+    border-color: var(--accent-secondary);
   }
 
-  .site-header--sidebar .site-header__link--sidebar.site-header__link--active {
-    background: var(--accent);
-    color: #000;
-    border-color: rgba(0, 0, 0, 0.2);
-    box-shadow: 0 3px 12px rgba(255, 193, 7, 0.4);
-  }
-
+  .site-header--sidebar .site-header__link--sidebar.site-header__link--active,
   .site-header--sidebar .site-header__link--sidebar.site-header__link--game.site-header__link--active {
     background: var(--accent-secondary);
     color: #fff;
     border-color: rgba(33, 150, 243, 0.4);
     box-shadow: 0 3px 12px rgba(33, 150, 243, 0.4);
-  }
-
-  .site-header--sidebar .site-header__link--sidebar.site-header__link--game:hover {
-    background: rgba(33, 150, 243, 0.2);
-    border-color: var(--accent-secondary);
   }
 
   .site-header--sidebar .site-header__sidebar-link-icon {
@@ -299,17 +288,29 @@ body::after {
     text-align: left;
   }
 
+  /* Кнопка «Звук» в сайдбаре — тот же стиль, что и остальные пункты (О проекте и т.д.) */
   .site-header--sidebar .site-header__link--sound {
     width: 100%;
     cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 16px;
+    font-size: 0.9375rem;
+    font-weight: 700;
     border: 2px solid var(--border-subtle);
+    border-radius: 12px;
     background: var(--bg-elevated);
-    color: var(--text);
+    min-height: 52px;
+    color: var(--text-primary);
     font: inherit;
     text-decoration: none;
+    transition: background-color var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast);
   }
-  .site-header--sidebar .site-header__link--sound.site-header__link--sound-on {
-    color: var(--accent);
+  .site-header--sidebar .site-header__link--sound.site-header__link--sound-on:hover {
+    background: var(--accent-soft);
+    border-color: var(--accent);
+    box-shadow: 0 2px 8px rgba(255, 193, 7, 0.2);
   }
   .site-header--sidebar .site-header__link--sound.site-header__link--sound-off {
     background: rgba(198, 40, 40, 0.15);
@@ -331,13 +332,29 @@ body::after {
     border-color: #e53935;
   }
 
+  [data-theme="dark"] .site-header--sidebar .site-header__link--sound.site-header__link--sound-on {
+    border-color: var(--border-strong);
+    background: var(--card-soft);
+  }
+
+  [data-theme="dark"] .site-header--sidebar .site-header__link--sound.site-header__link--sound-on:hover {
+    border-color: var(--accent);
+  }
+
   [data-theme="dark"] .site-header--sidebar .site-header__link--sidebar {
     border-color: var(--border-strong);
     background: var(--card-soft);
   }
 
   [data-theme="dark"] .site-header--sidebar .site-header__link--sidebar:hover {
-    border-color: var(--accent);
+    border-color: var(--accent-secondary);
+  }
+
+  [data-theme="dark"] .site-header--sidebar .site-header__link--sidebar.site-header__link--active {
+    background: var(--accent-secondary);
+    color: #fff;
+    border-color: rgba(33, 150, 243, 0.4);
+    box-shadow: 0 3px 12px rgba(33, 150, 243, 0.4);
   }
 
   .site-header--sidebar .site-header__user {
@@ -539,16 +556,10 @@ body::after {
 }
 
 .site-header__link:hover {
-  background: var(--accent-soft);
-  color: var(--text);
+  background: rgba(33, 150, 243, 0.15);
 }
 
-.site-header__link--active {
-  background: var(--accent);
-  color: #000;
-  box-shadow: 0 2px 8px rgba(255, 193, 7, 0.4);
-}
-
+.site-header__link--active,
 .site-header__link--game.site-header__link--active {
   background: var(--accent-secondary);
   color: #fff;
@@ -610,14 +621,14 @@ body::after {
 
 .site-header__profile--login {
   background: var(--accent);
-  color: #000;
+  color: var(--text-primary);
   border-color: var(--accent-strong);
 }
 
 .site-header__profile--login:hover {
   background: var(--accent-strong);
   border-color: var(--accent-strong);
-  color: #000;
+  color: var(--text-primary);
 }
 
 /* Нижняя навигация только на мобильных */
@@ -1711,16 +1722,47 @@ body::after {
 .game-intro {
   display: flex;
   flex-direction: column;
-  gap: 0;
+  gap: 12px;
 }
 
-/* Блок заголовка: название и краткое описание */
+/* Вариант 2: зоны с фоном и иконками */
+.game-intro__zone {
+  background: var(--card-soft);
+  border-radius: 10px;
+  padding: 16px 18px;
+  transition: background-color var(--transition-theme);
+}
+
+[data-theme="dark"] .game-intro__zone {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.game-intro__zone-icon {
+  flex-shrink: 0;
+  font-size: 1.15rem;
+  line-height: 1;
+  opacity: 0.9;
+}
+
+.game-intro__zone-icon--btn {
+  font-size: 0.85em;
+  margin-right: 6px;
+}
+
+/* Зона 1: заголовок и описание */
 .game-intro__header {
-  margin: 0 0 24px;
-  padding: 0 0 20px;
-  border-bottom: 2px solid var(--border-subtle);
-  border-radius: 0;
-  transition: border-color var(--transition-theme);
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin: 0;
+  padding: 16px 18px;
+  border: none;
+  border-radius: 10px;
+}
+
+.game-intro__header-inner {
+  flex: 1;
+  min-width: 0;
 }
 
 .game-intro__title {
@@ -1740,21 +1782,37 @@ body::after {
   transition: color var(--transition-theme);
 }
 
-/* Блок правил: визуально отделён */
+/* Зона 2: правила */
 .game-intro__rules {
-  margin: 0 0 24px;
-  padding: 0 0 20px;
-  border-bottom: 2px solid var(--border-subtle);
+  margin: 0;
+  padding: 16px 18px;
+  border: none;
   text-align: left;
-  transition: border-color var(--transition-theme);
+  transition: background-color var(--transition-theme);
 }
 
 .game-intro__rules-title {
-  margin: 0 0 12px;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  width: 100%;
+  margin: 0 0 6px;
+  padding: 0;
+  font-family: inherit;
   font-size: 0.95rem;
   font-weight: 700;
   color: var(--text);
+  text-align: left;
+  background: none;
+  border: none;
+  cursor: pointer;
   transition: color var(--transition-theme);
+}
+
+/* На десктопе показываем только "Правила" */
+.game-intro__rules-title-mobile {
+  display: none;
 }
 
 .game-intro__rules-list {
@@ -1774,18 +1832,71 @@ body::after {
   margin-bottom: 0;
 }
 
-/* Блок настроек */
+/* Мобильная версия: «Правила подробно» и выезжающий блок по нажатию */
+@media (max-width: 900px) {
+  .game-intro__rules-title-desktop {
+    display: none;
+  }
+  .game-intro__rules-title-mobile {
+    display: inline;
+  }
+  .game-intro__rules-title {
+    position: relative;
+    padding-right: 24px;
+  }
+  .game-intro__rules-title::after {
+    content: "";
+    position: absolute;
+    right: 0;
+    top: 50%;
+    width: 10px;
+    height: 10px;
+    margin-top: -6px;
+    border-right: 2px solid currentColor;
+    border-bottom: 2px solid currentColor;
+    transform: rotate(45deg);
+    transition: transform 0.2s ease;
+  }
+  .game-intro__rules--expanded .game-intro__rules-title::after {
+    transform: rotate(-135deg);
+  }
+  .game-intro__rules-list {
+    max-height: 0;
+    overflow: hidden;
+    margin: 0 0 0 1.2em;
+    transition: max-height 0.35s ease-out;
+  }
+  .game-intro__rules--expanded .game-intro__rules-list {
+    max-height: 80vh;
+  }
+}
+
+/* Зона 3: настройки */
 .game-intro__settings {
-  margin: 0 0 24px;
+  margin: 0;
+  padding: 16px 18px;
   text-align: left;
 }
 
 .game-intro__settings-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   margin: 0 0 12px;
   font-size: 0.95rem;
   font-weight: 700;
   color: var(--text);
   transition: color var(--transition-theme);
+}
+
+/* Зона 4: кнопка «Начать» */
+.game-intro__zone--action {
+  padding: 8px 0 0;
+  background: transparent;
+}
+
+[data-theme="dark"] .game-intro__zone--action {
+  background: transparent;
 }
 
 .game-intro__setting {
@@ -1804,8 +1915,11 @@ body::after {
 }
 
 .game-intro__start {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   width: 100%;
-  margin-top: 8px;
+  margin: 0;
   padding: 14px 20px;
   font-size: 1.1rem;
   font-weight: 700;
@@ -1816,6 +1930,17 @@ body::after {
 
 .primary-btn.game-intro__start {
   border-radius: 12px;
+}
+
+/* Мобильная карточка: компактнее отступы, кнопка «Начать» заметнее */
+@media (max-width: 900px) {
+  .lesson-card.game-intro-card {
+    padding: 24px 20px;
+  }
+  .game-intro__start {
+    padding: 16px 24px;
+    font-size: 1.15rem;
+  }
 }
 
 /* На мобильном кнопки настроек на всю ширину, без пустого пространства справа */
@@ -3976,6 +4101,7 @@ body::after {
   justify-content: center;
   line-height: 1.35;
   user-select: none;
+  touch-action: manipulation;
   transform: translateY(0);
   transition: background-color var(--transition-theme), border-color var(--transition-theme), color var(--transition-theme), transform var(--transition-fast), box-shadow var(--transition-fast);
   box-shadow: var(--shadow-soft);
@@ -5129,6 +5255,7 @@ body::after {
   font-weight: 700;
   background: var(--accent);
   border: 3px solid var(--border-strong);
+  touch-action: manipulation;
   border-radius: 0;
   color: #000000;
   cursor: pointer;
@@ -5835,6 +5962,11 @@ body::after {
   border-radius: 12px;
   border: 2px solid var(--border-subtle);
   background: var(--bg-elevated);
+  color: var(--text-primary);
+}
+
+[data-theme="dark"] .puzzle-result-guest-btn.primary-btn {
+  color: var(--text-primary);
 }
 
 .puzzle-result-footer {
@@ -6016,6 +6148,7 @@ body::after {
   color: var(--text);
   cursor: pointer;
   user-select: none;
+  touch-action: manipulation;
   transition: all var(--transition-theme), transform var(--transition-fast), box-shadow var(--transition-fast);
   text-shadow: none;
   letter-spacing: 1px;
@@ -7361,56 +7494,77 @@ body::after {
   }
 }
 
-/* Стили для страницы входа/регистрации */
+/* Страница входа/регистрации — в стиле навигации (карточка, голубой акцент) */
 .auth-container {
   min-height: 100vh;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 20px;
+  background: var(--bg);
 }
 
 .auth-card {
   width: 100%;
   max-width: 420px;
-  border-radius: 32px;
-  background: radial-gradient(
-      circle at -20% -20%,
-      #1d4ed8,
-      transparent
-    ),
-    radial-gradient(circle at 120% 120%, #0f766e, transparent),
-    linear-gradient(145deg, #020617, #020617);
+  border-radius: 12px;
+  background: var(--card);
+  border: 2px solid var(--border-subtle);
   padding: 32px 28px;
-  box-shadow: var(--shadow-soft);
-  border: 1px solid rgba(148, 163, 184, 0.35);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
+  transition: background-color var(--transition-theme), border-color var(--transition-theme), box-shadow var(--transition-theme);
+}
+
+[data-theme="dark"] .auth-card {
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
 }
 
 .auth-header {
-  text-align: center;
+  text-align: left;
   margin-bottom: 24px;
+}
+
+.auth-header .logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.auth-header .logo-text {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: 0.02em;
 }
 
 .auth-title {
-  font-size: 28px;
+  font-size: 1.5rem;
   margin: 16px 0 8px;
   font-weight: 700;
+  color: var(--text-primary);
+  transition: color var(--transition-theme);
+  text-align: center;
 }
 
 .auth-subtitle {
-  font-size: 14px;
+  font-size: 0.875rem;
   color: var(--text-soft);
   margin: 0;
+  transition: color var(--transition-theme);
+  text-align: center;
 }
 
+/* Вкладки Вход / Регистрация — как пункты сайдбара */
 .auth-tabs {
   display: flex;
   gap: 8px;
-  background: rgba(15, 23, 42, 0.6);
-  padding: 4px;
-  border-radius: var(--radius-pill);
-  border: 1px solid rgba(148, 163, 184, 0.3);
+  background: var(--bg-elevated);
+  padding: 6px;
+  border-radius: 12px;
+  border: 2px solid var(--border-subtle);
   margin-bottom: 24px;
+  transition: background-color var(--transition-theme), border-color var(--transition-theme);
 }
 
 .auth-tab {
@@ -7418,24 +7572,24 @@ body::after {
   border: none;
   outline: none;
   cursor: pointer;
-  padding: 8px 16px;
-  border-radius: var(--radius-pill);
-  font-size: 13px;
-  font-weight: 600;
+  padding: 12px 16px;
+  border-radius: 10px;
+  font-size: 0.9375rem;
+  font-weight: 700;
   background: transparent;
   color: var(--text-soft);
-  transition: all var(--transition-fast);
+  transition: background-color var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast);
 }
 
 .auth-tab:hover {
-  color: var(--text);
-  background: rgba(148, 163, 184, 0.1);
+  color: var(--text-primary);
+  background: rgba(33, 150, 243, 0.15);
 }
 
 .auth-tab.active {
-  background: linear-gradient(135deg, #22c55e, #4ade80);
-  color: #052e16;
-  box-shadow: 0 4px 12px rgba(34, 197, 94, 0.4);
+  background: var(--accent-secondary);
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(33, 150, 243, 0.4);
 }
 
 .auth-form {
@@ -7451,27 +7605,28 @@ body::after {
 }
 
 .form-group label {
-  font-size: 13px;
+  font-size: 0.8125rem;
   font-weight: 600;
   color: var(--text-soft);
+  transition: color var(--transition-theme);
 }
 
-  .form-group input {
+.form-group input {
   width: 100%;
   padding: 12px 16px;
-  border-radius: var(--radius-md);
-  border: 1px solid rgba(148, 163, 184, 0.4);
-  background: rgba(15, 23, 42, 0.8);
-  color: var(--text);
+  border-radius: 12px;
+  border: 2px solid var(--border-strong);
+  background: var(--bg-elevated);
+  color: var(--text-primary);
   font-size: 16px; /* не меньше 16px — иначе на iOS зум при фокусе */
   font-family: inherit;
-  transition: all var(--transition-fast);
+  transition: border-color var(--transition-fast), background-color var(--transition-theme), color var(--transition-theme), box-shadow var(--transition-fast);
 }
 
 .form-group input:focus {
   outline: none;
-  border-color: var(--accent-strong);
-  box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.2);
+  border-color: var(--accent-secondary);
+  box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.25);
 }
 
 .form-group input::placeholder {
@@ -7480,18 +7635,37 @@ body::after {
 
 .form-error {
   padding: 10px 14px;
-  border-radius: var(--radius-md);
-  background: rgba(251, 113, 133, 0.15);
-  border: 1px solid rgba(251, 113, 133, 0.3);
+  border-radius: 12px;
+  background: rgba(251, 113, 133, 0.12);
+  border: 2px solid rgba(251, 113, 133, 0.35);
   color: var(--danger);
-  font-size: 13px;
+  font-size: 0.8125rem;
+  font-weight: 600;
   text-align: center;
   min-height: 20px;
 }
 
+/* Кнопка отправки — голубая, как активный пункт навигации */
 .auth-submit-btn {
   width: 100%;
   margin-top: 8px;
+  background: var(--accent-secondary) !important;
+  color: #fff !important;
+  border: 2px solid rgba(33, 150, 243, 0.5) !important;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(33, 150, 243, 0.35);
+  font-weight: 700;
+}
+
+.auth-submit-btn:hover:not(:disabled) {
+  background: #1976d2 !important;
+  border-color: var(--accent-secondary) !important;
+  box-shadow: 0 4px 12px rgba(33, 150, 243, 0.4);
+}
+
+.auth-submit-btn:active:not(:disabled) {
+  transform: translateY(1px);
+  box-shadow: 0 2px 6px rgba(33, 150, 243, 0.35);
 }
 
 @media (max-width: 720px) {
@@ -7500,7 +7674,7 @@ body::after {
   }
 
   .auth-title {
-    font-size: 24px;
+    font-size: 1.375rem;
   }
 }
 

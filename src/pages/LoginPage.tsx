@@ -11,6 +11,8 @@ const LoginPage: React.FC = () => {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [lockoutUntil, setLockoutUntil] = useState<number | null>(null);
+  const [lockoutSecondsLeft, setLockoutSecondsLeft] = useState<number | null>(null);
   const { user, login, register } = useAuth();
   const navigate = useNavigate();
 
@@ -18,8 +20,26 @@ const LoginPage: React.FC = () => {
     if (user) navigate("/", { replace: true });
   }, [user, navigate]);
 
+  useEffect(() => {
+    if (lockoutUntil == null) return;
+    const tick = () => {
+      const left = Math.ceil((lockoutUntil - Date.now()) / 1000);
+      if (left <= 0) {
+        setLockoutUntil(null);
+        setLockoutSecondsLeft(null);
+        setError("");
+        return;
+      }
+      setLockoutSecondsLeft(left);
+    };
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [lockoutUntil]);
+
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (lockoutUntil != null) return;
     setError("");
     setLoading(true);
     const name = username.trim();
@@ -49,6 +69,10 @@ const LoginPage: React.FC = () => {
         navigate("/", { replace: true });
       } else {
         setError(result.error || "Неверный логин или пароль");
+        if (result.retryAfterSeconds != null) {
+          setLockoutUntil(Date.now() + result.retryAfterSeconds * 1000);
+          setLockoutSecondsLeft(result.retryAfterSeconds);
+        }
       }
     } finally {
       setLoading(false);
@@ -132,10 +156,27 @@ const LoginPage: React.FC = () => {
             </div>
           )}
 
-          {error && <div className="form-error">{error}</div>}
+          {error && (
+            <div className="form-error">
+              {error}
+              {lockoutSecondsLeft != null && (
+                <span className="form-error-lockout"> Повторите через {lockoutSecondsLeft} с.</span>
+              )}
+            </div>
+          )}
 
-          <button type="submit" className="primary-btn auth-submit-btn" disabled={loading}>
-            {loading ? "…" : mode === "login" ? "Войти" : "Зарегистрироваться"}
+          <button
+            type="submit"
+            className="primary-btn auth-submit-btn"
+            disabled={loading || lockoutUntil != null}
+          >
+            {loading
+              ? "…"
+              : lockoutSecondsLeft != null
+                ? `Подождите ${lockoutSecondsLeft} с`
+                : mode === "login"
+                  ? "Войти"
+                  : "Зарегистрироваться"}
           </button>
         </form>
       </div>

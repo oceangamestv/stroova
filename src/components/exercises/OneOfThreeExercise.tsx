@@ -137,9 +137,10 @@ const OneOfThreeExercise: React.FC = () => {
       Math.max(50, dictionaryWords.length),
       "both",
       progressType,
-      dictionarySource
+      dictionarySource,
+      { guestMode: !user }
     );
-  }, [dictionaryWords, wordsLoading, dictionarySource]);
+  }, [dictionaryWords, wordsLoading, dictionarySource, user]);
 
   const setDictionarySource = (source: DictionarySource) => {
     authService.updateGameSettings({ dictionarySource: source });

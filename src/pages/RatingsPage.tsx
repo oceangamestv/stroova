@@ -97,7 +97,6 @@ const RatingsPage: React.FC = () => {
     participating: boolean;
   } | null>(null);
   const [loading, setLoading] = useState(true);
-  const [participateLoading, setParticipateLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -117,20 +116,6 @@ const RatingsPage: React.FC = () => {
     load();
   }, [load]);
 
-  const handleParticipate = async () => {
-    if (!user) return;
-    setParticipateLoading(true);
-    setError(null);
-    try {
-      await ratingApi.participate();
-      await load();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Не удалось участвовать в рейтинге");
-    } finally {
-      setParticipateLoading(false);
-    }
-  };
-
   const [period, setPeriod] = useState<PeriodKey>("day");
   const currentData = data ? data[period] : null;
 
@@ -141,19 +126,6 @@ const RatingsPage: React.FC = () => {
         <div className={isMobile ? undefined : "page-card"}>
           <div className="rating-page">
             <h1 className="rating-page-title">Рейтинг</h1>
-
-          {user && !data?.participating && (
-            <div className="rating-actions">
-              <button
-                type="button"
-                className="rating-participate-btn"
-                onClick={handleParticipate}
-                disabled={participateLoading}
-              >
-                {participateLoading ? "Добавляем…" : "Участвовать в рейтинге"}
-              </button>
-            </div>
-          )}
 
           {!user && (
             <p className="rating-login-hint">

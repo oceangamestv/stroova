@@ -92,7 +92,8 @@ const PairsExercise: React.FC = () => {
 
   useEffect(() => {
     if (wordsLoading || dictionaryWords.length === 0) return;
-    // Сбрасываем выбранную карточку сразу при изменении этапа
+    // Разблокируем карточки для нового этапа и сбрасываем выбранную карточку
+    setLocked(false);
     setSelectedIndex(null);
     if (prevStageRef.current !== stage) {
       justChangedStageRef.current = true;
@@ -103,7 +104,8 @@ const PairsExercise: React.FC = () => {
       PAIRS_PER_STAGE,
       "both",
       "beginner",
-      dictionarySource
+      dictionarySource,
+      { guestMode: !user }
     );
     setStageWords(words);
     setCards(buildPairsCards(words));
@@ -114,7 +116,7 @@ const PairsExercise: React.FC = () => {
       clearTimeout(stageTransitionTimeoutRef.current);
       stageTransitionTimeoutRef.current = null;
     }
-  }, [stage, dictionarySource, dictionaryWords, wordsLoading]);
+  }, [stage, dictionarySource, dictionaryWords, wordsLoading, user]);
 
   const handleCardClick = (index: number) => {
     if (locked) return;
@@ -235,6 +237,8 @@ const PairsExercise: React.FC = () => {
     }
     const currentStage = stage;
     stageCompletedRef.current = currentStage;
+    // Блокируем клики по карточкам до перехода на следующий этап (избегаем залипания подсветки из-за отложенного tap на мобильных)
+    setLocked(true);
     // Сбрасываем выбранную карточку при завершении этапа
     setSelectedIndex(null);
     if (process.env.NODE_ENV === "development") {
@@ -423,6 +427,12 @@ const PairsExercise: React.FC = () => {
                   selectedIndex === card.index ? "card--selected" : ""
                 } ${wrongIndices.includes(card.index) ? "card--wrong" : ""}`}
                 onClick={() => handleCardClick(card.index)}
+                onPointerDown={(e) => {
+                  if (e.pointerType === "touch" || e.pointerType === "pen") {
+                    e.preventDefault();
+                    handleCardClick(card.index);
+                  }
+                }}
                 type="button"
               >
                 {card.accent !== "both" && (
@@ -444,6 +454,12 @@ const PairsExercise: React.FC = () => {
                   selectedIndex === card.index ? "card--selected" : ""
                 } ${wrongIndices.includes(card.index) ? "card--wrong" : ""}`}
                 onClick={() => handleCardClick(card.index)}
+                onPointerDown={(e) => {
+                  if (e.pointerType === "touch" || e.pointerType === "pen") {
+                    e.preventDefault();
+                    handleCardClick(card.index);
+                  }
+                }}
                 type="button"
               >
                 <span className="card-label">{card.label}</span>
@@ -537,6 +553,8 @@ const PairsExercise: React.FC = () => {
                   setTotalErrors(0);
                   setSessionWords([]);
                   setWordsWithErrorThisStage(new Set());
+                  setLocked(false);
+                  setSelectedIndex(null);
                   sessionXpRef.current = 0;
                   stageCompletedRef.current = 0;
                   prevStageRef.current = 1;

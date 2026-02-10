@@ -25,18 +25,23 @@ export const dictionaryService = {
 
   /**
    * Слова для игры из переданного пула. source: «общий словарь» или «мой словарь».
+   * Для гостей (guestMode: true) при source "general" используются только слова уровня A0.
    */
   getRandomWordsForGameFromPool(
     pool: Word[],
     count: number,
     accent: Accent = "both",
     progressType: WordProgressType = "beginner",
-    source: DictionarySource = "general"
+    source: DictionarySource = "general",
+    options?: { guestMode?: boolean }
   ): Word[] {
-    const words =
+    let words =
       source === "personal"
         ? personalDictionaryService.getPersonalWordsFromPool(pool)
         : pool;
+    if (options?.guestMode && source === "general") {
+      words = words.filter((w) => w.level === "A0");
+    }
     const byAccent = filterByAccent(words, accent);
     const filtered = byAccent.filter((w) =>
       progressService.isWordAvailableForGame(w.id, progressType)

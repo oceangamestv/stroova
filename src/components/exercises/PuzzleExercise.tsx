@@ -184,10 +184,11 @@ const PuzzleExercise: React.FC = () => {
             1,
             "both",
             progressType,
-            dictionarySource
+            dictionarySource,
+            { guestMode: !user }
           )[0]
         : undefined,
-    [currentIndex, difficulty, dictionarySource, dictionaryWords]
+    [currentIndex, difficulty, dictionarySource, dictionaryWords, user]
   );
 
   useEffect(() => {
@@ -585,6 +586,12 @@ const PuzzleExercise: React.FC = () => {
                     className={`puzzle-letter ${isUsed ? "puzzle-letter--used" : ""}`}
                     type="button"
                     onClick={() => !isUsed && applyLetter(item.letter, item.index)}
+                    onPointerDown={(e) => {
+                      if (!isUsed && (e.pointerType === "touch" || e.pointerType === "pen")) {
+                        e.preventDefault();
+                        applyLetter(item.letter, item.index);
+                      }
+                    }}
                     disabled={isUsed}
                     aria-disabled={isUsed}
                   >
@@ -599,6 +606,12 @@ const PuzzleExercise: React.FC = () => {
               type="button"
               className="puzzle-letters puzzle-letters--next-btn puzzle-next-word-btn"
               onClick={goNextWord}
+              onPointerDown={(e) => {
+                if (e.pointerType === "touch" || e.pointerType === "pen") {
+                  e.preventDefault();
+                  goNextWord();
+                }
+              }}
             >
               Следующее слово (Enter)
             </button>

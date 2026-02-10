@@ -78,12 +78,21 @@ export async function optIn(username) {
 }
 
 /**
- * Получить список участников рейтинга (username[]).
- * @returns {Promise<string[]>}
+ * Получить всех пользователей с данными для рейтинга (все, у кого есть XP за период).
+ * Рейтинг теперь по умолчанию для всех: в таблицу попадают все, кто получил опыт.
+ * @param {object} users - объект username -> user из getUsers()
+ * @param {string} period - 'day' | 'week' | 'all'
+ * @returns {string[]} usernames с xp > 0 за период
  */
-async function getParticipatingUsernames() {
-  const res = await pool.query("SELECT username FROM rating_participants ORDER BY opted_at");
-  return res.rows.map((r) => r.username);
+function getUsernamesWithXpForPeriod(users, period) {
+  const usernames = [];
+  for (const username of Object.keys(users)) {
+    const user = users[username];
+    const stats = user?.stats || {};
+    const xp = xpForPeriod(stats, period);
+    if (xp > 0) usernames.push(username);
+  }
+  return usernames;
 }
 
 /**
@@ -138,8 +147,8 @@ function xpForPeriod(stats, period) {
  * @returns {Promise<{ items: Array<{ rank, username, displayName, xp, level, maxStreak }>, currentUser?, participating }>}
  */
 export async function getLeaderboard(period, currentUsername) {
-  const usernames = await getParticipatingUsernames();
   const users = await getUsers();
+  const usernames = getUsernamesWithXpForPeriod(users, period);
   const maxStreaks = await getMaxStreaks(usernames);
 
   const list = [];
@@ -149,10 +158,6 @@ export async function getLeaderboard(period, currentUsername) {
     const stats = user.stats || {};
     const totalXp = typeof stats.totalXp === "number" ? stats.totalXp : (stats.totalScore ?? 0) || 0;
     const xp = xpForPeriod(stats, period);
-    // Показываем только пользователей с XP > 0 для всех периодов
-    if (xp === 0) {
-      continue;
-    }
     const displayName = (user.displayName || user.username || "").trim() || user.username;
     const level = getLevelFromXp(totalXp);
     const maxStreak = maxStreaks.get(username) ?? 0;
@@ -170,7 +175,8 @@ export async function getLeaderboard(period, currentUsername) {
   }));
 
   let currentUser = null;
-  const participating = currentUsername ? await isParticipating(currentUsername) : false;
+  /** Участие по умолчанию: все с опытом в рейтинге; для UI считаем авторизованного участвующим */
+  const participating = !!currentUsername;
   if (currentUsername) {
     const idx = list.findIndex((e) => e.username === currentUsername);
     if (idx >= 0) {

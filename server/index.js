@@ -15,6 +15,9 @@ import {
   getSessionByToken,
   createSession,
   createDefaultUser,
+  getLoginLockout,
+  recordFailedLogin,
+  clearLoginLockout,
 } from "./store.js";
 import { getWordsByLanguage, getLanguages, getWordIdsByLevel, getDictionaryVersion } from "./dictionaryRepo.js";
 import { getActiveDays, recordActivity } from "./activeDays.js";
@@ -114,6 +117,15 @@ const routes = {
   "POST /api/auth/login": async (req, res, body) => {
     const username = (body.username || "").trim();
     const password = body.password || "";
+    const lockout = await getLoginLockout(username);
+    if (lockout.lockedUntil) {
+      const waitSec = Math.ceil((lockout.lockedUntil - new Date()) / 1000);
+      send(res, 429, {
+        error: "Слишком много попыток входа. Подождите 60 секунд.",
+        retryAfterSeconds: Math.max(1, waitSec),
+      });
+      return;
+    }
     const user = await getUser(username);
     if (!user) {
       send(res, 401, { error: "Неверный логин или пароль" });
@@ -121,9 +133,18 @@ const routes = {
     }
     const hash = hashPassword(password);
     if (user.passwordHash !== hash) {
-      send(res, 401, { error: "Неверный логин или пароль" });
+      const { justLocked } = await recordFailedLogin(username);
+      if (justLocked) {
+        send(res, 429, {
+          error: "Слишком много попыток входа. Подождите 60 секунд.",
+          retryAfterSeconds: 60,
+        });
+      } else {
+        send(res, 401, { error: "Неверный логин или пароль" });
+      }
       return;
     }
+    await clearLoginLockout(username);
     const token = randomToken();
     await createSession(token, username);
     send(res, 200, { token, user: normalizeUserForResponse(user) });

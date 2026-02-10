@@ -49,13 +49,17 @@ async function request<T>(
   if (!res.ok) {
     const text = await res.text();
     let message = text;
+    let details: Record<string, unknown> | undefined;
     try {
-      const json = JSON.parse(text) as { error?: string; message?: string };
+      const json = JSON.parse(text) as { error?: string; message?: string; retryAfterSeconds?: number };
       message = json.error ?? json.message ?? text;
+      if (json.retryAfterSeconds !== undefined) {
+        details = { retryAfterSeconds: json.retryAfterSeconds };
+      }
     } catch {
       // leave message as text
     }
-    throw new ApiError(res.status, message);
+    throw new ApiError(res.status, message, details);
   }
   const contentType = res.headers.get("content-type");
   if (contentType?.includes("application/json")) {
@@ -67,7 +71,8 @@ async function request<T>(
 export class ApiError extends Error {
   constructor(
     public status: number,
-    message: string
+    message: string,
+    public details?: Record<string, unknown>
   ) {
     super(message);
     this.name = "ApiError";

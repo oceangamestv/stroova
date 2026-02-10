@@ -11,7 +11,7 @@ const GAME_INTRO: Record<
 > = {
   pairs: {
     title: "🔗 Поиск пары",
-    description: "Соединяйте английские слова с правильными русскими переводами.",
+    description: "Находите правильные пары английских и русских слов.",
     rules: [
       "На каждом этапе перед вами 5 пар: английское слово и русский перевод.",
       "Сначала нажмите на английское слово, затем — на подходящий русский перевод. Если пара верная, она засчитается.",
@@ -57,6 +57,7 @@ interface GameIntroScreenProps {
 }
 
 const GameIntroScreen: React.FC<GameIntroScreenProps> = ({ gameSlug, onStart }) => {
+  const [rulesExpanded, setRulesExpanded] = React.useState(false);
   const { user, refresh: refreshUser } = useAuth();
   const dictionarySource: DictionarySource =
     user?.gameSettings?.dictionarySource ?? (user ? "personal" : "general");
@@ -76,22 +77,38 @@ const GameIntroScreen: React.FC<GameIntroScreenProps> = ({ gameSlug, onStart }) 
 
   return (
     <div className="game-intro">
-      <header className="game-intro__header">
-        <h1 className="game-intro__title">{intro.title}</h1>
-        <p className="game-intro__description">{intro.description}</p>
+      <header className="game-intro__header game-intro__zone game-intro__zone--header">
+        <div className="game-intro__header-inner">
+          <h1 className="game-intro__title">{intro.title}</h1>
+          <p className="game-intro__description">{intro.description}</p>
+        </div>
       </header>
-      <section className="game-intro__rules" aria-label="Правила">
-        <h2 className="game-intro__rules-title">Правила</h2>
+      <section
+        className={`game-intro__rules game-intro__zone game-intro__zone--rules ${rulesExpanded ? "game-intro__rules--expanded" : ""}`}
+        aria-label="Правила"
+      >
+        <button
+          type="button"
+          className="game-intro__rules-title"
+          onClick={() => setRulesExpanded((v) => !v)}
+          aria-expanded={rulesExpanded}
+        >
+          <span className="game-intro__zone-icon" aria-hidden="true">📜</span>
+          <span className="game-intro__rules-title-desktop">Правила</span>
+          <span className="game-intro__rules-title-mobile">Правила подробно</span>
+        </button>
         <ul className="game-intro__rules-list">
           {intro.rules.map((rule, i) => (
             <li key={i} className="game-intro__rules-item">{rule}</li>
           ))}
         </ul>
       </section>
-      <section className="game-intro__settings" aria-label="Настройки">
-        <h2 className="game-intro__settings-title">Настройки</h2>
+      <section className="game-intro__settings game-intro__zone game-intro__zone--settings" aria-label="Настройки">
+        <h2 className="game-intro__settings-title">
+          <span className="game-intro__zone-icon" aria-hidden="true">⚙️</span>
+          Настройки
+        </h2>
         <div className="game-intro__setting">
-          <span className="game-intro__setting-label">Слова из:</span>
           <div className="game-dictionary-source-btns">
             <button
               type="button"
@@ -131,9 +148,12 @@ const GameIntroScreen: React.FC<GameIntroScreenProps> = ({ gameSlug, onStart }) 
           </div>
         )}
       </section>
-      <button type="button" className="primary-btn game-intro__start" onClick={onStart}>
-        Начать
-      </button>
+      <div className="game-intro__zone game-intro__zone--action">
+        <button type="button" className="primary-btn game-intro__start" onClick={onStart}>
+          <span className="game-intro__zone-icon game-intro__zone-icon--btn" aria-hidden="true">▶</span>
+          Начать
+        </button>
+      </div>
     </div>
   );
 };

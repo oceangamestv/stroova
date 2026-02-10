@@ -63,7 +63,10 @@ export const serverAuthAdapter = {
   },
 
   /** Логин: запрос к API, сохранение токена и сессии, заполнение кэша. */
-  async login(username: string, password: string): Promise<{ success: boolean; error?: string }> {
+  async login(
+    username: string,
+    password: string
+  ): Promise<{ success: boolean; error?: string; retryAfterSeconds?: number }> {
     try {
       const { token, user } = await authApi.login(username, password);
       setStoredToken(token);
@@ -72,7 +75,11 @@ export const serverAuthAdapter = {
       return { success: true };
     } catch (e) {
       const message = e instanceof ApiError ? e.message : "Ошибка входа";
-      return { success: false, error: message };
+      const retryAfterSeconds =
+        e instanceof ApiError && typeof e.details?.retryAfterSeconds === "number"
+          ? e.details.retryAfterSeconds
+          : undefined;
+      return { success: false, error: message, retryAfterSeconds };
     }
   },
 

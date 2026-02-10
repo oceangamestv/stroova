@@ -102,6 +102,46 @@ export async function removeSession(token) {
   await pool.query("DELETE FROM sessions WHERE token = $1", [token]);
 }
 
+const LOCKOUT_ATTEMPTS = 3;
+const LOCKOUT_SECONDS = 60;
+
+/** Возвращает блокировку входа по логину: null если нет записи или блокировка истекла */
+export async function getLoginLockout(username) {
+  const res = await pool.query(
+    "SELECT failed_attempts, locked_until FROM login_lockouts WHERE username = $1",
+    [username]
+  );
+  const row = res.rows[0];
+  if (!row) return { lockedUntil: null, failedAttempts: 0 };
+  const lockedUntil = row.locked_until;
+  const isLocked = lockedUntil && new Date(lockedUntil) > new Date();
+  return {
+    lockedUntil: isLocked ? (lockedUntil instanceof Date ? lockedUntil : new Date(lockedUntil)) : null,
+    failedAttempts: row.failed_attempts || 0,
+  };
+}
+
+/** Учитывает неудачную попытку входа. При 3-й попытке ставит блокировку на 60 сек. Возвращает { justLocked }. */
+export async function recordFailedLogin(username) {
+  const res = await pool.query(
+    `INSERT INTO login_lockouts (username, failed_attempts, locked_until)
+     VALUES ($1, 1, CASE WHEN 1 >= $2 THEN NOW() + ($3 * INTERVAL '1 second') ELSE NULL END)
+     ON CONFLICT (username) DO UPDATE SET
+       failed_attempts = login_lockouts.failed_attempts + 1,
+       locked_until = CASE WHEN login_lockouts.failed_attempts + 1 >= $2 THEN NOW() + ($3 * INTERVAL '1 second') ELSE login_lockouts.locked_until END
+     RETURNING failed_attempts, locked_until`,
+    [username, LOCKOUT_ATTEMPTS, LOCKOUT_SECONDS]
+  );
+  const row = res.rows[0];
+  const justLocked = row && row.failed_attempts === LOCKOUT_ATTEMPTS && row.locked_until;
+  return { justLocked: !!justLocked };
+}
+
+/** Сбрасывает счётчик неудачных попыток при успешном входе */
+export async function clearLoginLockout(username) {
+  await pool.query("DELETE FROM login_lockouts WHERE username = $1", [username]);
+}
+
 export function createDefaultUser(username, passwordHash) {
   return {
     username,

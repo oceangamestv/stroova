@@ -28,6 +28,24 @@ const BoostyIcon: React.FC<{ className?: string }> = ({ className }) => (
   </svg>
 );
 
+/** Иконка T-Bank (жёлтый круг с буквой T в стиле бренда) */
+const TBankIcon: React.FC<{ className?: string; style?: React.CSSProperties }> = ({ className, style }) => (
+  <svg
+    viewBox="0 0 24 24"
+    className={className}
+    aria-hidden="true"
+    width="22"
+    height="22"
+    style={style}
+  >
+    <circle cx="12" cy="12" r="11" fill="#FFDD2D" />
+    <path
+      d="M7 6h10v2.5H13v9h-2v-9H7V6z"
+      fill="#333"
+    />
+  </svg>
+);
+
 const AboutPage: React.FC = () => {
   const isMobile = useIsMobile();
   return (
@@ -273,40 +291,74 @@ const AboutPage: React.FC = () => {
                   color: "var(--text-soft)",
                 }}>
                   Если вам нравится Stroova и вы хотите помочь проекту развиваться дальше, 
-                  вы можете поддержать нас на Boosty. Ваше имя будет вписано в историю злодеев проекта! 😈
+                  вы можете поддержать нас на Boosty или в T-Bank. Ваше имя будет вписано в историю злодеев проекта! 😈
                 </p>
-                <a
-                  href="https://boosty.to/stroova"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: "0.75rem",
-                    color: "#000000",
-                    textDecoration: "none",
-                    fontWeight: "600",
-                    padding: "0.875rem 1.75rem",
-                    borderRadius: "12px",
-                    background: "linear-gradient(135deg, #ffc107 0%, #ffb300 100%)",
-                    border: "none",
-                    transition: "all 0.3s ease",
-                    boxShadow: "0 4px 15px rgba(255, 193, 7, 0.4)",
-                    position: "relative",
-                    overflow: "hidden",
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.transform = "translateY(-2px) scale(1.02)";
-                    e.currentTarget.style.boxShadow = "0 6px 25px rgba(255, 193, 7, 0.5)";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.transform = "translateY(0) scale(1)";
-                    e.currentTarget.style.boxShadow = "0 4px 15px rgba(255, 193, 7, 0.4)";
-                  }}
-                >
-                  <BoostyIcon style={{ width: "22px", height: "22px" }} />
-                  <span>Поддержать на Boosty</span>
-                </a>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "1rem", alignItems: "center" }}>
+                  <a
+                    href="https://boosty.to/stroova"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: "0.75rem",
+                      color: "#000000",
+                      textDecoration: "none",
+                      fontWeight: "600",
+                      padding: "0.875rem 1.75rem",
+                      borderRadius: "12px",
+                      background: "linear-gradient(135deg, #ffc107 0%, #ffb300 100%)",
+                      border: "none",
+                      transition: "all 0.3s ease",
+                      boxShadow: "0 4px 15px rgba(255, 193, 7, 0.4)",
+                      position: "relative",
+                      overflow: "hidden",
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.transform = "translateY(-2px) scale(1.02)";
+                      e.currentTarget.style.boxShadow = "0 6px 25px rgba(255, 193, 7, 0.5)";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.transform = "translateY(0) scale(1)";
+                      e.currentTarget.style.boxShadow = "0 4px 15px rgba(255, 193, 7, 0.4)";
+                    }}
+                  >
+                    <BoostyIcon style={{ width: "22px", height: "22px" }} />
+                    <span>Поддержать на Boosty</span>
+                  </a>
+                  <a
+                    href="https://www.tbank.ru/cf/81uMr5e8sPA"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: "0.75rem",
+                      color: "#000000",
+                      textDecoration: "none",
+                      fontWeight: "600",
+                      padding: "0.875rem 1.75rem",
+                      borderRadius: "12px",
+                      background: "linear-gradient(135deg, #FFDD2D 0%, #FFCC00 100%)",
+                      border: "none",
+                      transition: "all 0.3s ease",
+                      boxShadow: "0 4px 15px rgba(255, 221, 45, 0.4)",
+                      position: "relative",
+                      overflow: "hidden",
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.transform = "translateY(-2px) scale(1.02)";
+                      e.currentTarget.style.boxShadow = "0 6px 25px rgba(255, 221, 45, 0.5)";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.transform = "translateY(0) scale(1)";
+                      e.currentTarget.style.boxShadow = "0 4px 15px rgba(255, 221, 45, 0.4)";
+                    }}
+                  >
+                    <TBankIcon />
+                    <span>Поддержать в T-Bank</span>
+                  </a>
+                </div>
               </div>
             </div>
           </div>
