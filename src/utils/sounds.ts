@@ -3,6 +3,60 @@ let preferredVoiceUri: string | null = null;
 
 let globalAudioContext: AudioContext | null = null;
 
+/** Ключ localStorage: включён ли звук в упражнениях (по умолчанию да). */
+const SOUND_ENABLED_KEY = "stroova_sound_enabled";
+
+/** Минимальный тихий WAV для обхода iOS (медиа-канал вместо звонка). */
+const SILENT_WAV_DATA_URL =
+  "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=";
+
+/** Читает, включён ли звук (из localStorage). По умолчанию true. */
+export const getSoundEnabled = (): boolean => {
+  try {
+    return localStorage.getItem(SOUND_ENABLED_KEY) !== "0";
+  } catch {
+    return true;
+  }
+};
+
+/** Включает/выключает звук. При включении вызывает обход беззвучного режима на iOS. */
+export const setSoundEnabled = (enabled: boolean): void => {
+  try {
+    localStorage.setItem(SOUND_ENABLED_KEY, enabled ? "1" : "0");
+  } catch {
+    // ignore
+  }
+  if (enabled) {
+    ensureMediaPlaybackOnIOS();
+  }
+};
+
+/**
+ * На iOS: переводит воспроизведение в медиа-канал, чтобы звук шёл даже при беззвучном режиме.
+ * iOS 17+: Audio Session API. Старые iOS: тихий <audio> в фоне.
+ */
+export const ensureMediaPlaybackOnIOS = (): void => {
+  if (typeof navigator === "undefined") return;
+  try {
+    const nav = navigator as Navigator & { audioSession?: { type: string } };
+    if (nav.audioSession !== undefined && typeof nav.audioSession.type !== "undefined") {
+      nav.audioSession.type = "playback";
+      return;
+    }
+  } catch {
+    // ignore
+  }
+  try {
+    const el = document.createElement("audio");
+    el.src = SILENT_WAV_DATA_URL;
+    el.setAttribute("playsinline", "true");
+    el.volume = 0;
+    el.play().catch(() => {});
+  } catch {
+    // ignore
+  }
+};
+
 /** Единственные голоса в приложении: Bella (женский), Michael (мужской) */
 const VOICES = {
   BELLA: "af_bella",
@@ -144,11 +198,14 @@ export const speakWord = async (
   _accent: "UK" | "US" | "both" = "both",
   rate?: number
 ): Promise<void> => {
+  if (!getSoundEnabled()) return;
   const voice = preferredVoiceUri || `kokoro:${VOICES.BELLA}`;
   await tryPlayPreGenerated(word, voice, rate);
 };
 
+/** Короткий чёткий звук ошибки (низкий тон) */
 export const playErrorSound = (): void => {
+  if (!getSoundEnabled()) return;
   try {
     const audioContext = getAudioContext();
     const oscillator = audioContext.createOscillator();
@@ -161,6 +218,29 @@ export const playErrorSound = (): void => {
     gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.2);
     oscillator.start(audioContext.currentTime);
     oscillator.stop(audioContext.currentTime + 0.2);
+  } catch {
+    // ignore
+  }
+};
+
+/** Короткий звонкий звук при правильном ответе (два быстрых тона) */
+export const playCorrectSound = (): void => {
+  if (!getSoundEnabled()) return;
+  try {
+    const ctx = getAudioContext();
+    const t0 = ctx.currentTime;
+    const gainNode = ctx.createGain();
+    gainNode.connect(ctx.destination);
+    gainNode.gain.setValueAtTime(0, t0);
+    gainNode.gain.linearRampToValueAtTime(0.25, t0 + 0.02);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, t0 + 0.12);
+    const osc1 = ctx.createOscillator();
+    osc1.type = "sine";
+    osc1.frequency.setValueAtTime(660, t0);
+    osc1.frequency.setValueAtTime(880, t0 + 0.06);
+    osc1.connect(gainNode);
+    osc1.start(t0);
+    osc1.stop(t0 + 0.12);
   } catch {
     // ignore
   }

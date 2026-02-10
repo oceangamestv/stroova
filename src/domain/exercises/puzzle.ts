@@ -61,16 +61,19 @@ export const placeLetterInSlot = (
   nextSlots[slotIndex] = letter;
 
   const correctLetter = state.word[slotIndex];
-  if (letter === correctLetter) {
+  const isCorrect = letter === correctLetter;
+  if (isCorrect) {
     nextSlotsState[slotIndex] = "correct";
   } else {
     nextSlotsState[slotIndex] = "wrong";
   }
-  // В лёгком режиме из списка возможных убираем букву, которая должна стоять на этом месте
+  // В лёгком режиме: при правильной букве — помечаем ту, на которую нажали; при неправильной — ту, что должна была быть в этом слоте
   if (difficulty === "easy") {
-    const letterToMark = state.letters.find(
-      (item) => item.letter === correctLetter && !item.used
-    );
+    const letterToMark = isCorrect
+      ? clickedLetterIndex !== undefined
+        ? state.letters.find((item) => item.index === clickedLetterIndex)
+        : state.letters.find((item) => item.letter === correctLetter && !item.used)
+      : state.letters.find((item) => item.letter === correctLetter && !item.used);
     if (letterToMark) letterToMark.used = true;
   }
 

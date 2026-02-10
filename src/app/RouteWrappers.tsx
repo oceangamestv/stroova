@@ -8,6 +8,7 @@ import PairsExercise from "../components/exercises/PairsExercise";
 import PuzzleExercise from "../components/exercises/PuzzleExercise";
 import DanetkaExercise from "../components/exercises/DanetkaExercise";
 import OneOfThreeExercise from "../components/exercises/OneOfThreeExercise";
+import { getSoundEnabled, ensureMediaPlaybackOnIOS } from "../utils/sounds";
 
 /**
  * Главная: и на мобильном, и на десктопе — гейм-хаб (одинаковый сценарий и стиль).
@@ -36,6 +37,12 @@ export const GameRoute: React.FC = () => {
     setShowIntro(true);
   }, [pathname]);
 
+  useEffect(() => {
+    if (!showIntro && getSoundEnabled()) {
+      ensureMediaPlaybackOnIOS();
+    }
+  }, [showIntro, exercise]);
+
   if (showIntro) {
     return (
       <GameOnlyLayout backIconOnly={false}>
@@ -59,7 +66,7 @@ export const GameRoute: React.FC = () => {
 
   return (
     <GameOnlyLayout backIconOnly={exercise === "pairs"}>
-      <section className="lesson-card">{content}</section>
+      {content}
     </GameOnlyLayout>
   );
 };

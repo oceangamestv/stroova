@@ -199,11 +199,22 @@ body::after {
   }
 
   .site-header--sidebar .site-header__nav {
+    display: flex;
     flex: 1;
     flex-direction: column;
     align-items: stretch;
     justify-content: flex-start;
     gap: 8px;
+    min-height: 0;
+  }
+
+  .site-header--sidebar .site-header__nav-list--sidebar {
+    flex: 0 0 auto;
+  }
+
+  .site-header--sidebar .site-header__sidebar-sound-wrap {
+    margin-top: auto;
+    padding-top: 8px;
   }
 
   .site-header--sidebar .site-header__nav-group {
@@ -286,6 +297,38 @@ body::after {
   .site-header--sidebar .site-header__sidebar-link-text {
     flex: 1;
     text-align: left;
+  }
+
+  .site-header--sidebar .site-header__link--sound {
+    width: 100%;
+    cursor: pointer;
+    border: 2px solid var(--border-subtle);
+    background: var(--bg-elevated);
+    color: var(--text);
+    font: inherit;
+    text-decoration: none;
+  }
+  .site-header--sidebar .site-header__link--sound.site-header__link--sound-on {
+    color: var(--accent);
+  }
+  .site-header--sidebar .site-header__link--sound.site-header__link--sound-off {
+    background: rgba(198, 40, 40, 0.15);
+    border-color: #c62828;
+    color: #c62828;
+  }
+  .site-header--sidebar .site-header__link--sound.site-header__link--sound-off:hover {
+    background: rgba(198, 40, 40, 0.25);
+    border-color: #b71c1c;
+    color: #b71c1c;
+  }
+  [data-theme="dark"] .site-header--sidebar .site-header__link--sound.site-header__link--sound-off {
+    background: rgba(244, 67, 54, 0.2);
+    border-color: #ef5350;
+    color: #ef5350;
+  }
+  [data-theme="dark"] .site-header--sidebar .site-header__link--sound.site-header__link--sound-off:hover {
+    background: rgba(244, 67, 54, 0.3);
+    border-color: #e53935;
   }
 
   [data-theme="dark"] .site-header--sidebar .site-header__link--sidebar {
@@ -1466,8 +1509,20 @@ body::after {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 24px 0;
+  padding: 24px 16px;
   overflow-y: auto;
+  box-sizing: border-box;
+}
+
+/* Прямой контейнер игры (без lesson-card): полная ширина до max, чтобы вёрстка не «плыла» */
+.app-shell--game-only .game-only-main > .exercise-area {
+  width: 100%;
+  max-width: 720px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  box-sizing: border-box;
 }
 
 /* В сложном режиме пазлов на мобильной версии выравнивание сверху */
@@ -1476,73 +1531,149 @@ body::after {
   padding-top: 12px;
 }
 
+/* Верхнее меню игры: полная ширина, фиксированная высота, новый стиль */
 .game-only-header {
+  flex-shrink: 0;
+  background: var(--card);
+  border-bottom: 1px solid var(--border-subtle);
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.04);
+  transition: background-color var(--transition-theme), border-color var(--transition-theme);
+}
+
+.game-only-header__inner {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 12px 16px;
-  padding-top: max(12px, env(safe-area-inset-top));
-  padding-left: max(16px, env(safe-area-inset-left));
-  padding-right: max(16px, env(safe-area-inset-right));
-  background: var(--card);
-  border-bottom: 2px solid var(--border-subtle);
-  flex-shrink: 0;
-  transition: background-color var(--transition-theme), border-color var(--transition-theme);
+  min-height: 52px;
+  padding: 10px 12px;
+  padding-top: max(10px, env(safe-area-inset-top));
+  padding-left: max(12px, env(safe-area-inset-left));
+  padding-right: max(12px, env(safe-area-inset-right));
+  box-sizing: border-box;
 }
 
-[data-theme="dark"] .game-only-header {
-  border-color: var(--border-strong);
+.game-only-header__title {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--text-soft);
+  pointer-events: none;
 }
 
-.game-only-header__back,
-.game-only-header__abort {
+.game-only-header__btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  padding: 8px 12px;
+  gap: 8px;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0 14px;
+  font: inherit;
   font-size: 0.9rem;
   font-weight: 600;
   color: var(--text);
   background: var(--bg-elevated);
-  border: 2px solid var(--border-subtle);
-  border-radius: var(--radius-md, 8px);
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
   cursor: pointer;
-  transition: background-color var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast);
+  transition: background-color var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast);
+  flex-shrink: 0;
+  box-sizing: border-box;
 }
 
-.game-only-header__back svg,
-.game-only-header__abort svg {
-  width: 20px;
-  height: 20px;
-}
-
-.game-only-header__back:hover,
-.game-only-header__abort:hover {
+.game-only-header__btn:hover {
   background: var(--accent-soft);
   border-color: var(--accent);
 }
 
-.game-only-header__abort {
-  margin-left: auto;
+.game-only-header__btn svg {
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+}
+
+.game-only-header__back-text {
+  white-space: nowrap;
 }
 
 .game-only-header__back--icon-only {
-  padding: 8px;
+  padding: 0;
+  min-width: 44px;
 }
+
 .game-only-header__back--icon-only svg {
   width: 24px;
   height: 24px;
 }
 
-/* Десктоп: игровой layout с тем же сценарием, что и на мобильном */
-@media (min-width: 901px) {
-  .app-shell--game-only .game-only-header {
-    padding: 16px 24px;
+.game-only-header__sound {
+  margin-left: auto;
+}
+
+.game-only-header__sound--on {
+  color: var(--accent);
+  border-color: rgba(255, 193, 7, 0.4);
+  background: var(--accent-soft);
+}
+
+.game-only-header__sound--on:hover {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+.game-only-header__sound--off {
+  background: rgba(198, 40, 40, 0.12);
+  border-color: #c62828;
+  color: #c62828;
+}
+
+.game-only-header__sound--off:hover {
+  background: rgba(198, 40, 40, 0.22);
+  border-color: #b71c1c;
+  color: #b71c1c;
+}
+
+[data-theme="dark"] .game-only-header {
+  border-bottom-color: var(--border-strong);
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.15);
+}
+
+[data-theme="dark"] .game-only-header__sound--off {
+  background: rgba(244, 67, 54, 0.18);
+  border-color: #ef5350;
+  color: #ef5350;
+}
+
+[data-theme="dark"] .game-only-header__sound--off:hover {
+  background: rgba(244, 67, 54, 0.28);
+  border-color: #e53935;
+}
+
+/* Игровой layout: шапка на всю ширину на мобильном (без отступа shell) */
+@media (max-width: 900px) {
+  .app-shell.app-shell--game-only {
+    padding-top: 0;
+    padding-left: 0;
+    padding-right: 0;
   }
-  .app-shell--game-only .game-only-header__back:not(.game-only-header__back--icon-only) {
-    padding: 10px 16px;
+  .app-shell--game-only .game-only-main {
+    padding-left: max(16px, env(safe-area-inset-left));
+    padding-right: max(16px, env(safe-area-inset-right));
+  }
+}
+
+/* Десктоп: игровой layout */
+@media (min-width: 901px) {
+  .app-shell--game-only .game-only-header__inner {
+    padding: 12px 24px;
+    min-height: 56px;
+  }
+  .app-shell--game-only .game-only-header__btn:not(.game-only-header__back--icon-only) {
+    padding: 0 18px;
     font-size: 1rem;
   }
   .app-shell--game-only .game-only-main {
@@ -1554,9 +1685,27 @@ body::after {
   }
 }
 
-/* --- Экран перед игрой (описание, правила, настройки) --- */
+/* --- Экран перед игрой (описание, правила, настройки) — скруглённый, без прямых углов --- */
 .game-intro-card {
   max-width: 520px;
+}
+
+.lesson-card.game-intro-card {
+  border-radius: 12px;
+  border: 2px solid var(--border-subtle);
+  box-shadow: var(--shadow-soft);
+  padding: 32px 28px;
+  gap: 0;
+  overflow: hidden;
+  transition: background-color var(--transition-theme), border-color var(--transition-theme), box-shadow var(--transition-theme);
+}
+
+.lesson-card.game-intro-card::before {
+  display: none;
+}
+
+[data-theme="dark"] .lesson-card.game-intro-card {
+  box-shadow: var(--shadow-soft), 0 0 24px rgba(255, 193, 7, 0.06);
 }
 
 .game-intro {
@@ -1570,6 +1719,7 @@ body::after {
   margin: 0 0 24px;
   padding: 0 0 20px;
   border-bottom: 2px solid var(--border-subtle);
+  border-radius: 0;
   transition: border-color var(--transition-theme);
 }
 
@@ -1659,6 +1809,13 @@ body::after {
   padding: 14px 20px;
   font-size: 1.1rem;
   font-weight: 700;
+  border-radius: 12px;
+  border: 2px solid rgba(0, 0, 0, 0.15);
+  box-shadow: var(--shadow-soft);
+}
+
+.primary-btn.game-intro__start {
+  border-radius: 12px;
 }
 
 /* На мобильном кнопки настроек на всю ширину, без пустого пространства справа */
@@ -1698,14 +1855,96 @@ body::after {
   }
 }
 
-/* --- Поиск пары: этапы кружками (мобильный) --- */
-.pairs-stages-dots {
+/* --- Поиск пары: 5 сегментов прогресса + кружки между ними (мобильный/компактный) --- */
+.pairs-progress {
+  width: 100%;
+  flex-shrink: 0;
+  padding: 8px 0 20px;
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 10px;
+  gap: 0;
+  box-sizing: border-box;
+  min-height: 28px;
+}
+
+/* Каждый сегмент — отдельный мини-прогресс-бар, заполняется 0–100% внутри этапа */
+.pairs-progress__segment {
+  flex: 1;
+  min-width: 0;
+  height: 14px;
+  background: var(--bg-elevated);
+  border: 2px solid var(--border-subtle);
+  position: relative;
+  overflow: hidden;
+  transition: border-color var(--transition-fast), background-color var(--transition-theme);
+}
+
+.pairs-progress__segment:first-child {
+  border-radius: 12px 0 0 12px;
+  border-right-width: 1px;
+}
+
+.pairs-progress__segment:last-child {
+  border-radius: 0 12px 12px 0;
+  border-left-width: 1px;
+}
+
+.pairs-progress__segment:not(:first-child):not(:last-child) {
+  border-left-width: 1px;
+  border-right-width: 1px;
+}
+
+.pairs-progress__fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  background: linear-gradient(90deg, var(--accent), var(--accent-strong));
+  transition: width var(--transition-slow);
+  min-width: 0;
+}
+
+.pairs-progress__segment:first-child .pairs-progress__fill {
+  border-radius: 10px 0 0 10px;
+}
+
+.pairs-progress__segment:last-child .pairs-progress__fill {
+  border-radius: 0 10px 10px 0;
+}
+
+/* Кружок = граница этапа, между сегментами; перекрывает край сегментов, убирая зазоры */
+.pairs-progress__dot {
+  width: 22px;
+  height: 22px;
   flex-shrink: 0;
-  padding: 8px 0 16px;
+  margin-left: -2px;
+  margin-right: -2px;
+  border-radius: 50%;
+  background: var(--bg-elevated);
+  border: 2px solid var(--border-subtle);
+  transition: background-color var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast);
+  z-index: 1;
+}
+
+.pairs-progress__dot--done {
+  background: var(--accent);
+  border-color: var(--accent-strong);
+  box-shadow: 0 0 0 2px var(--accent-soft);
+}
+
+.pairs-progress__dot--current {
+  background: var(--card);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.pairs-progress__dot--done.pairs-progress__dot--current {
+  background: var(--accent);
+  border-color: var(--accent-strong);
+}
+
+[data-theme="dark"] .pairs-progress__dot--current {
+  background: var(--card);
 }
 
 /* --- Puzzle: строка состояния на мобильном (слов, опыт, таймер) --- */
@@ -1719,39 +1958,270 @@ body::after {
   justify-content: space-between;
   align-items: center;
   flex-wrap: wrap;
-  gap: 8px;
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--text);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
+  gap: 10px;
   transition: color var(--transition-theme);
 }
 
+/* Слов / Опыт / Таймер — единый стиль скруглённых бейджей */
+.puzzle-mobile-stat,
 .puzzle-mobile-status-row .puzzle-timer {
-  color: var(--accent, #f59e0b);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 14px;
+  background: var(--bg-elevated);
+  border: 2px solid var(--border-subtle);
+  border-radius: 12px;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--text);
   white-space: nowrap;
+  box-shadow: var(--shadow-soft);
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast), color var(--transition-theme), background-color var(--transition-theme);
+}
+
+.puzzle-mobile-status-row .puzzle-timer {
+  color: var(--accent-strong);
   margin-left: auto;
 }
 
-.pairs-stages-dot {
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  background: var(--bg-elevated);
-  border: 2px solid var(--border-subtle);
-  transition: background-color var(--transition-fast), border-color var(--transition-fast);
+.puzzle-mobile-status-row .puzzle-timer[title]:not([title=""]) {
+  cursor: help;
 }
 
-.pairs-stages-dot--done {
-  background: var(--accent);
+/* --- Данетка: верхняя строка (слова + опыт, таймер справа) --- */
+.danetka-status.puzzle-mobile-status {
+  padding: 8px 0 16px;
+}
+
+.danetka-top-row {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  flex-wrap: wrap;
+}
+
+.danetka-top-row--align-end {
+  justify-content: flex-end;
+}
+
+/* Счётчик слов/опыта — первая строка внутри карточки, в форме блока без отдельного ящика */
+.danetka-card-stats-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 10px;
+  align-self: stretch;
+  padding: 0 0 10px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.danetka-card-stats-row .danetka-stats-words {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text-soft);
+}
+
+.danetka-card-stats-row .danetka-stats-xp {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--accent-strong);
+  min-width: 5ch;
+}
+
+.danetka-top-row .danetka-stats-block {
+  margin-right: 6px;
+}
+
+.danetka-top-row .danetka-timer-circle {
+  margin-right: 10px;
+}
+
+.danetka-top-row .danetka-stage-cells {
+  margin-right: 8px;
+}
+
+.danetka-top-row .danetka-stage-done {
+  margin-left: 4px;
+}
+
+.danetka-stats-block {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  min-width: 88px;
+  padding: 8px 10px;
+  background: var(--bg-elevated);
+  border: 2px solid var(--border-subtle);
+  border-radius: 10px;
+  box-shadow: var(--shadow-soft);
+  transition: border-color var(--transition-fast), color var(--transition-theme);
+}
+
+.danetka-stats-words {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text);
+  text-align: center;
+  line-height: 1.3;
+}
+
+.danetka-stats-divider {
+  height: 0;
+  margin: 6px 0;
+  border: none;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.danetka-stats-xp {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 5ch;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--accent-strong);
+  text-align: center;
+  letter-spacing: 0.02em;
+}
+
+.danetka-top-row--desktop {
+  margin-bottom: 4px;
+}
+
+/* Таймер и этапы в правой части на десктопе (1 из 3, данетка) */
+.danetka-top-row__right {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  margin-left: auto;
+}
+
+.danetka-top-row__right .danetka-timer-circle {
+  margin-right: 10px;
+}
+
+.danetka-top-row__right .danetka-stage-cells {
+  margin-right: 8px;
+}
+
+/* --- Данетка: ячейки этапа и бонус в одной строке с таймером --- */
+
+.danetka-timer-circle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 2.34rem;
+  font-weight: 700;
+  color: var(--accent-strong);
+  flex-shrink: 0;
+  transition: color var(--transition-theme);
+}
+
+.danetka-timer-icon {
+  font-size: 3.08rem;
+  line-height: 1;
+}
+
+.danetka-timer-circle[title]:not([title=""]) {
+  cursor: help;
+}
+
+.danetka-stage-cells {
+  display: grid;
+  grid-template-columns: repeat(8, 16px);
+  grid-template-rows: repeat(2, 16px);
+  gap: 3px;
+  width: 152px;
+  flex-shrink: 0;
+}
+
+/* Полоски (первые 13 из 16 ячеек) — одинаковый размер, уменьшенный для мобильного */
+.danetka-stage-bar {
+  width: 16px;
+  height: 16px;
+  box-sizing: border-box;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: 4px;
+  transition: background var(--transition-fast), border-color var(--transition-fast), opacity var(--transition-fast);
+}
+
+.danetka-stage-bar--filled {
+  background: var(--accent-soft);
   border-color: var(--accent-strong);
 }
 
-.pairs-stages-dot--current {
+[data-theme="dark"] .danetka-stage-bar--filled {
+  background: rgba(255, 193, 7, 0.25);
+  border-color: var(--accent-strong);
+}
+
+/* Квадраты (последние 3 ячейки) — те же размеры и рамка, что у полосок, для единого вида */
+.danetka-stage-square {
+  width: 16px;
+  height: 16px;
+  box-sizing: border-box;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: 4px;
+  transition: background var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast), opacity var(--transition-fast);
+}
+
+.danetka-stage-square--filled {
   background: var(--accent-soft);
-  border-color: var(--accent);
-  box-shadow: 0 0 0 2px var(--accent-soft);
+  border-color: var(--accent-strong);
+}
+
+.danetka-stage-square--completed {
+  background: var(--accent-soft);
+  border-color: var(--accent-strong);
+  box-shadow: 0 0 0 2px var(--accent-strong);
+}
+
+[data-theme="dark"] .danetka-stage-square--filled,
+[data-theme="dark"] .danetka-stage-square--completed {
+  background: rgba(255, 193, 7, 0.25);
+  border-color: var(--accent-strong);
+}
+
+/* Лишние ячейки на этапах 2, 4, 8 — затемнены */
+/* Активные ячейки (без затемнения) — на 10% ярче */
+.danetka-stage-bar:not(.danetka-stage-cell--dimmed),
+.danetka-stage-square:not(.danetka-stage-cell--dimmed) {
+  filter: brightness(1.1);
+}
+
+.danetka-stage-cell--dimmed {
+  opacity: 0.35;
+  pointer-events: none;
+}
+
+.danetka-bonus-head {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 40px;
+  height: 40px;
+  padding: 0 8px;
+  background: var(--bg-elevated);
+  border: 2px solid var(--border-subtle);
+  border-radius: 50%;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--accent-strong);
+  flex-shrink: 0;
+  box-shadow: var(--shadow-soft);
+  transition: color var(--transition-theme);
+}
+
+.danetka-stage-done {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-soft);
 }
 
 /* --- Поиск пары мобильный: крупные карточки и шрифт, в стиле lesson-card --- */
@@ -1768,13 +2238,14 @@ body::after {
     min-height: 80px;
     padding: 20px 16px;
     font-size: 1.2rem;
-    border: 4px solid var(--border-strong);
-    box-shadow: 0 4px 0 rgba(0, 0, 0, 0.2);
-    background: var(--card-soft);
+    border: 2px solid var(--border-subtle);
+    border-radius: 12px;
+    box-shadow: var(--shadow-soft);
+    background: var(--bg-elevated);
   }
 
   [data-theme="dark"] .pairs-exercise--mobile .card {
-    box-shadow: 0 4px 0 rgba(0, 0, 0, 0.5);
+    box-shadow: var(--shadow-soft);
   }
 
   .pairs-exercise--mobile .card-label {
@@ -1791,27 +2262,26 @@ body::after {
   .pairs-exercise--mobile .card--selected {
     border-color: var(--accent);
     background: var(--accent-soft);
-    box-shadow: 0 0 0 3px rgba(255, 193, 7, 0.35),
-      0 6px 0 rgba(0, 0, 0, 0.3);
+    box-shadow: 0 0 0 2px rgba(255, 193, 7, 0.35), 0 6px 24px rgba(255, 193, 7, 0.22);
   }
 
   .pairs-exercise--mobile .card--wrong {
     border-color: var(--danger);
     background: var(--danger);
     color: #fff;
-    box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.25);
+    box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.2), var(--shadow-soft);
   }
 
   .pairs-exercise--mobile .card--matched {
     border-color: var(--border-subtle);
     background: var(--bg-elevated);
-    opacity: 0.55;
-    filter: grayscale(0.4);
+    opacity: 0.6;
+    filter: grayscale(0.35);
     color: var(--text-soft);
   }
 
   [data-theme="dark"] .pairs-exercise--mobile .card--matched {
-    opacity: 0.4;
+    opacity: 0.5;
   }
 
   .pairs-exercise--mobile .card-tag,
@@ -3221,10 +3691,11 @@ body::after {
 .game-dictionary-source-btns {
   display: flex;
   gap: 0;
-  border: 2px solid var(--border-strong);
-  border-radius: 0;
+  border: 2px solid var(--border-subtle);
+  border-radius: 12px;
   overflow: hidden;
-  background: var(--card);
+  background: var(--bg-elevated);
+  box-shadow: var(--shadow-soft);
 }
 
 .game-dictionary-source-btn {
@@ -3250,9 +3721,9 @@ body::after {
 .game-empty-personal {
   text-align: center;
   padding: 32px 24px;
-  background: var(--card-soft);
+  background: var(--bg-elevated);
   border: 2px solid var(--border-subtle);
-  border-radius: var(--radius-md);
+  border-radius: 12px;
 }
 
 .game-empty-personal p {
@@ -3350,28 +3821,38 @@ body::after {
   color: #c62828;
 }
 
+/* Таймер в десктопной шапке: такой же скруглённый блок */
 .progress-text .puzzle-timer {
-  color: var(--accent, #f59e0b);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: var(--bg-elevated);
+  border: 2px solid var(--border-subtle);
+  border-radius: 12px;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--accent-strong);
   white-space: nowrap;
+  box-shadow: var(--shadow-soft);
+  transition: border-color var(--transition-fast), color var(--transition-theme);
 }
 
 .progress-bar {
   width: 100%;
-  height: 16px;
-  background: var(--card);
-  border-radius: 0;
+  height: 14px;
+  background: var(--bg-elevated);
+  border-radius: 12px;
   overflow: hidden;
-  border: 3px solid var(--border-strong);
-  box-shadow: inset 0 0 0 1px rgba(255, 193, 7, 0.3);
+  border: 2px solid var(--border-subtle);
   transition: background-color var(--transition-theme), border-color var(--transition-theme);
 }
 
 #progress-fill {
   height: 100%;
   width: 0%;
-  border-radius: 0;
+  border-radius: 10px;
   background: linear-gradient(90deg, #ffc107, #ffb300);
-  box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.3);
   transition: width var(--transition-slow);
   position: relative;
 }
@@ -3396,7 +3877,7 @@ body::after {
   }
 }
 
-/* Обёртка игровой зоны: в одном стиле с lesson-card, профилем и меню */
+/* Обёртка игровой зоны: в стиле навигации и game-hub — округло, минималистично */
 .pairs-exercise {
   display: flex;
   flex-direction: column;
@@ -3405,48 +3886,35 @@ body::after {
   position: relative;
   background: var(--card);
   padding: 40px;
-  border-radius: var(--radius-lg);
+  border-radius: 12px;
   overflow: hidden;
-  box-shadow: 0 4px 0 rgba(0, 0, 0, 0.2);
-  border: 4px solid var(--border-strong);
+  box-shadow: var(--shadow-soft);
+  border: 2px solid var(--border-subtle);
   transition: background-color var(--transition-theme), border-color var(--transition-theme), box-shadow var(--transition-theme);
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 [data-theme="dark"] .pairs-exercise {
-  box-shadow: 0 4px 0 rgba(0, 0, 0, 0.5), 0 0 20px rgba(255, 193, 7, 0.2);
+  box-shadow: var(--shadow-soft), 0 0 20px rgba(255, 193, 7, 0.08);
 }
 
 .pairs-exercise::before {
   content: "";
   position: absolute;
-  top: -4px;
-  left: -4px;
-  right: -4px;
-  bottom: -4px;
-  background: linear-gradient(135deg, #ffc107, #2196f3);
-  z-index: -1;
-  opacity: 0.1;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(135deg, rgba(255, 193, 7, 0.04), rgba(33, 150, 243, 0.04));
+  z-index: 0;
   pointer-events: none;
   transition: opacity var(--transition-theme);
 }
 
-[data-theme="dark"] .pairs-exercise::before {
-  opacity: 0.15;
-}
-
 .pairs-exercise::after {
-  content: "";
-  position: absolute;
-  bottom: -30%;
-  left: -10%;
-  width: 300px;
-  height: 300px;
-  background: linear-gradient(135deg, rgba(33, 150, 243, 0.1), rgba(33, 150, 243, 0.05));
-  clip-path: polygon(50% 0%, 0% 100%, 100% 100%);
-  z-index: 0;
-  pointer-events: none;
-  transform: rotate(180deg);
-  transition: background var(--transition-theme);
+  display: none;
 }
 
 /* Обёртка для упражнения "Поиск пар": слева EN, справа RU */
@@ -3458,6 +3926,8 @@ body::after {
   position: relative;
   z-index: 1;
   min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .cards-column {
@@ -3465,14 +3935,17 @@ body::after {
   flex-direction: column;
   gap: 16px;
   min-width: 0;
+  min-height: 0;
 }
 
 #cards-column-english .card {
   border-left: 4px solid var(--accent);
+  border-radius: 12px;
 }
 
 #cards-column-russian .card {
   border-left: 4px solid var(--accent-secondary);
+  border-radius: 12px;
 }
 
 .errors-label {
@@ -3484,18 +3957,18 @@ body::after {
   display: none;
 }
 
-/* Карточки слов: в стиле lesson-card/профиля — крупнее блоки и шрифт */
+/* Карточки слов: в стиле навигации и game-hub — округлые, минималистичные */
 
 .card {
   position: relative;
-  border-radius: var(--radius-md);
+  border-radius: 12px;
   padding: 20px 18px;
-  background: var(--card-soft);
+  background: var(--bg-elevated);
   cursor: pointer;
   text-align: center;
   font-size: 1.25rem;
   font-weight: 700;
-  border: 4px solid var(--border-strong);
+  border: 2px solid var(--border-subtle);
   color: var(--text);
   min-height: 88px;
   display: flex;
@@ -3505,7 +3978,7 @@ body::after {
   user-select: none;
   transform: translateY(0);
   transition: background-color var(--transition-theme), border-color var(--transition-theme), color var(--transition-theme), transform var(--transition-fast), box-shadow var(--transition-fast);
-  box-shadow: 0 4px 0 rgba(0, 0, 0, 0.2);
+  box-shadow: var(--shadow-soft);
   container-type: inline-size;
   container-name: card;
   min-width: 0;
@@ -3523,12 +3996,12 @@ body::after {
 
 [data-theme="dark"] .card {
   background: var(--card-soft);
-  box-shadow: 0 4px 0 rgba(0, 0, 0, 0.5);
+  box-shadow: var(--shadow-soft);
 }
 
 .card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 6px 0 rgba(0, 0, 0, 0.3);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 24px rgba(255, 193, 7, 0.18);
   background: var(--accent-soft);
   border-color: var(--accent);
 }
@@ -3545,16 +4018,14 @@ body::after {
   border-color: var(--accent);
   background: var(--accent-soft);
   color: var(--text);
-  box-shadow: 0 0 0 3px rgba(255, 193, 7, 0.35),
-    0 6px 0 rgba(0, 0, 0, 0.3);
+  box-shadow: 0 0 0 2px rgba(255, 193, 7, 0.35), 0 6px 24px rgba(255, 193, 7, 0.22);
 }
 
 [data-theme="dark"] .card--selected {
   background: var(--accent-soft);
   color: var(--text);
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(255, 193, 7, 0.35),
-    0 6px 0 rgba(0, 0, 0, 0.5);
+  box-shadow: 0 0 0 2px rgba(255, 193, 7, 0.35), 0 6px 24px rgba(255, 193, 7, 0.25);
 }
 
 .card--matched {
@@ -3562,31 +4033,30 @@ body::after {
   border-color: var(--border-subtle);
   color: var(--text-soft);
   cursor: default;
-  opacity: 0.55;
-  filter: grayscale(0.4);
-  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.15),
-    0 0 0 2px var(--accent-secondary);
+  opacity: 0.6;
+  filter: grayscale(0.35);
+  box-shadow: var(--shadow-soft);
   position: relative;
 }
 
 [data-theme="dark"] .card--matched {
   background: var(--bg-elevated);
-  opacity: 0.4;
-  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.5),
-    0 0 0 2px var(--accent-secondary);
+  opacity: 0.5;
+  box-shadow: var(--shadow-soft);
 }
 
 .card--matched::before {
   content: "";
   position: absolute;
-  top: -4px;
-  left: -4px;
-  right: -4px;
-  bottom: -4px;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
   border: 2px solid var(--accent-secondary);
-  opacity: 0.4;
+  opacity: 0.35;
   border-radius: inherit;
   animation: pulse-glow 2s ease-in-out infinite;
+  pointer-events: none;
 }
 
 .card--disabled {
@@ -3599,13 +4069,11 @@ body::after {
   background: var(--danger);
   border-color: var(--danger);
   color: #ffffff;
-  box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.25),
-    0 6px 0 rgba(0, 0, 0, 0.4);
+  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.2), var(--shadow-soft);
 }
 
 [data-theme="dark"] .card--wrong {
-  box-shadow: 0 0 0 3px rgba(255, 68, 68, 0.3),
-    0 6px 0 rgba(0, 0, 0, 0.5);
+  box-shadow: 0 0 0 2px rgba(255, 68, 68, 0.3), var(--shadow-soft);
 }
 
 .card-tag {
@@ -3905,7 +4373,7 @@ body::after {
   }
 }
 
-/* Стили для упражнения "Сборка слова" */
+/* Стили для упражнения "Сборка слова" — в стиле «Найди пару»: скруглённо, минималистично */
 .puzzle-exercise {
   display: flex;
   flex-direction: column;
@@ -3914,91 +4382,46 @@ body::after {
   position: relative;
   background: var(--card);
   padding: 40px;
-  border-radius: 8px;
+  border-radius: 12px;
   overflow: hidden;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-  transition: background-color var(--transition-theme), box-shadow var(--transition-theme);
+  box-shadow: var(--shadow-soft);
+  border: 2px solid var(--border-subtle);
+  transition: background-color var(--transition-theme), border-color var(--transition-theme), box-shadow var(--transition-theme);
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 [data-theme="dark"] .puzzle-exercise {
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5), 0 0 30px rgba(255, 193, 7, 0.1);
+  box-shadow: var(--shadow-soft), 0 0 24px rgba(255, 193, 7, 0.06);
 }
 
 .puzzle-exercise::before {
   content: "";
   position: absolute;
-  top: -50%;
-  right: -20%;
-  width: 400px;
-  height: 400px;
-  background: linear-gradient(135deg, rgba(255, 193, 7, 0.15), rgba(255, 193, 7, 0.05));
-  clip-path: polygon(50% 0%, 0% 100%, 100% 100%);
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(135deg, rgba(255, 193, 7, 0.04), rgba(33, 150, 243, 0.04));
   z-index: 0;
   pointer-events: none;
 }
 
 .puzzle-exercise::after {
-  content: "";
-  position: absolute;
-  bottom: -30%;
-  left: -10%;
-  width: 300px;
-  height: 300px;
-  background: linear-gradient(135deg, rgba(33, 150, 243, 0.1), rgba(33, 150, 243, 0.05));
-  clip-path: polygon(50% 0%, 0% 100%, 100% 100%);
-  z-index: 0;
-  pointer-events: none;
-  transform: rotate(180deg);
+  display: none;
 }
 
-.puzzle-help-btn {
-  position: absolute;
-  top: 20px;
-  right: 20px;
-  width: 44px;
-  height: 44px;
-  border-radius: 4px;
-  background: var(--card);
-  border: 2px solid var(--accent);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all var(--transition-theme), transform var(--transition-fast), box-shadow var(--transition-fast);
-  z-index: 10;
-  padding: 0;
-  box-shadow: 0 2px 8px rgba(255, 193, 7, 0.3);
-}
-
-[data-theme="dark"] .puzzle-help-btn {
-  background: var(--card);
-  box-shadow: 0 2px 8px rgba(255, 193, 7, 0.4), 0 0 10px rgba(255, 193, 7, 0.2);
-}
-
-.puzzle-help-btn:hover {
-  background: #ffc107;
-  transform: translateY(-2px);
-  box-shadow: 0 4px 16px rgba(255, 193, 7, 0.5);
-}
-
-.puzzle-help-btn svg {
-  width: 20px;
-  height: 20px;
-  color: #ffc107;
-  transition: all var(--transition-fast);
-}
-
-.puzzle-help-btn:hover svg {
-  color: #000000;
-}
-
-/* Обёртка области обучения (слово + слоты + буквы) для скролла на мобильных */
+/* Обёртка области обучения (слово + слоты + буквы): центрирование на десктопе и мобиле */
 .puzzle-learning-area {
   display: flex;
   flex-direction: column;
+  align-items: center;
   gap: 32px;
   position: relative;
   z-index: 1;
+  width: 100%;
+  min-width: 0;
 }
 
 .puzzle-difficulty-switcher {
@@ -4015,16 +4438,17 @@ body::after {
   outline: none;
   cursor: pointer;
   padding: 10px 20px;
-  border-radius: 0;
+  border-radius: 12px;
   font-size: 14px;
   font-weight: 700;
-  background: var(--card);
+  background: var(--bg-elevated);
   color: var(--text);
-  border: 2px solid var(--border-strong);
+  border: 2px solid var(--border-subtle);
   transition: all var(--transition-theme), transform var(--transition-fast), box-shadow var(--transition-fast);
   text-transform: uppercase;
   letter-spacing: 0.5px;
   position: relative;
+  box-shadow: var(--shadow-soft);
 }
 
 .difficulty-btn::before {
@@ -4054,18 +4478,11 @@ body::after {
   background: var(--accent);
   color: #000000;
   border-color: var(--accent);
-  box-shadow: 0 0 0 2px rgba(255, 193, 7, 0.3), 0 4px 12px rgba(255, 193, 7, 0.2);
+  box-shadow: 0 0 0 2px rgba(255, 193, 7, 0.3), var(--shadow-soft);
 }
 
 .difficulty-btn.active::after {
-  content: "";
-  position: absolute;
-  bottom: -2px;
-  left: 0;
-  right: 0;
-  height: 3px;
-  background: var(--accent);
-  box-shadow: 0 0 8px rgba(255, 193, 7, 0.6);
+  display: none;
 }
 
 [data-theme="dark"] .difficulty-btn.active {
@@ -4075,8 +4492,9 @@ body::after {
 .puzzle-hint {
   text-align: center;
   padding: 17px 24px;
-  width: 757px;
-  height: 110px;
+  width: 100%;
+  max-width: 100%;
+  min-height: 120px;
   background: transparent;
   border-radius: 0;
   border: none;
@@ -4086,7 +4504,10 @@ body::after {
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
   gap: 0;
+  box-sizing: border-box;
+  flex-shrink: 0;
 }
 
 .puzzle-hint-accent {
@@ -4104,11 +4525,14 @@ body::after {
   font-size: 42px;
   font-weight: 900;
   margin: 0;
+  min-height: 1.2em;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   color: var(--text);
   text-transform: uppercase;
   letter-spacing: 2px;
   position: relative;
-  display: inline-block;
   transition: color var(--transition-theme);
 }
 
@@ -4308,6 +4732,9 @@ body::after {
   min-height: 100px;
   padding: 24px 16px;
   line-height: 1.5;
+  flex-shrink: 0;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .puzzle-slot-text {
@@ -4438,9 +4865,9 @@ body::after {
   min-width: 0;
   aspect-ratio: 1;
   flex-shrink: 0;
-  border-radius: 0;
-  background: var(--card);
-  border: 3px solid var(--border-strong);
+  border-radius: 12px;
+  background: var(--bg-elevated);
+  border: 2px solid var(--border-subtle);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -4452,13 +4879,13 @@ body::after {
   text-shadow: none;
   letter-spacing: 0.5px;
   position: relative;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  box-shadow: var(--shadow-soft);
   box-sizing: border-box;
   overflow: visible;
 }
 
 [data-theme="dark"] .puzzle-slot {
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+  box-shadow: var(--shadow-soft);
 }
 
 .puzzle-slot.filled {
@@ -4557,7 +4984,23 @@ body::after {
   flex-direction: column;
   align-items: center;
   gap: 24px;
+  min-height: 160px;
+  flex-shrink: 0;
   transition: all var(--transition-fast);
+  width: 100%;
+}
+
+/* Область букв: всегда занимает место, чтобы не прыгать при исчезновении панели */
+.puzzle-letters-area {
+  min-height: 96px;
+  width: 100%;
+  max-width: 100%;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow-x: hidden;
+  box-sizing: border-box;
 }
 
 .puzzle-hint-letter-count {
@@ -4733,6 +5176,38 @@ body::after {
   box-shadow: 0 2px 0 rgba(0, 0, 0, 0.3);
 }
 
+/* Та же панель, что и буквы, но в виде одной кнопки «Следующее слово» */
+.puzzle-letters.puzzle-letters--next-btn {
+  width: 100%;
+  cursor: pointer;
+  font-size: 1rem;
+  font-weight: 700;
+  color: #000000;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border: 2px solid rgba(0, 0, 0, 0.15);
+  border-radius: 12px;
+  background: var(--accent);
+  box-shadow: var(--shadow-soft);
+  justify-content: center;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast), transform var(--transition-fast), background-color var(--transition-fast);
+}
+
+.puzzle-letters.puzzle-letters--next-btn::before {
+  display: none;
+}
+
+.puzzle-letters.puzzle-letters--next-btn:hover {
+  background: var(--accent-strong);
+  border-color: var(--accent-strong);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 24px rgba(255, 193, 7, 0.28);
+}
+
+.puzzle-letters.puzzle-letters--next-btn:active {
+  transform: translateY(0);
+}
+
 /* ---------- Danetka game ---------- */
 .danetka-exercise {
   display: flex;
@@ -4742,6 +5217,80 @@ body::after {
   padding: 28px 24px;
   position: relative;
   min-height: 200px;
+}
+
+.danetka-exercise--mobile {
+  padding-top: 14px;
+}
+
+/* Подложка как в игре пазлы: карточка с фоном, рамкой, тенью */
+.danetka-exercise-card {
+  background: var(--card);
+  border: 2px solid var(--border-subtle);
+  border-radius: 12px;
+  box-shadow: var(--shadow-soft);
+  overflow: hidden;
+  transition: background-color var(--transition-theme), border-color var(--transition-theme), box-shadow var(--transition-theme);
+}
+
+[data-theme="dark"] .danetka-exercise-card {
+  box-shadow: var(--shadow-soft), 0 0 24px rgba(255, 193, 7, 0.06);
+}
+
+.danetka-exercise-card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(135deg, rgba(255, 193, 7, 0.04), rgba(33, 150, 243, 0.04));
+  z-index: 0;
+  pointer-events: none;
+}
+
+.danetka-exercise-card > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* Короткая вспышка карточки при ответе */
+.danetka-flash--correct {
+  animation: danetka-flash-correct 0.4s ease-out;
+}
+
+.danetka-flash--wrong {
+  animation: danetka-flash-wrong 0.5s ease-out;
+}
+
+@keyframes danetka-flash-correct {
+  0% {
+    box-shadow: var(--shadow-soft);
+    border-color: var(--border-subtle);
+  }
+  20% {
+    box-shadow: 0 0 0 4px rgba(46, 125, 50, 0.5), 0 0 32px rgba(46, 125, 50, 0.35);
+    border-color: #2e7d32;
+  }
+  100% {
+    box-shadow: var(--shadow-soft);
+    border-color: var(--border-subtle);
+  }
+}
+
+@keyframes danetka-flash-wrong {
+  0% {
+    box-shadow: var(--shadow-soft);
+    border-color: var(--border-subtle);
+  }
+  25% {
+    box-shadow: 0 0 0 4px rgba(244, 67, 54, 0.55), 0 0 32px rgba(244, 67, 54, 0.4);
+    border-color: #e53935;
+  }
+  100% {
+    box-shadow: var(--shadow-soft);
+    border-color: var(--border-subtle);
+  }
 }
 
 .danetka-word {
@@ -4755,19 +5304,55 @@ body::after {
   line-height: 1.3;
 }
 
+.danetka-translation-wrap {
+  position: relative;
+  max-width: 500px;
+  width: 100%;
+}
+
 .danetka-translation {
   font-size: 22px;
-  font-weight: 600;
-  color: var(--text-soft);
+  font-weight: 700;
+  color: var(--text);
   margin: 0;
   text-align: center;
   line-height: 1.4;
-  padding: 12px 20px;
-  background: var(--card);
+  padding: 14px 24px;
+  background: var(--bg-elevated);
   border: 2px solid var(--border-subtle);
-  border-radius: 8px;
-  max-width: 500px;
+  border-radius: 12px;
   width: 100%;
+  box-sizing: border-box;
+  box-shadow: var(--shadow-soft);
+}
+
+.danetka-result-icon {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 2;
+  font-size: 4rem;
+  font-weight: 900;
+  line-height: 1;
+  pointer-events: none;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.2);
+}
+
+.danetka-result-icon--correct {
+  color: #2e7d32;
+}
+
+[data-theme="dark"] .danetka-result-icon--correct {
+  color: #66bb6a;
+}
+
+.danetka-result-icon--wrong {
+  color: #c62828;
+}
+
+[data-theme="dark"] .danetka-result-icon--wrong {
+  color: #ef5350;
 }
 
 .danetka-options {
@@ -4810,6 +5395,21 @@ body::after {
   box-shadow: 0 0 0 3px rgba(255, 193, 7, 0.5);
 }
 
+/* Явная подсветка кнопки «Да»/«Нет» при правильном ответе */
+.danetka-yes-no-btn.danetka-option--correct {
+  background: rgba(46, 125, 50, 0.2);
+  border-color: #2e7d32;
+  color: #1b5e20;
+  box-shadow: 0 0 0 3px rgba(46, 125, 50, 0.35), 0 4px 16px rgba(46, 125, 50, 0.25);
+}
+
+[data-theme="dark"] .danetka-yes-no-btn.danetka-option--correct {
+  background: rgba(102, 187, 106, 0.2);
+  border-color: #66bb6a;
+  color: #81c784;
+  box-shadow: 0 0 0 3px rgba(102, 187, 106, 0.4), 0 4px 16px rgba(102, 187, 106, 0.3);
+}
+
 .danetka-option--wrong {
   background: var(--danger);
   border-color: var(--border-strong);
@@ -4830,6 +5430,71 @@ body::after {
   opacity: 0.6;
 }
 
+/* ---------- 1 из 3: кнопки выбора перевода (отдельно от данетки Да/Нет) ---------- */
+.one-of-three-options {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  max-width: 420px;
+}
+
+.one-of-three-option {
+  padding: 16px 20px;
+  font-size: 1.1rem;
+  font-weight: 600;
+  background: var(--bg-elevated);
+  border: 2px solid var(--border-subtle);
+  border-radius: 12px;
+  color: var(--text);
+  cursor: pointer;
+  transition: background var(--transition-fast), border-color var(--transition-fast), transform var(--transition-fast), box-shadow var(--transition-fast);
+  text-align: center;
+  position: relative;
+  box-shadow: var(--shadow-soft);
+}
+
+.one-of-three-option:hover:not(.one-of-three-option--locked) {
+  background: var(--accent-soft);
+  border-color: var(--accent-strong);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-soft);
+}
+
+.one-of-three-option--correct {
+  background: rgba(46, 125, 50, 0.2);
+  border-color: #2e7d32;
+  color: #1b5e20;
+  box-shadow: 0 0 0 2px rgba(46, 125, 50, 0.35);
+}
+
+[data-theme="dark"] .one-of-three-option--correct {
+  background: rgba(102, 187, 106, 0.2);
+  border-color: #66bb6a;
+  color: #81c784;
+  box-shadow: 0 0 0 2px rgba(102, 187, 106, 0.4);
+}
+
+.one-of-three-option--wrong {
+  background: var(--danger);
+  border-color: var(--border-strong);
+  color: #ffffff;
+  cursor: default;
+}
+
+[data-theme="dark"] .one-of-three-option--wrong {
+  background: #ff4444;
+}
+
+.one-of-three-option--locked {
+  cursor: default;
+  opacity: 0.9;
+}
+
+.one-of-three-option--locked:not(.one-of-three-option--correct):not(.one-of-three-option--wrong) {
+  opacity: 0.7;
+}
+
 .danetka-next {
   margin-top: 8px;
 }
@@ -4847,34 +5512,40 @@ body::after {
   padding: 20px 32px;
   font-size: 20px;
   font-weight: 700;
-  background: var(--card);
-  border: 3px solid var(--border-strong);
-  border-radius: 0;
+  border: 2px solid var(--border-subtle);
+  border-radius: 12px;
   color: var(--text);
   cursor: pointer;
-  transition: all var(--transition-fast);
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast), transform var(--transition-fast), background-color var(--transition-fast), color var(--transition-theme);
   text-align: center;
   min-width: 120px;
 }
 
+.danetka-yes-no-btn--yes {
+  background: rgba(76, 175, 80, 0.12);
+  border-color: rgba(76, 175, 80, 0.6);
+  box-shadow: 0 4px 16px rgba(76, 175, 80, 0.2);
+}
+
+.danetka-yes-no-btn--no {
+  background: rgba(244, 67, 54, 0.1);
+  border-color: rgba(244, 67, 54, 0.55);
+  box-shadow: 0 4px 16px rgba(244, 67, 54, 0.18);
+}
+
 .danetka-yes-no-btn:hover:not(.danetka-option--locked) {
-  background: var(--accent-soft);
-  border-color: var(--accent-strong);
   transform: translateY(-2px);
-  box-shadow: var(--shadow-soft);
 }
 
 .danetka-yes-no-btn--yes:hover:not(.danetka-option--locked) {
-  background: rgba(76, 175, 80, 0.15);
-  border-color: #4caf50;
+  box-shadow: 0 6px 24px rgba(76, 175, 80, 0.3);
 }
 
 .danetka-yes-no-btn--no:hover:not(.danetka-option--locked) {
-  background: rgba(244, 67, 54, 0.15);
-  border-color: #f44336;
+  box-shadow: 0 6px 24px rgba(244, 67, 54, 0.25);
 }
 
-/* ---------- Puzzle result modal ---------- */
+/* ---------- Puzzle result modal (стиль как игра «Найди пару» и меню навигации) ---------- */
 .puzzle-result-modal-backdrop {
   align-items: center;
   justify-content: center;
@@ -4889,58 +5560,72 @@ body::after {
   padding: 0;
   overflow: hidden;
   text-align: left;
+  background: var(--card);
+  border: 2px solid var(--border-subtle);
+  border-radius: 12px;
+  box-shadow: var(--shadow-strong);
+  transition: background-color var(--transition-theme), border-color var(--transition-theme), box-shadow var(--transition-theme);
+}
+
+.puzzle-result-modal::before {
+  display: none;
+}
+
+[data-theme="dark"] .puzzle-result-modal {
+  box-shadow: var(--shadow-strong), 0 0 24px rgba(255, 193, 7, 0.08);
+}
+
+/* Десктоп: центрируем модалку по области контента (без учёта сайдбара 284px) + доп. сдвиг вправо */
+@media (min-width: 1101px) {
+  .puzzle-result-modal-backdrop .puzzle-result-modal {
+    margin-left: 244px;
+  }
 }
 
 .puzzle-result-hero {
-  padding: 28px 28px 24px;
+  padding: 24px 24px 20px;
   background: var(--card);
-  border-bottom: 1px solid var(--border-subtle);
+  border-bottom: 2px solid var(--border-subtle);
   text-align: center;
+  transition: border-color var(--transition-theme);
 }
 
 .puzzle-result-title {
   margin: 0 0 16px;
-  font-size: 22px;
-  font-weight: 900;
+  font-size: 1.35rem;
+  font-weight: 800;
   color: var(--text);
-  text-transform: uppercase;
-  letter-spacing: 1px;
+  letter-spacing: -0.02em;
   line-height: 1.2;
+  transition: color var(--transition-theme);
 }
 
 .puzzle-result-score-block {
-  display: table;
+  display: flex;
   width: 100%;
-  border-collapse: separate;
-  border-spacing: 0;
-  border: 1px solid var(--border-strong);
-  border-radius: 8px;
-  overflow: hidden;
-  background: var(--card);
-  table-layout: fixed;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
 .puzzle-result-score-card {
-  display: table-cell;
+  flex: 1;
+  min-width: 0;
   text-align: center;
-  vertical-align: middle;
   padding: 16px 12px;
-  border-right: 1px solid var(--border-strong);
-  background: var(--card);
-  position: relative;
-  width: 33.333%;
-}
-
-.puzzle-result-score-card:last-child {
-  border-right: none;
+  background: var(--bg-elevated);
+  border: 2px solid var(--border-subtle);
+  border-radius: 12px;
+  box-shadow: var(--shadow-soft);
+  transition: background-color var(--transition-theme), border-color var(--transition-theme), box-shadow var(--transition-theme);
 }
 
 .puzzle-result-score-card--points {
   background: var(--accent-soft);
+  border-color: rgba(255, 193, 7, 0.4);
 }
 
 .puzzle-result-score-card--points .puzzle-result-score-card-value {
-  color: var(--accent);
+  color: var(--accent-strong);
 }
 
 .puzzle-result-score-card--errors .puzzle-result-score-card-value {
@@ -4953,19 +5638,21 @@ body::after {
 
 .puzzle-result-score-card-value {
   display: block;
-  font-size: 26px;
-  font-weight: 900;
+  font-size: 1.6rem;
+  font-weight: 800;
   line-height: 1.2;
   margin-bottom: 4px;
+  transition: color var(--transition-theme);
 }
 
 .puzzle-result-score-card-label {
   display: block;
-  font-size: 11px;
+  font-size: 0.7rem;
   font-weight: 600;
   color: var(--text-soft);
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.06em;
+  transition: color var(--transition-theme);
 }
 
 .puzzle-result-words-section {
@@ -4979,11 +5666,12 @@ body::after {
 
 .puzzle-result-words-heading {
   margin: 0 0 12px;
-  font-size: 11px;
+  font-size: 0.7rem;
   font-weight: 700;
   color: var(--text-soft);
   text-transform: uppercase;
   letter-spacing: 0.1em;
+  transition: color var(--transition-theme);
 }
 
 .puzzle-result-words-grid {
@@ -4994,24 +5682,23 @@ body::after {
   overflow-x: hidden;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
   scrollbar-width: thin;
   scrollbar-color: var(--accent) var(--border-subtle);
 }
 
-/* Кастомный скролл для WebKit браузеров */
 .puzzle-result-words-grid::-webkit-scrollbar {
   width: 8px;
 }
 
 .puzzle-result-words-grid::-webkit-scrollbar-track {
-  background: var(--border-subtle);
-  border-radius: 4px;
+  background: var(--bg-elevated);
+  border-radius: 8px;
 }
 
 .puzzle-result-words-grid::-webkit-scrollbar-thumb {
   background: var(--accent);
-  border-radius: 4px;
+  border-radius: 8px;
   transition: background var(--transition-fast);
 }
 
@@ -5032,38 +5719,37 @@ body::after {
   flex-direction: row;
   align-items: center;
   gap: 12px;
-  padding: 10px 12px;
-  background: var(--card-soft);
-  border: 1px solid var(--border-subtle);
-  border-radius: 8px;
+  padding: 12px 14px;
+  background: var(--bg-elevated);
+  border: 2px solid var(--border-subtle);
+  border-radius: 12px;
   min-width: 0;
-  transition: all var(--transition-fast);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast), background-color var(--transition-theme);
+  box-shadow: var(--shadow-soft);
 }
 
 .puzzle-result-word-tile:hover {
-  background: var(--card);
-  border-color: var(--border-strong);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-  transform: translateY(-1px);
+  border-color: var(--accent);
+  box-shadow: 0 6px 24px rgba(255, 193, 7, 0.18);
 }
 
 .puzzle-result-word-tile--success {
-  border-left: 3px solid var(--accent);
-  background: rgba(255, 193, 7, 0.05);
+  border-left: 4px solid #66bb6a;
+  background: rgba(102, 187, 106, 0.12);
 }
 
 .puzzle-result-word-tile--error {
-  border-left: 3px solid var(--danger);
-  background: rgba(244, 67, 54, 0.05);
+  border-left: 4px solid var(--danger);
+  background: rgba(244, 67, 54, 0.08);
 }
 
 [data-theme="dark"] .puzzle-result-word-tile--success {
-  background: rgba(255, 193, 7, 0.08);
+  border-left-color: #81c784;
+  background: rgba(129, 199, 132, 0.15);
 }
 
 [data-theme="dark"] .puzzle-result-word-tile--error {
-  background: rgba(244, 67, 54, 0.08);
+  background: rgba(244, 67, 54, 0.12);
 }
 
 .puzzle-result-word-tile-info {
@@ -5106,20 +5792,22 @@ body::after {
 
 .puzzle-result-progress-track {
   width: 60px;
-  height: 4px;
-  background: var(--border-subtle);
-  border-radius: 2px;
+  height: 8px;
+  background: var(--bg-elevated);
+  border: 2px solid var(--border-subtle);
+  border-radius: 8px;
   overflow: hidden;
+  transition: border-color var(--transition-theme);
 }
 
 .puzzle-result-progress-fill {
   height: 100%;
-  border-radius: 2px;
+  border-radius: 6px;
   transition: width 0.35s ease-out;
 }
 
 .puzzle-result-progress-fill--increase {
-  background: var(--accent);
+  background: linear-gradient(90deg, var(--accent), var(--accent-strong));
 }
 
 .puzzle-result-progress-fill--decrease {
@@ -5127,30 +5815,36 @@ body::after {
 }
 
 .puzzle-result-guest-cta {
-  padding: 16px 28px;
-  border-top: 1px solid var(--border-strong);
-  background: var(--bg-soft);
+  padding: 16px 24px;
+  border-top: 2px solid var(--border-subtle);
+  background: var(--bg-elevated);
   text-align: center;
+  transition: background-color var(--transition-theme), border-color var(--transition-theme);
 }
 
 .puzzle-result-guest-cta-text {
   margin: 0 0 12px;
   font-size: 0.95rem;
-  color: var(--text-secondary);
+  color: var(--text-soft);
+  transition: color var(--transition-theme);
 }
 
 .puzzle-result-guest-btn {
   width: 100%;
   justify-content: center;
+  border-radius: 12px;
+  border: 2px solid var(--border-subtle);
+  background: var(--bg-elevated);
 }
 
 .puzzle-result-footer {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  padding: 20px 28px 28px;
-  border-top: 2px solid var(--border-strong);
+  gap: 12px;
+  padding: 20px 24px 24px;
+  border-top: 2px solid var(--border-subtle);
   background: var(--card);
+  transition: background-color var(--transition-theme), border-color var(--transition-theme);
 }
 
 .puzzle-result-btn {
@@ -5161,13 +5855,13 @@ body::after {
   gap: 10px;
   background: var(--accent);
   color: #000000;
-  border: none;
+  border: 2px solid rgba(0, 0, 0, 0.15);
   border-radius: 12px;
   font-weight: 700;
-  font-size: 16px;
-  padding: 16px 24px;
-  transition: all var(--transition-fast);
-  box-shadow: 0 2px 8px rgba(255, 193, 7, 0.25);
+  font-size: 1rem;
+  padding: 14px 20px;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast), transform var(--transition-fast), background-color var(--transition-fast);
+  box-shadow: var(--shadow-soft);
   position: relative;
   overflow: hidden;
 }
@@ -5179,14 +5873,15 @@ body::after {
   left: -100%;
   width: 100%;
   height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.25), transparent);
   transition: left 0.5s;
 }
 
 .puzzle-result-btn:hover {
   background: var(--accent-strong);
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(255, 193, 7, 0.4);
+  box-shadow: 0 6px 24px rgba(255, 193, 7, 0.28);
+  border-color: var(--accent-strong);
 }
 
 .puzzle-result-btn:hover::before {
@@ -5195,7 +5890,6 @@ body::after {
 
 .puzzle-result-btn:active {
   transform: translateY(0);
-  box-shadow: 0 2px 6px rgba(255, 193, 7, 0.3);
 }
 
 .puzzle-result-btn svg {
@@ -5205,28 +5899,23 @@ body::after {
 }
 
 .puzzle-result-btn--secondary {
-  background: var(--card);
-  border: 2px solid var(--border-strong);
+  background: var(--bg-elevated);
+  border: 2px solid var(--border-subtle);
   color: var(--text);
   font-weight: 600;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  box-shadow: var(--shadow-soft);
 }
 
 .puzzle-result-btn--secondary:hover {
-  background: var(--bg-elevated);
+  background: var(--accent-soft);
   border-color: var(--accent);
-  color: var(--accent);
+  color: var(--text);
   transform: translateY(-2px);
-  box-shadow: 0 4px 8px rgba(255, 193, 7, 0.2);
+  box-shadow: 0 6px 24px rgba(255, 193, 7, 0.2);
 }
 
 .puzzle-result-btn--secondary::before {
   display: none;
-}
-
-/* Улучшенная читаемость для светлой темы */
-.puzzle-result-btn--secondary {
-  color: #1a1a1a;
 }
 
 [data-theme="dark"] .puzzle-result-btn--secondary {
@@ -5237,8 +5926,7 @@ body::after {
 
 [data-theme="dark"] .puzzle-result-btn--secondary:hover {
   border-color: var(--accent);
-  background: rgba(255, 193, 7, 0.1);
-  color: var(--accent);
+  background: var(--accent-soft);
 }
 
 @media (min-width: 520px) {
@@ -5277,43 +5965,49 @@ body::after {
 
 @media (max-width: 360px) {
   .puzzle-result-score-block {
-    display: table;
-    border-radius: 6px;
+    gap: 8px;
   }
 
   .puzzle-result-score-card {
-    display: table-cell;
     padding: 12px 8px;
   }
 
   .puzzle-result-score-card-value {
-    font-size: 22px;
+    font-size: 1.35rem;
   }
 
   .puzzle-result-score-card-label {
-    font-size: 9px;
+    font-size: 0.65rem;
   }
 }
 
 .puzzle-letters {
   display: flex;
   justify-content: center;
+  align-items: center;
   gap: 12px;
   flex-wrap: wrap;
   padding: 24px;
-  background: var(--card);
-  border: 2px solid var(--border-strong);
+  min-height: 96px;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  background: var(--bg-elevated);
+  border: 2px solid var(--border-subtle);
+  border-radius: 12px;
   position: relative;
   z-index: 1;
   transition: background-color var(--transition-theme), border-color var(--transition-theme);
+  box-shadow: var(--shadow-soft);
+  flex-shrink: 0;
 }
 
 .puzzle-letter {
   width: 64px;
   height: 64px;
-  border-radius: 0;
-  background: var(--card);
-  border: 3px solid var(--border-strong);
+  border-radius: 12px;
+  background: var(--bg-elevated);
+  border: 2px solid var(--border-subtle);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -5325,12 +6019,12 @@ body::after {
   transition: all var(--transition-theme), transform var(--transition-fast), box-shadow var(--transition-fast);
   text-shadow: none;
   letter-spacing: 1px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  box-shadow: var(--shadow-soft);
   position: relative;
 }
 
 [data-theme="dark"] .puzzle-letter {
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+  box-shadow: var(--shadow-soft);
 }
 
 .puzzle-letter::before {
@@ -5340,6 +6034,7 @@ body::after {
   left: 0;
   right: 0;
   bottom: 0;
+  border-radius: inherit;
   background: #ffc107;
   transform: scale(0);
   transition: transform 0.2s ease;
@@ -5347,9 +6042,9 @@ body::after {
 }
 
 .puzzle-letter:hover {
-  transform: translateY(-4px);
-  border-color: #ffc107;
-  box-shadow: 0 6px 20px rgba(255, 193, 7, 0.4);
+  transform: translateY(-2px);
+  border-color: var(--accent);
+  box-shadow: 0 6px 24px rgba(255, 193, 7, 0.22);
 }
 
 .puzzle-letter:hover::before {
@@ -5496,9 +6191,9 @@ body::after {
   }
 
   .puzzle-letter {
-    width: 48px;
-    height: 48px;
-    font-size: 22px;
+    width: 44px;
+    height: 44px;
+    font-size: 20px;
   }
 
   .puzzle-slot-hint {
@@ -6878,11 +7573,6 @@ body::after {
     min-height: 48px;
   }
 
-  .puzzle-help-btn {
-    min-width: 44px;
-    min-height: 44px;
-  }
-
   .user-menu-trigger {
     min-height: 44px;
     padding: 10px 14px;
@@ -7052,9 +7742,16 @@ body::after {
     font-size: clamp(18px, 4.5vw, 22px);
     padding: 10px 16px;
   }
+  .danetka-exercise--mobile .danetka-result-icon {
+    font-size: 3rem;
+  }
   .danetka-exercise--mobile .danetka-option {
     padding: 20px 24px;
     font-size: 1.1rem;
+    min-height: 56px;
+  }
+  .danetka-exercise--mobile .one-of-three-option {
+    padding: 20px 24px;
     min-height: 56px;
   }
   .danetka-exercise--mobile .danetka-yes-no-buttons {
@@ -7074,9 +7771,17 @@ body::after {
   .puzzle-hint {
     width: 100%;
     max-width: 100%;
-    height: auto;
-    min-height: 80px;
+    min-height: 90px;
     padding: 12px 16px;
+    flex-shrink: 0;
+  }
+
+  .puzzle-letters-area {
+    min-height: 80px;
+  }
+
+  .puzzle-slots-wrapper {
+    min-height: 140px;
   }
 
   .puzzle-translation {
@@ -7086,6 +7791,7 @@ body::after {
   .puzzle-slots {
     padding: 16px 12px 20px;
     min-height: 100px;
+    flex-shrink: 0;
   }
 
   /* Мобильные стили для адаптивных квадратов */
@@ -7134,8 +7840,18 @@ body::after {
   }
 
   .puzzle-letters {
-    padding: 16px;
+    padding: 12px 16px;
     gap: 8px;
+    min-height: 80px;
+    max-width: 100%;
+    width: 100%;
+  }
+
+  .puzzle-letter {
+    width: 44px;
+    height: 44px;
+    font-size: 20px;
+    flex-shrink: 0;
   }
 
   .puzzle-difficulty-switcher {
@@ -7188,12 +7904,12 @@ body::after {
   }
 
   .puzzle-result-title {
-    font-size: 18px;
+    font-size: 1.1rem;
     margin-bottom: 12px;
   }
 
   .puzzle-result-score-block {
-    border-radius: 6px;
+    gap: 8px;
   }
 
   .puzzle-result-score-card {
@@ -7532,21 +8248,19 @@ body::after {
   }
 
   .puzzle-result-score-block {
-    display: table;
-    border-radius: 6px;
+    gap: 8px;
   }
 
   .puzzle-result-score-card {
-    display: table-cell;
     padding: 12px 10px;
   }
 
   .puzzle-result-score-card-value {
-    font-size: 20px;
+    font-size: 1.25rem;
   }
 
   .puzzle-result-score-card-label {
-    font-size: 9px;
+    font-size: 0.65rem;
   }
 
   .auth-card {

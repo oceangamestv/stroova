@@ -15,6 +15,10 @@ import { useIsMobile } from "../../hooks/useIsMobile";
 import { useGameOnlyLayout } from "../../contexts/GameOnlyLayoutContext";
 
 const ONE_OF_THREE_TIMER_INITIAL_SEC = 60;
+/** Размеры этапов бонуса: 2, 4, 8, 16 правильных подряд. Каждый этап доступен 1 раз за игру. */
+const ONE_OF_THREE_STAGE_SIZES = [2, 4, 8, 16] as const;
+const ONE_OF_THREE_STAGE_GRID_SIZE = 16;
+const ONE_OF_THREE_STAGE_BAR_COUNT = 13;
 
 type SessionWordEntry = {
   word: Word;
@@ -90,12 +94,6 @@ function buildOptions(correctWord: Word, pool: Word[]): Option[] {
   return shuffle(options);
 }
 
-const formatTimer = (seconds: number) => {
-  const m = Math.floor(seconds / 60);
-  const s = seconds % 60;
-  return `${m}:${s.toString().padStart(2, "0")}`;
-};
-
 const progressType = "beginner" as const;
 
 const OneOfThreeExercise: React.FC = () => {
@@ -122,6 +120,10 @@ const OneOfThreeExercise: React.FC = () => {
   const [endedByTime, setEndedByTime] = useState(false);
   const [correctIndex, setCorrectIndex] = useState<number | null>(null);
   const [selectedWrongIndex, setSelectedWrongIndex] = useState<number | null>(null);
+  /** Индекс текущего этапа бонуса (0..3). 4 = все этапы пройдены. */
+  const [stageIndex, setStageIndex] = useState(0);
+  /** Сколько ячеек текущего этапа уже заполнено подряд (сбрасывается при ошибке). */
+  const [stageProgress, setStageProgress] = useState(0);
 
   const sessionXpRef = useRef(0);
   const sessionWordsRef = useRef<SessionWordEntry[]>([]);
@@ -231,7 +233,15 @@ const OneOfThreeExercise: React.FC = () => {
         ...prev,
         { word: currentWord, progressBefore, progressAfter, hadError: false },
       ]);
-      setTimeLeft((prev) => Math.max(0, prev + 1));
+      const currentStageSize = stageIndex < ONE_OF_THREE_STAGE_SIZES.length ? ONE_OF_THREE_STAGE_SIZES[stageIndex] : 0;
+      const nextProgress = stageProgress + 1;
+      if (currentStageSize > 0 && nextProgress >= currentStageSize) {
+        setTimeLeft((prev) => prev + currentStageSize);
+        setStageProgress(0);
+        setStageIndex((prev) => Math.min(prev + 1, ONE_OF_THREE_STAGE_SIZES.length));
+      } else {
+        setStageProgress(nextProgress);
+      }
       speakWord(currentWord.en, currentWord.accent || "both", undefined);
       setStatus("Верно! Следующее слово…");
       const nextWord = pickNextWord();
@@ -256,11 +266,7 @@ const OneOfThreeExercise: React.FC = () => {
       ...prev,
       { word: currentWord, progressBefore, progressAfter, hadError: true },
     ]);
-    setTimeLeft((prev) => {
-      const next = Math.max(0, prev - 1);
-      if (next === 0) endGameByTime();
-      return next;
-    });
+    setStageProgress(0);
     playErrorSound();
     setStatus("Правильный вариант подсвечен. Нажми «Далее».");
     setShowNext(true);
@@ -302,12 +308,16 @@ const OneOfThreeExercise: React.FC = () => {
     setEndedByTime(false);
     setCorrectIndex(null);
     setSelectedWrongIndex(null);
+    setStageIndex(0);
+    setStageProgress(0);
     const next = pickNextWord();
     setCurrentWord(next);
     setOptions(next ? buildOptions(next, poolWords) : []);
   };
 
   const progressPercent = (timeLeft / ONE_OF_THREE_TIMER_INITIAL_SEC) * 100;
+  const hasActiveStage = stageIndex < ONE_OF_THREE_STAGE_SIZES.length;
+  const currentStageSize = hasActiveStage ? ONE_OF_THREE_STAGE_SIZES[stageIndex] : 0;
   const personalWordsCount =
     dictionaryWords.length > 0
       ? personalDictionaryService.getPersonalWordsFromPool(dictionaryWords).length
@@ -359,12 +369,10 @@ const OneOfThreeExercise: React.FC = () => {
       ) : (
         <>
       {isCompact ? (
-        <div className="puzzle-mobile-status">
-          <div className="puzzle-mobile-status-row">
-            <span>{`Слов: ${sessionWords.length}`}</span>
-            <span>{`Опыт: ${formatXp(sessionXp)}`}</span>
+        <div className="puzzle-mobile-status danetka-status">
+          <div className="danetka-top-row danetka-top-row--align-end">
             <span
-              className="puzzle-timer"
+              className="danetka-timer-circle puzzle-timer"
               aria-live="polite"
               title={
                 !timerRunning && timeLeft === ONE_OF_THREE_TIMER_INITIAL_SEC
@@ -372,8 +380,33 @@ const OneOfThreeExercise: React.FC = () => {
                   : undefined
               }
             >
-              ⏱ {formatTimer(timeLeft)}
+              <span className="danetka-timer-icon" aria-hidden>⏱</span> {timeLeft}
             </span>
+            {hasActiveStage ? (
+              <>
+                <div className="danetka-stage-cells" role="progressbar" aria-valuenow={stageProgress} aria-valuemin={0} aria-valuemax={currentStageSize} aria-label={`Прогресс этапа: ${stageProgress} из ${currentStageSize}`}>
+                  {Array.from({ length: ONE_OF_THREE_STAGE_GRID_SIZE }, (_, i) => {
+                    const isBar = i < ONE_OF_THREE_STAGE_BAR_COUNT;
+                    const active = i < currentStageSize;
+                    const dimmed = !active;
+                    const filled = active && i < stageProgress;
+                    const isComplete = stageProgress === currentStageSize;
+                    const completedHighlight = !isBar && active && isComplete && i < ONE_OF_THREE_STAGE_BAR_COUNT + 2;
+                    const base = isBar ? "danetka-stage-bar" : "danetka-stage-square";
+                    const classes = [
+                      base,
+                      filled ? (isBar ? "danetka-stage-bar--filled" : "danetka-stage-square--filled") : "",
+                      completedHighlight ? "danetka-stage-square--completed" : "",
+                      dimmed ? "danetka-stage-cell--dimmed" : "",
+                    ].filter(Boolean).join(" ");
+                    return <div key={i} className={classes} />;
+                  })}
+                </div>
+                <span className="danetka-bonus-head" aria-label={`Бонус за этап: +${currentStageSize} сек`}>+{currentStageSize}</span>
+              </>
+            ) : (
+              <span className="danetka-stage-done">Все бонусы получены</span>
+            )}
           </div>
         </div>
       ) : (
@@ -383,40 +416,76 @@ const OneOfThreeExercise: React.FC = () => {
             <h1 className="lesson-title">1 из 3</h1>
           </div>
           <div className="progress">
-            <div className="progress-text">
-              <span>{`Слов: ${sessionWords.length}`}</span>
-              <span>{`Опыт: ${formatXp(sessionXp)}`}</span>
-              <span
-                className="puzzle-timer"
-                aria-live="polite"
-                title={
-                  !timerRunning && timeLeft === ONE_OF_THREE_TIMER_INITIAL_SEC
-                    ? "Таймер запустится после первого ответа"
-                    : undefined
-                }
-              >
-                ⏱ {formatTimer(timeLeft)}
-              </span>
+            <div className="danetka-top-row danetka-top-row--desktop">
+              <div className="danetka-stats-block" aria-label={`Слов: ${sessionWords.length}, Опыт: ${formatXp(sessionXp)}`}>
+                <span className="danetka-stats-words">{`Слов: ${sessionWords.length}`}</span>
+                <div className="danetka-stats-divider" aria-hidden />
+                <span className="danetka-stats-xp">{formatXp(sessionXp)}</span>
+              </div>
+              <div className="danetka-top-row__right">
+                <span
+                  className="danetka-timer-circle puzzle-timer"
+                  aria-live="polite"
+                  title={
+                    !timerRunning && timeLeft === ONE_OF_THREE_TIMER_INITIAL_SEC
+                      ? "Таймер запустится после первого ответа"
+                      : undefined
+                  }
+                >
+                  <span className="danetka-timer-icon" aria-hidden>⏱</span> {timeLeft}
+                </span>
+                {hasActiveStage ? (
+                  <>
+                    <div className="danetka-stage-cells" role="progressbar" aria-valuenow={stageProgress} aria-valuemin={0} aria-valuemax={currentStageSize} aria-label={`Прогресс этапа: ${stageProgress} из ${currentStageSize}`}>
+                      {Array.from({ length: ONE_OF_THREE_STAGE_GRID_SIZE }, (_, i) => {
+                        const isBar = i < ONE_OF_THREE_STAGE_BAR_COUNT;
+                        const active = i < currentStageSize;
+                        const dimmed = !active;
+                        const filled = active && i < stageProgress;
+                        const isComplete = stageProgress === currentStageSize;
+                        const completedHighlight = !isBar && active && isComplete && i < ONE_OF_THREE_STAGE_BAR_COUNT + 2;
+                        const base = isBar ? "danetka-stage-bar" : "danetka-stage-square";
+                        const classes = [
+                          base,
+                          filled ? (isBar ? "danetka-stage-bar--filled" : "danetka-stage-square--filled") : "",
+                          completedHighlight ? "danetka-stage-square--completed" : "",
+                          dimmed ? "danetka-stage-cell--dimmed" : "",
+                        ].filter(Boolean).join(" ");
+                        return <div key={i} className={classes} />;
+                      })}
+                    </div>
+                    <span className="danetka-bonus-head" aria-label={`Бонус за этап: +${currentStageSize} сек`}>+{currentStageSize}</span>
+                  </>
+                ) : (
+                  <span className="danetka-stage-done">Все бонусы получены</span>
+                )}
+              </div>
             </div>
             <div className="progress-bar">
-              <div id="progress-fill" style={{ width: `${progressPercent}%` }} />
+              <div id="progress-fill" style={{ width: `${Math.min(100, progressPercent)}%` }} />
             </div>
           </div>
         </div>
       )}
 
-          <div className={`danetka-exercise ${isCompact ? "danetka-exercise--mobile" : ""}`} id="one-of-three-exercise">
+          <div className={`danetka-exercise danetka-exercise-card ${isCompact ? "danetka-exercise--mobile" : ""}`} id="one-of-three-exercise">
+            {isCompact && (
+              <div className="danetka-card-stats-row" aria-label={`Слов: ${sessionWords.length}, Опыт: ${formatXp(sessionXp)}`}>
+                <span className="danetka-stats-words">{`Слов: ${sessionWords.length}`}</span>
+                <span className="danetka-stats-xp">{formatXp(sessionXp)}</span>
+              </div>
+            )}
             {currentWord && (
               <>
                 <p className="danetka-word" aria-label={`Слово: ${currentWord.en}`}>
                   {currentWord.en}
                 </p>
-                <div className="danetka-options" role="group" aria-label="Варианты перевода" key={currentWord.id}>
+                <div className="one-of-three-options" role="group" aria-label="Варианты перевода" key={currentWord.id}>
                   {options.map((opt, index) => (
                     <button
                       key={`${currentWord.id}-${index}-${opt.ru}`}
                       type="button"
-                      className={`danetka-option ${correctIndex === index ? "danetka-option--correct" : ""} ${selectedWrongIndex === index ? "danetka-option--wrong" : ""} ${locked ? "danetka-option--locked" : ""}`}
+                      className={`one-of-three-option ${correctIndex === index ? "one-of-three-option--correct" : ""} ${selectedWrongIndex === index ? "one-of-three-option--wrong" : ""} ${locked ? "one-of-three-option--locked" : ""}`}
                       onClick={() => handleOptionClick(index)}
                       disabled={locked}
                     >

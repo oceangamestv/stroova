@@ -356,14 +356,34 @@ const PairsExercise: React.FC = () => {
       ) : (
         <>
       {isCompact ? (
-        <div className="pairs-stages-dots" role="progressbar" aria-valuenow={stage} aria-valuemin={1} aria-valuemax={PAIRS_STAGES_TOTAL} aria-label={`Этап ${stage} из ${PAIRS_STAGES_TOTAL}`}>
-          {Array.from({ length: PAIRS_STAGES_TOTAL }, (_, i) => i + 1).map((s) => (
-            <span
-              key={s}
-              className={`pairs-stages-dot ${s < stage ? "pairs-stages-dot--done" : ""} ${s === stage ? "pairs-stages-dot--current" : ""}`}
-              aria-hidden
-            />
-          ))}
+        <div
+          className="pairs-progress"
+          role="progressbar"
+          aria-valuenow={stage}
+          aria-valuemin={1}
+          aria-valuemax={PAIRS_STAGES_TOTAL}
+          aria-valuetext={`Этап ${stage} из ${PAIRS_STAGES_TOTAL}, собрано пар: ${matchedCount} из ${PAIRS_PER_STAGE}`}
+          aria-label={`Прогресс: этап ${stage} из ${PAIRS_STAGES_TOTAL}`}
+        >
+          {Array.from({ length: PAIRS_STAGES_TOTAL }, (_, i) => {
+            const stageNum = i + 1;
+            const segmentFillPercent =
+              stage > stageNum ? 100 : stage === stageNum ? (matchedCount / PAIRS_PER_STAGE) * 100 : 0;
+            return (
+              <React.Fragment key={stageNum}>
+                <div className="pairs-progress__segment" aria-hidden>
+                  <div
+                    className="pairs-progress__fill"
+                    style={{ width: `${segmentFillPercent}%` }}
+                  />
+                </div>
+                <span
+                  className={`pairs-progress__dot ${stage > stageNum ? "pairs-progress__dot--done" : ""} ${stage === stageNum ? "pairs-progress__dot--current" : ""}`}
+                  aria-hidden
+                />
+              </React.Fragment>
+            );
+          })}
         </div>
       ) : (
         <div className="lesson-header">

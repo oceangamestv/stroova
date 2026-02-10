@@ -1,7 +1,7 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import { useAuth } from "../../features/auth/AuthContext";
-import { setPreferredVoiceUri, VOICE_STORAGE_KEY_PREFIX } from "../../utils/sounds";
+import { getSoundEnabled, setSoundEnabled, setPreferredVoiceUri, VOICE_STORAGE_KEY_PREFIX } from "../../utils/sounds";
 import { useIsMobile } from "../../hooks/useIsMobile";
 
 /** Конфиг навигации: легко добавлять новые разделы (например, "Уроки") */
@@ -61,6 +61,16 @@ const NavIcons = {
       <path d="M12 16v-4M12 8h.01" />
     </svg>
   ),
+  soundOn: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M11 5L6 9H2v6h4l5 4V5zM15.54 8.46a5 5 0 0 1 0 7.07M19.07 4.93a10 10 0 0 1 0 14.14" />
+    </svg>
+  ),
+  soundOff: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M11 5L6 9H2v6h4l5 4V5zM23 9l-6 6M17 9l6 6" />
+    </svg>
+  ),
 };
 
 /** Пункты сайдбара на десктопе: иконка + подпись, включая кнопку «Игры» */
@@ -87,6 +97,7 @@ const Header: React.FC = () => {
   const { user } = useAuth();
   const location = useLocation();
   const isMobile = useIsMobile();
+  const [soundOn, setSoundOn] = useState(getSoundEnabled);
 
   useEffect(() => {
     if (user) {
@@ -114,26 +125,48 @@ const Header: React.FC = () => {
 
           <nav className="site-header__nav" aria-label="Основная навигация">
             {!isMobile ? (
-              <ul className="site-header__nav-list site-header__nav-list--sidebar" role="list">
-                {SIDEBAR_ITEMS.map((item) => {
-                  const isGamesActive =
-                    item.to === "/" &&
-                    (location.pathname === "/" || gamePaths.includes(location.pathname));
-                  return (
-                    <li key={item.to}>
-                      <NavLink
-                        to={item.to}
-                        className={({ isActive }) =>
-                          `site-header__link site-header__link--sidebar ${item.to === "/" ? "site-header__link--game" : ""} ${isActive || isGamesActive ? "site-header__link--active" : ""}`
-                        }
-                      >
-                        <span className="site-header__sidebar-link-icon">{NavIcons[item.iconKey]}</span>
-                        <span className="site-header__sidebar-link-text">{item.label}</span>
-                      </NavLink>
-                    </li>
-                  );
-                })}
-              </ul>
+              <>
+                <ul className="site-header__nav-list site-header__nav-list--sidebar" role="list">
+                  {SIDEBAR_ITEMS.map((item) => {
+                    const isGamesActive =
+                      item.to === "/" &&
+                      (location.pathname === "/" || gamePaths.includes(location.pathname));
+                    return (
+                      <li key={item.to}>
+                        <NavLink
+                          to={item.to}
+                          className={({ isActive }) =>
+                            `site-header__link site-header__link--sidebar ${item.to === "/" ? "site-header__link--game" : ""} ${isActive || isGamesActive ? "site-header__link--active" : ""}`
+                          }
+                        >
+                          <span className="site-header__sidebar-link-icon">{NavIcons[item.iconKey]}</span>
+                          <span className="site-header__sidebar-link-text">{item.label}</span>
+                        </NavLink>
+                      </li>
+                    );
+                  })}
+                </ul>
+                <div className="site-header__sidebar-sound-wrap">
+                  <button
+                    type="button"
+                    className={`site-header__link site-header__link--sidebar site-header__link--sound ${soundOn ? "site-header__link--sound-on" : "site-header__link--sound-off"}`}
+                    onClick={() => {
+                      const next = !soundOn;
+                      setSoundEnabled(next);
+                      setSoundOn(next);
+                    }}
+                    aria-label={soundOn ? "Выключить звук" : "Включить звук"}
+                    title={soundOn ? "Выключить звук" : "Включить звук"}
+                  >
+                    <span className="site-header__sidebar-link-icon">
+                      {soundOn ? NavIcons.soundOn : NavIcons.soundOff}
+                    </span>
+                    <span className="site-header__sidebar-link-text">
+                      {soundOn ? "Звук включён" : "Звук выключен"}
+                    </span>
+                  </button>
+                </div>
+              </>
             ) : (
               <>
                 {navGroups.map((group) => (

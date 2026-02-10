@@ -437,8 +437,8 @@ const PuzzleExercise: React.FC = () => {
       {isCompact ? (
         <div className="puzzle-mobile-status">
           <div className="puzzle-mobile-status-row">
-            <span>{`Слов: ${sessionWords.length}`}</span>
-            <span>{`Опыт: ${formatXp(sessionXp)}`}</span>
+            <span className="puzzle-mobile-stat" aria-label={`Слов: ${sessionWords.length}`}>{`Слов: ${sessionWords.length}`}</span>
+            <span className="puzzle-mobile-stat" aria-label={`Опыт: ${formatXp(sessionXp)}`}>{`Опыт: ${formatXp(sessionXp)}`}</span>
             <span className="puzzle-timer" aria-live="polite" title={!timerRunning && timeLeft === PUZZLE_TIMER_INITIAL_SEC ? "Таймер запустится после первого собранного слова" : undefined}>
               ⏱ {formatTimer(timeLeft)}
             </span>
@@ -466,20 +466,6 @@ const PuzzleExercise: React.FC = () => {
       )}
 
       <div className={`puzzle-exercise ${isCompact ? "puzzle-exercise--mobile" : ""}`} id="puzzle-exercise">
-        <button
-          className="puzzle-help-btn"
-          id="puzzle-help-btn"
-          type="button"
-          onClick={() => setShowRules(true)}
-        >
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <path
-              d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 17c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1zm1-4h-2c0-2 2-2.5 2-4 0-1.1-.9-2-2-2s-2 .9-2 2H8c0-2.21 1.79-4 4-4s4 1.79 4 4c0 2-2 2.5-2 4z"
-              fill="currentColor"
-            />
-          </svg>
-        </button>
-
         <div ref={learningAreaRef} id="puzzle-learning-area" className="puzzle-learning-area">
         {!isCompact && (
           <div className="puzzle-difficulty-switcher">
@@ -548,22 +534,17 @@ const PuzzleExercise: React.FC = () => {
               </div>
             )}
           </div>
-          {showNext && (
-            <button className="puzzle-next-word-btn" type="button" onClick={goNextWord}>
-              Следующее слово (Enter)
-            </button>
-          )}
         </div>
 
-        {difficulty === "hard" && state && hasEmptySlot && !locked && (
-          <div className={`puzzle-hard-input-wrap ${isMobile ? "puzzle-hard-input-wrap--mobile" : ""}`}>
+        {difficulty === "hard" && state && hasEmptySlot && !locked && isMobile && (
+          <div className={`puzzle-hard-input-wrap puzzle-hard-input-wrap--mobile`}>
             {!isCompact && (
               <label htmlFor="puzzle-hard-input" className="puzzle-hard-input-label">
                 Введите слово сюда
               </label>
             )}
             <div
-              className={`puzzle-hard-input-inner ${isMobile ? "puzzle-hard-input-inner--mobile" : ""}`}
+              className="puzzle-hard-input-inner puzzle-hard-input-inner--mobile"
               onClick={() => hardInputRef.current?.focus()}
             >
               {!isCompact && (
@@ -578,7 +559,7 @@ const PuzzleExercise: React.FC = () => {
                 ref={hardInputRef}
                 id="puzzle-hard-input"
                 type="text"
-                className={`puzzle-hard-input ${isMobile ? "puzzle-hard-input--mobile" : ""}`}
+                className="puzzle-hard-input puzzle-hard-input--mobile"
                 data-puzzle-hard-input="true"
                 autoComplete="off"
                 autoCapitalize="characters"
@@ -586,32 +567,43 @@ const PuzzleExercise: React.FC = () => {
                 maxLength={state.slots.length}
                 value={state.slots.join("")}
                 onChange={handleHardInputChange}
-                placeholder={isMobile ? "" : ""}
-                aria-label={isMobile ? `Введите слово из ${state.slots.length} букв` : `Введите слово из ${state.slots.length} букв. Нажмите в это поле, чтобы открыть клавиатуру.`}
+                placeholder=""
+                aria-label={`Введите слово из ${state.slots.length} букв`}
               />
             </div>
           </div>
         )}
 
-        {showLettersPanel && (
-          <div className="puzzle-letters" id="puzzle-letters">
-            {state?.letters.map((item) => {
-              const isUsed = difficulty === "easy" && item.used;
-              return (
-                <button
-                  key={`letter-${item.index}-${item.letter}`}
-                  className={`puzzle-letter ${isUsed ? "puzzle-letter--used" : ""}`}
-                  type="button"
-                  onClick={() => !isUsed && applyLetter(item.letter, item.index)}
-                  disabled={isUsed}
-                  aria-disabled={isUsed}
-                >
-                  {item.letter === " " ? "␣" : item.letter}
-                </button>
-              );
-            })}
-          </div>
-        )}
+        <div className="puzzle-letters-area" aria-hidden={!showLettersPanel && !showNext}>
+          {showLettersPanel && (
+            <div className="puzzle-letters" id="puzzle-letters">
+              {state?.letters.map((item) => {
+                const isUsed = difficulty === "easy" && item.used;
+                return (
+                  <button
+                    key={`letter-${item.index}-${item.letter}`}
+                    className={`puzzle-letter ${isUsed ? "puzzle-letter--used" : ""}`}
+                    type="button"
+                    onClick={() => !isUsed && applyLetter(item.letter, item.index)}
+                    disabled={isUsed}
+                    aria-disabled={isUsed}
+                  >
+                    {item.letter === " " ? "␣" : item.letter}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+          {showNext && (
+            <button
+              type="button"
+              className="puzzle-letters puzzle-letters--next-btn puzzle-next-word-btn"
+              onClick={goNextWord}
+            >
+              Следующее слово (Enter)
+            </button>
+          )}
+        </div>
         </div>
 
       </div>

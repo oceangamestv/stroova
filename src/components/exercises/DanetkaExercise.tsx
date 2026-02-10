@@ -6,7 +6,7 @@ import type { DictionarySource } from "../../services/dictionaryService";
 import { dictionaryService } from "../../services/dictionaryService";
 import { personalDictionaryService } from "../../services/personalDictionaryService";
 import { progressService } from "../../services/progressService";
-import { speakWord, playErrorSound } from "../../utils/sounds";
+import { playCorrectSound, playErrorSound } from "../../utils/sounds";
 import { authService } from "../../services/authService";
 import { guestPendingResultService } from "../../services/guestPendingResultService";
 import { useAuth } from "../../features/auth/AuthContext";
@@ -15,6 +15,11 @@ import { useIsMobile } from "../../hooks/useIsMobile";
 import { useGameOnlyLayout } from "../../contexts/GameOnlyLayoutContext";
 
 const DANETKA_TIMER_INITIAL_SEC = 60;
+/** Размеры этапов бонуса: 2, 4, 8, 16 правильных подряд. Каждый этап доступен 1 раз за игру. */
+const DANETKA_STAGE_SIZES = [2, 4, 8, 16] as const;
+/** Всегда показываем сетку 16 ячеек (8×2): 13 полосок + 3 квадрата. Лишние для текущего этапа затемняем. */
+const DANETKA_STAGE_GRID_SIZE = 16;
+const DANETKA_STAGE_BAR_COUNT = 13;
 
 type SessionWordEntry = {
   word: Word;
@@ -114,9 +119,16 @@ const DanetkaExercise: React.FC = () => {
   const [timerRunning, setTimerRunning] = useState(false);
   const [endedByTime, setEndedByTime] = useState(false);
   const [userAnswer, setUserAnswer] = useState<boolean | null>(null);
+  const [flashType, setFlashType] = useState<"correct" | "wrong" | null>(null);
+  /** Индекс текущего этапа бонуса (0..3). 4 = все этапы пройдены. */
+  const [stageIndex, setStageIndex] = useState(0);
+  /** Сколько ячеек текущего этапа уже заполнено подряд (сбрасывается при ошибке). */
+  const [stageProgress, setStageProgress] = useState(0);
 
   const sessionXpRef = useRef(0);
   const sessionWordsRef = useRef<SessionWordEntry[]>([]);
+  const wrongAnswerTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const goNextWordRef = useRef<(() => void) | null>(null);
   sessionXpRef.current = sessionXp;
   sessionWordsRef.current = sessionWords;
 
@@ -141,6 +153,12 @@ const DanetkaExercise: React.FC = () => {
     const idx = Math.floor(Math.random() * poolWords.length);
     return poolWords[idx] ?? null;
   }, [poolWords]);
+
+  useEffect(() => {
+    return () => {
+      if (wrongAnswerTimeoutRef.current) clearTimeout(wrongAnswerTimeoutRef.current);
+    };
+  }, []);
 
   useEffect(() => {
     if (poolWords.length === 0 || showResult) return;
@@ -214,6 +232,8 @@ const DanetkaExercise: React.FC = () => {
     setUserAnswer(answer);
 
     if (isCorrect) {
+      setFlashType("correct");
+      playCorrectSound();
       const progressBefore = progressService.getWordProgressValue(currentQuestion.word.id, progressType);
       const xpEarned = calculateXp({
         level: currentQuestion.word.level,
@@ -228,11 +248,19 @@ const DanetkaExercise: React.FC = () => {
         ...prev,
         { word: currentQuestion.word, progressBefore, progressAfter, hadError: false },
       ]);
-      setTimeLeft((prev) => Math.max(0, prev + 1));
-      speakWord(currentQuestion.word.en, currentQuestion.word.accent || "both", undefined);
+      const currentStageSize = stageIndex < DANETKA_STAGE_SIZES.length ? DANETKA_STAGE_SIZES[stageIndex] : 0;
+      const nextProgress = stageProgress + 1;
+      if (currentStageSize > 0 && nextProgress >= currentStageSize) {
+        setTimeLeft((prev) => prev + currentStageSize);
+        setStageProgress(0);
+        setStageIndex((prev) => Math.min(prev + 1, DANETKA_STAGE_SIZES.length));
+      } else {
+        setStageProgress(nextProgress);
+      }
       setStatus("Верно! Следующее слово…");
       const nextWord = pickNextWord();
       setTimeout(() => {
+        setFlashType(null);
         if (nextWord) {
           const nextQuestion = buildQuestion(nextWord, poolWords);
           setCurrentQuestion(nextQuestion);
@@ -244,7 +272,11 @@ const DanetkaExercise: React.FC = () => {
       return;
     }
 
+    setFlashType("wrong");
+    playErrorSound();
+    setTimeout(() => setFlashType(null), 500);
     setTotalErrors((prev) => prev + 1);
+    setStageProgress(0);
     const progressBefore = progressService.getWordProgressValue(currentQuestion.word.id, progressType);
     progressService.updateWordProgress(currentQuestion.word.id, false, progressType);
     const progressAfter = progressService.getWordProgressValue(currentQuestion.word.id, progressType);
@@ -252,18 +284,12 @@ const DanetkaExercise: React.FC = () => {
       ...prev,
       { word: currentQuestion.word, progressBefore, progressAfter, hadError: true },
     ]);
-    setTimeLeft((prev) => {
-      const next = Math.max(0, prev - 1);
-      if (next === 0) endGameByTime();
-      return next;
-    });
-    playErrorSound();
     setStatus(
       currentQuestion.isCorrectTranslation
-        ? "Неправильно. Это правильный перевод. Нажми «Далее»."
-        : "Неправильно. Это неправильный перевод. Нажми «Далее»."
+        ? "Неправильно. Это правильный перевод."
+        : "Неправильно. Это неправильный перевод."
     );
-    setShowNext(true);
+    wrongAnswerTimeoutRef.current = window.setTimeout(() => goNextWordRef.current?.(), 400);
   };
 
   const goNextWord = useCallback(() => {
@@ -277,6 +303,7 @@ const DanetkaExercise: React.FC = () => {
     setUserAnswer(null);
     setStatus("Правильный ли это перевод?");
   }, [pickNextWord, poolWords]);
+  goNextWordRef.current = goNextWord;
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -302,6 +329,8 @@ const DanetkaExercise: React.FC = () => {
     setTimerRunning(false);
     setEndedByTime(false);
     setUserAnswer(null);
+    setStageIndex(0);
+    setStageProgress(0);
     const next = pickNextWord();
     if (next) {
       const nextQuestion = buildQuestion(next, poolWords);
@@ -310,6 +339,8 @@ const DanetkaExercise: React.FC = () => {
   };
 
   const progressPercent = (timeLeft / DANETKA_TIMER_INITIAL_SEC) * 100;
+  const hasActiveStage = stageIndex < DANETKA_STAGE_SIZES.length;
+  const currentStageSize = hasActiveStage ? DANETKA_STAGE_SIZES[stageIndex] : 0;
   const personalWordsCount =
     dictionaryWords.length > 0
       ? personalDictionaryService.getPersonalWordsFromPool(dictionaryWords).length
@@ -360,62 +391,132 @@ const DanetkaExercise: React.FC = () => {
         </div>
       ) : (
         <>
-      {isCompact ? (
-        <div className="puzzle-mobile-status">
-          <div className="puzzle-mobile-status-row">
-            <span>{`Слов: ${sessionWords.length}`}</span>
-            <span>{`Опыт: ${formatXp(sessionXp)}`}</span>
-            <span
-              className="puzzle-timer"
-              aria-live="polite"
-              title={
-                !timerRunning && timeLeft === DANETKA_TIMER_INITIAL_SEC
-                  ? "Таймер запустится после первого ответа"
-                  : undefined
-              }
-            >
-              ⏱ {formatTimer(timeLeft)}
-            </span>
-          </div>
-        </div>
-      ) : (
-        <div className="lesson-header">
-          <div>
-            <span className="lesson-label">Игра</span>
-            <h1 className="lesson-title">Данетка</h1>
-          </div>
-          <div className="progress">
-            <div className="progress-text">
-              <span>{`Слов: ${sessionWords.length}`}</span>
-              <span>{`Опыт: ${formatXp(sessionXp)}`}</span>
-              <span
-                className="puzzle-timer"
-                aria-live="polite"
-                title={
-                  !timerRunning && timeLeft === DANETKA_TIMER_INITIAL_SEC
-                    ? "Таймер запустится после первого ответа"
-                    : undefined
-                }
-              >
-                ⏱ {formatTimer(timeLeft)}
-              </span>
+          {isCompact ? (
+            <div className="puzzle-mobile-status danetka-status">
+              <div className="danetka-top-row danetka-top-row--align-end">
+                <span
+                  className="danetka-timer-circle puzzle-timer"
+                  aria-live="polite"
+                  title={
+                    !timerRunning && timeLeft === DANETKA_TIMER_INITIAL_SEC
+                      ? "Таймер запустится после первого ответа"
+                      : undefined
+                  }
+                >
+                  <span className="danetka-timer-icon" aria-hidden>⏱</span> {timeLeft}
+                </span>
+                {hasActiveStage ? (
+                  <>
+                    <div className="danetka-stage-cells" role="progressbar" aria-valuenow={stageProgress} aria-valuemin={0} aria-valuemax={currentStageSize} aria-label={`Прогресс этапа: ${stageProgress} из ${currentStageSize}`}>
+                      {Array.from({ length: DANETKA_STAGE_GRID_SIZE }, (_, i) => {
+                        const isBar = i < DANETKA_STAGE_BAR_COUNT;
+                        const active = i < currentStageSize;
+                        const dimmed = !active;
+                        const filled = active && i < stageProgress;
+                        const isComplete = stageProgress === currentStageSize;
+                        const completedHighlight = !isBar && active && isComplete && i < DANETKA_STAGE_BAR_COUNT + 2;
+                        const base = isBar ? "danetka-stage-bar" : "danetka-stage-square";
+                        const classes = [
+                          base,
+                          filled ? (isBar ? "danetka-stage-bar--filled" : "danetka-stage-square--filled") : "",
+                          completedHighlight ? "danetka-stage-square--completed" : "",
+                          dimmed ? "danetka-stage-cell--dimmed" : "",
+                        ].filter(Boolean).join(" ");
+                        return <div key={i} className={classes} />;
+                      })}
+                    </div>
+                    <span className="danetka-bonus-head" aria-label={`Бонус за этап: +${currentStageSize} сек`}>+{currentStageSize}</span>
+                  </>
+                ) : (
+                  <span className="danetka-stage-done">Все бонусы получены</span>
+                )}
+              </div>
             </div>
-            <div className="progress-bar">
-              <div id="progress-fill" style={{ width: `${progressPercent}%` }} />
+          ) : (
+            <div className="lesson-header">
+              <div>
+                <span className="lesson-label">Игра</span>
+                <h1 className="lesson-title">Данетка</h1>
+              </div>
+              <div className="progress">
+                <div className="danetka-top-row danetka-top-row--desktop">
+                  <div className="danetka-stats-block" aria-label={`Слов: ${sessionWords.length}, Опыт: ${formatXp(sessionXp)}`}>
+                    <span className="danetka-stats-words">{`Слов: ${sessionWords.length}`}</span>
+                    <div className="danetka-stats-divider" aria-hidden />
+                    <span className="danetka-stats-xp">{formatXp(sessionXp)}</span>
+                  </div>
+                  <div className="danetka-top-row__right">
+                    <span
+                      className="danetka-timer-circle puzzle-timer"
+                      aria-live="polite"
+                      title={
+                        !timerRunning && timeLeft === DANETKA_TIMER_INITIAL_SEC
+                          ? "Таймер запустится после первого ответа"
+                          : undefined
+                      }
+                    >
+                      <span className="danetka-timer-icon" aria-hidden>⏱</span> {timeLeft}
+                    </span>
+                    {hasActiveStage ? (
+                      <>
+                        <div className="danetka-stage-cells" role="progressbar" aria-valuenow={stageProgress} aria-valuemin={0} aria-valuemax={currentStageSize} aria-label={`Прогресс этапа: ${stageProgress} из ${currentStageSize}`}>
+                          {Array.from({ length: DANETKA_STAGE_GRID_SIZE }, (_, i) => {
+                            const isBar = i < DANETKA_STAGE_BAR_COUNT;
+                            const active = i < currentStageSize;
+                            const dimmed = !active;
+                            const filled = active && i < stageProgress;
+                            const isComplete = stageProgress === currentStageSize;
+                            const completedHighlight = !isBar && active && isComplete && i < DANETKA_STAGE_BAR_COUNT + 2;
+                            const base = isBar ? "danetka-stage-bar" : "danetka-stage-square";
+                            const classes = [
+                              base,
+                              filled ? (isBar ? "danetka-stage-bar--filled" : "danetka-stage-square--filled") : "",
+                              completedHighlight ? "danetka-stage-square--completed" : "",
+                              dimmed ? "danetka-stage-cell--dimmed" : "",
+                            ].filter(Boolean).join(" ");
+                            return <div key={i} className={classes} />;
+                          })}
+                        </div>
+                        <span className="danetka-bonus-head" aria-label={`Бонус за этап: +${currentStageSize} сек`}>+{currentStageSize}</span>
+                      </>
+                    ) : (
+                      <span className="danetka-stage-done">Все бонусы получены</span>
+                    )}
+                  </div>
+                </div>
+                <div className="progress-bar">
+                  <div id="progress-fill" style={{ width: `${Math.min(100, progressPercent)}%` }} />
+                </div>
+              </div>
             </div>
-          </div>
-        </div>
-      )}
+          )}
 
-          <div className={`danetka-exercise ${isCompact ? "danetka-exercise--mobile" : ""}`} id="danetka-exercise">
+          <div
+            className={`danetka-exercise danetka-exercise-card ${isCompact ? "danetka-exercise--mobile" : ""} ${flashType ? `danetka-flash--${flashType}` : ""}`}
+            id="danetka-exercise"
+          >
+            {isCompact && (
+              <div className="danetka-card-stats-row" aria-label={`Слов: ${sessionWords.length}, Опыт: ${formatXp(sessionXp)}`}>
+                <span className="danetka-stats-words">{`Слов: ${sessionWords.length}`}</span>
+                <span className="danetka-stats-xp">{formatXp(sessionXp)}</span>
+              </div>
+            )}
             {currentQuestion && (
               <>
                 <p className="danetka-word" aria-label={`Слово: ${currentQuestion.word.en}`}>
                   {currentQuestion.word.en}
                 </p>
-                <p className="danetka-translation" aria-label={`Перевод: ${currentQuestion.shownTranslation}`}>
-                  {currentQuestion.shownTranslation}
-                </p>
+                <div className="danetka-translation-wrap">
+                  <p className="danetka-translation" aria-label={`Перевод: ${currentQuestion.shownTranslation}`}>
+                    {currentQuestion.shownTranslation}
+                  </p>
+                  {locked && ((userAnswer === true && currentQuestion.isCorrectTranslation) || (userAnswer === false && !currentQuestion.isCorrectTranslation)) && (
+                    <span className="danetka-result-icon danetka-result-icon--correct" role="img" aria-label="Правильно">✓</span>
+                  )}
+                  {locked && ((userAnswer === true && !currentQuestion.isCorrectTranslation) || (userAnswer === false && currentQuestion.isCorrectTranslation)) && (
+                    <span className="danetka-result-icon danetka-result-icon--wrong" role="img" aria-label="Неправильно">✗</span>
+                  )}
+                </div>
                 <div className="danetka-yes-no-buttons" role="group" aria-label="Ответ: правильный ли перевод" key={currentQuestion.word.id}>
                   <button
                     type="button"
@@ -434,11 +535,6 @@ const DanetkaExercise: React.FC = () => {
                     Нет
                   </button>
                 </div>
-                {showNext && (
-                  <button className="puzzle-next-word-btn danetka-next" type="button" onClick={goNextWord}>
-                    Далее (Enter)
-                  </button>
-                )}
               </>
             )}
           </div>
