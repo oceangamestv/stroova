@@ -12,11 +12,17 @@ dist/
 # Vite
 .vite/
 
-# Capacitor / Android (сборки и артефакты)
+# Capacitor / Android — сборки, кэш и сгенерированные файлы (не синхронизировать с гитом)
 android/app/build/
 android/build/
 android/.gradle/
+android/.cxx/
+android/.externalNativeBuild/
 android/capacitor/build/
+android/capacitor-cordova-android-plugins/
+android/captures/
+android/local.properties
+android/app/src/main/assets/
 *.apk
 *.aab
 

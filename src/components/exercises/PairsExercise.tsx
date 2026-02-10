@@ -150,6 +150,14 @@ const PairsExercise: React.FC = () => {
       return;
     }
 
+    // Принудительный сброс выбора при выборе второй карточки (на мобильных убирает «залипание» подсветки)
+    setSelectedIndex(null);
+    const container = document.getElementById("pairs-exercise");
+    const active = document.activeElement;
+    if (container && active instanceof HTMLElement && container.contains(active)) {
+      active.blur();
+    }
+
     setLocked(true);
 
     if (isMatch(selected, card, stageWords)) {
@@ -198,7 +206,6 @@ const PairsExercise: React.FC = () => {
       speakWord(englishWord, wordData?.accent || "both", undefined);
 
       setStatus("Отлично! Ты нашёл правильную пару.");
-      setSelectedIndex(null);
       setLocked(false);
     } else {
       // За ошибку опыт не начисляется.
