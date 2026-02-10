@@ -82,6 +82,9 @@ export async function recordActivity(username) {
   const today = getServerDateString();
   const yesterday = getYesterdayString();
 
+  let newStreakDays = 1;
+  let lastActiveDate = today;
+
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
@@ -93,9 +96,6 @@ export async function recordActivity(username) {
       [username]
     );
     const row = res.rows[0];
-
-    let newStreakDays = 1;
-    let lastActiveDate = today;
 
     if (row) {
       const prevDate = toServerDateString(row.last_active_date) || (row.last_active_date ? String(row.last_active_date).slice(0, 10) : null);
