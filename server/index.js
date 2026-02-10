@@ -31,6 +31,8 @@ const CORS_ORIGINS = CORS_ORIGIN.split(",").map((s) => s.trim()).filter(Boolean)
 function getAllowedOrigin(req) {
   const origin = req?.headers?.origin;
   if (origin && CORS_ORIGINS.includes(origin)) return origin;
+  if (origin === "null" || origin === "" || !origin) return CORS_ORIGINS[0] || "*";
+  if (typeof origin === "string" && (origin.startsWith("capacitor://") || origin.startsWith("http://localhost") || origin.startsWith("https://localhost"))) return origin;
   return CORS_ORIGINS[0] || "*";
 }
 

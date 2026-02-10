@@ -40,8 +40,10 @@ const LoginPage: React.FC = () => {
         setApiDebug((prev) => ({ ...prev, status: `Ответ: ${res.status}` }));
       } catch (e) {
         if (cancelled) return;
-        const msg = e instanceof Error ? e.message : String(e);
-        setApiDebug((prev) => ({ ...prev, status: `Ошибка: ${msg}` }));
+        const err = e instanceof Error ? e : new Error(String(e));
+        const cause = err.cause instanceof Error ? err.cause.message : (err.cause ? String(err.cause) : "");
+        const detail = cause ? ` (${cause})` : "";
+        setApiDebug((prev) => ({ ...prev, status: `Ошибка: ${err.message}${detail}` }));
       }
     })();
     return () => {
