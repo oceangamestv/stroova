@@ -121,7 +121,19 @@ APK: `android\app\build\outputs\apk\debug\app-debug.apk`.
 
 ## Размер APK
 
-В APK **не попадают** предгенерированные WAV (~3777 файлов, ~500 МБ): перед `cap copy` папка `dist/audio` удаляется скриптом `scripts/remove-audio-for-android.cjs`. Без неё APK получается в разы меньше (десятки МБ). Озвучка слов в приложении при отсутствии локальных файлов не проигрывается; при желании можно добавить на бэкенд endpoint вида `/api/audio/:voice/:slug.wav` и подставлять в приложении запрос к серверу.
+В APK **не попадают** предгенерированные WAV: перед `cap copy` папка `dist/audio` удаляется. Озвучка слов грузится **с сервера** по URL вида `https://ваш-домен/audio/female/slug.wav`. Чтобы в приложении звук воспроизводился, на сервере должны быть файлы в `dist/audio/` и **Nginx должен отдавать CORS** для пути `/audio/` (иначе WebView блокирует загрузку).
+
+### CORS для озвучки на сервере (Nginx)
+
+В конфиг сайта (например `/etc/nginx/sites-available/stroova`) добавь блок **до** `location /`:
+
+```nginx
+    location /audio/ {
+        add_header Access-Control-Allow-Origin *;
+    }
+```
+
+Проверка: `sudo nginx -t`, затем `sudo systemctl reload nginx`. После этого приложение сможет загружать WAV с сервера.
 
 ## Структура
 

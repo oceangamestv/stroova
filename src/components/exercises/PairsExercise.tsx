@@ -85,6 +85,17 @@ const PairsExercise: React.FC = () => {
     sessionWordsRef.current = sessionWords;
   }, [sessionWords]);
 
+  // На мобильных снимаем фокус с карточки при сбросе выбора, чтобы подсветка не «переезжала» на следующий набор
+  useEffect(() => {
+    if (selectedIndex === null) {
+      const container = document.getElementById("pairs-exercise");
+      const active = document.activeElement;
+      if (container && active instanceof HTMLElement && container.contains(active)) {
+        active.blur();
+      }
+    }
+  }, [selectedIndex]);
+
   const setDictionarySource = (source: DictionarySource) => {
     authService.updateGameSettings({ dictionarySource: source });
     refreshUser();

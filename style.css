@@ -2403,6 +2403,7 @@ body::after {
     opacity: 0.6;
     filter: grayscale(0.35);
     color: var(--text-soft);
+    pointer-events: none;
   }
 
   [data-theme="dark"] .pairs-exercise--mobile .card--matched {
@@ -4163,6 +4164,7 @@ body::after {
   filter: grayscale(0.35);
   box-shadow: var(--shadow-soft);
   position: relative;
+  pointer-events: none; /* на мобильных тап по серой карточке не даёт фокус и не вызывает реакцию */
 }
 
 [data-theme="dark"] .card--matched {

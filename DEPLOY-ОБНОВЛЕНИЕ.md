@@ -170,6 +170,8 @@ pm2 restart stroova-api
 - `CORS_ORIGIN: https://stroova.ru,...`
 - `CORS origins (4): ...` (число = сколько origin в списке). Если видишь только один origin — в `.env` поправь `CORS_ORIGIN` (несколько адресов через запятую). **Важно:** после изменения `.env` одного `pm2 restart` мало — окружение не перечитывается. Нужно перезапустить с загрузкой .env: `pm2 stop stroova-api && pm2 delete stroova-api`, затем `set -a && source .env && set +a && pm2 start server/index.js --name stroova-api` и `pm2 save`.
 
+**Озвучка слов в мобильном приложении:** приложение грузит WAV с сайта (`https://ваш-домен/audio/...`). Nginx по умолчанию не отдаёт CORS для статики, из‑за этого WebView блокирует загрузку. В конфиг Nginx (например `/etc/nginx/sites-available/stroova`) добавь блок **до** `location /`: `location /audio/ { add_header Access-Control-Allow-Origin *; }`. Затем `sudo nginx -t` и `sudo systemctl reload nginx`. Подробнее — в `docs/ANDROID-APK.md`.
+
 **Шпаргалка — команды по порядку:**
 
 | Где | Команды |
