@@ -85,16 +85,17 @@ const PairsExercise: React.FC = () => {
     sessionWordsRef.current = sessionWords;
   }, [sessionWords]);
 
-  // На мобильных снимаем фокус с карточки при сбросе выбора, чтобы подсветка не «переезжала» на следующий набор
+  // На мобильных снимаем фокус с карточки при сбросе выбора, чтобы подсветка не «переезжала» на следующий набор.
+  // Не делаем blur при открытом экране результата: иначе фокус перескакивает на кнопку «Играть снова» и может сработать как тап.
   useEffect(() => {
-    if (selectedIndex === null) {
+    if (selectedIndex === null && !showResult) {
       const container = document.getElementById("pairs-exercise");
       const active = document.activeElement;
       if (container && active instanceof HTMLElement && container.contains(active)) {
         active.blur();
       }
     }
-  }, [selectedIndex]);
+  }, [selectedIndex, showResult]);
 
   const setDictionarySource = (source: DictionarySource) => {
     authService.updateGameSettings({ dictionarySource: source });
