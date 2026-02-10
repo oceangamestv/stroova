@@ -168,7 +168,7 @@ pm2 restart stroova-api
 
 **CORS для мобильного приложения:** в логах при старте API должны быть строки:
 - `CORS_ORIGIN: https://stroova.ru,...`
-- `CORS origins (4): https://stroova.ru, ...` (число = сколько origin в списке). Если видишь только один origin — в `.env` на сервере в `CORS_ORIGIN` не хватает запятой и остальных значений. Исправь `.env`, выполни `pm2 restart stroova-api` и снова посмотри логи.
+- `CORS origins (4): ...` (число = сколько origin в списке). Если видишь только один origin — в `.env` поправь `CORS_ORIGIN` (несколько адресов через запятую). **Важно:** после изменения `.env` одного `pm2 restart` мало — окружение не перечитывается. Нужно перезапустить с загрузкой .env: `pm2 stop stroova-api && pm2 delete stroova-api`, затем `set -a && source .env && set +a && pm2 start server/index.js --name stroova-api` и `pm2 save`.
 
 **Шпаргалка — команды по порядку:**
 

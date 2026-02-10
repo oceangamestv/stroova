@@ -82,13 +82,11 @@ export async function recordActivity(username) {
   const today = getServerDateString();
   const yesterday = getYesterdayString();
 
-  let newStreakDays = 1;
-  let lastActiveDate = today;
+  const result = { streakDays: 1, lastActiveDate: today, xpGranted: 0 };
 
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
-    // Блокировка по пользователю: только один recordActivity на пользователя одновременно
     await client.query("SELECT pg_advisory_xact_lock(hashtext($1))", [username]);
 
     const res = await client.query(
@@ -103,19 +101,17 @@ export async function recordActivity(username) {
 
       if (prevDate === today) {
         await client.query("COMMIT");
-        return {
-          streakDays: prevStreak,
-          lastActiveDate: today,
-          xpGranted: 0,
-        };
+        result.streakDays = prevStreak;
+        result.lastActiveDate = today;
+        return result;
       }
       if (prevDate === yesterday) {
-        newStreakDays = prevStreak + 1;
+        result.streakDays = prevStreak + 1;
       }
     }
 
     const prevMax = row ? Math.max(0, Number(row.max_streak) || 0) : 0;
-    const newMaxStreak = Math.max(prevMax, newStreakDays);
+    const newMaxStreak = Math.max(prevMax, result.streakDays);
 
     await client.query(
       `INSERT INTO user_active_days (username, last_active_date, streak_days, max_streak)
@@ -124,7 +120,7 @@ export async function recordActivity(username) {
          last_active_date = EXCLUDED.last_active_date,
          streak_days = EXCLUDED.streak_days,
          max_streak = GREATEST(user_active_days.max_streak, EXCLUDED.max_streak)`,
-      [username, lastActiveDate, newStreakDays, newMaxStreak]
+      [username, result.lastActiveDate, result.streakDays, newMaxStreak]
     );
 
     await client.query("COMMIT");
@@ -136,11 +132,6 @@ export async function recordActivity(username) {
   }
 
   const rewardConfig = await getRewardConfig("active_day");
-  const xpGranted = rewardConfig && typeof rewardConfig.xp === "number" ? rewardConfig.xp : 0;
-
-  return {
-    streakDays: newStreakDays,
-    lastActiveDate,
-    xpGranted,
-  };
+  result.xpGranted = rewardConfig && typeof rewardConfig.xp === "number" ? rewardConfig.xp : 0;
+  return result;
 }
