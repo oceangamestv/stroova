@@ -7907,8 +7907,24 @@ body::after {
   .puzzle-exercise--mobile {
     gap: 16px;
   }
+  /* Убираем подсветку кнопок букв при нажатии на мобильной (лёгкая сложность) */
   .puzzle-exercise--mobile .puzzle-letter:focus {
     outline: none;
+    box-shadow: var(--shadow-soft);
+    border-color: var(--border-subtle);
+  }
+  .puzzle-exercise--mobile .puzzle-letter:active {
+    transform: none;
+    border-color: var(--border-subtle);
+    box-shadow: var(--shadow-soft);
+  }
+  .puzzle-exercise--mobile .puzzle-letter:hover {
+    transform: none;
+    border-color: var(--border-subtle);
+    box-shadow: var(--shadow-soft);
+  }
+  .puzzle-exercise--mobile .puzzle-letter:hover::before {
+    transform: scale(0);
   }
 
   /* Мобильная версия Данетки: увеличить кнопки, улучшить читаемость */
