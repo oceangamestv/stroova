@@ -2361,7 +2361,7 @@ body::after {
 
   .pairs-exercise--mobile .card {
     min-height: 80px;
-    padding: 20px 16px;
+    padding: 14px 3px;
     font-size: 1.2rem;
     border: 2px solid var(--border-subtle);
     border-radius: 12px;
@@ -2374,8 +2374,8 @@ body::after {
   }
 
   .pairs-exercise--mobile .card-label {
-    font-size: clamp(16px, 5cqi, 24px);
     font-weight: 800;
+    /* размер задаётся из JS по измерению ячейки и длине самого длинного слова */
   }
 
   .pairs-exercise--mobile .card--english,
@@ -4088,7 +4088,7 @@ body::after {
 .card {
   position: relative;
   border-radius: 12px;
-  padding: 20px 18px;
+  padding: 14px 3px;
   background: var(--bg-elevated);
   cursor: pointer;
   text-align: center;
@@ -4111,13 +4111,12 @@ body::after {
   min-width: 0;
 }
 
-/* Текст слова: крупнее, подстраивается под ширину карточки */
+/* Текст слова: одна строка, размер задаётся из JS по измерению ячейки и самому длинному слову */
 .card-label {
   display: block;
-  overflow: hidden;
-  text-overflow: ellipsis;
   max-width: 100%;
-  font-size: clamp(14px, 14cqi, 26px);
+  white-space: nowrap;
+  overflow: hidden;
   font-weight: 800;
 }
 
@@ -7884,11 +7883,7 @@ body::after {
 
   .pairs-exercise .card {
     min-height: 72px;
-    padding: 18px 14px;
-  }
-
-  .pairs-exercise .card-label {
-    font-size: clamp(14px, 12cqi, 22px);
+    padding: 14px 3px;
   }
 
   .card-tag,

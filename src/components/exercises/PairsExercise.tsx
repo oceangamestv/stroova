@@ -70,6 +70,9 @@ const PairsExercise: React.FC = () => {
   /** Слова, по которым в текущем раунде уже была ошибка — при верной паре прогресс не увеличиваем */
   const [wordsWithErrorThisStage, setWordsWithErrorThisStage] = useState<Set<number>>(new Set());
   const [wrongIndices, setWrongIndices] = useState<number[]>([]);
+  /** Динамический размер шрифта: по ширине ячейки и самому длинному слову, один для всех карточек */
+  const [cardFontSize, setCardFontSize] = useState<number | null>(null);
+  const cardMeasureRef = useRef<HTMLButtonElement>(null);
   const stageCompletedRef = useRef<number>(0);
   const sessionXpRef = useRef<number>(0);
   const sessionWordsRef = useRef<SessionWordEntry[]>([]);
@@ -334,6 +337,40 @@ const PairsExercise: React.FC = () => {
       : personalDictionaryService.getPersonalWordIds().length;
   const showPersonalEmpty = dictionarySource === "personal" && personalWordsCount === 0;
 
+  /** Динамический размер шрифта: измеряем ширину ячейки, по самому длинному слову считаем размер, один для всех */
+  const maxLabelLength = cards.length ? Math.max(...cards.map((c) => c.label.length)) : 0;
+  useEffect(() => {
+    if (!cards.length || maxLabelLength === 0) {
+      setCardFontSize(null);
+      return;
+    }
+    const el = cardMeasureRef.current;
+    if (!el) return;
+    const measure = () => {
+      const w = el.offsetWidth;
+      if (!w) return;
+      const paddingPx = 6;
+      const availableWidth = w - paddingPx;
+      const charWidthRatio = 0.58;
+      const size = Math.min(18, Math.max(9, availableWidth / (maxLabelLength * charWidthRatio)));
+      setCardFontSize(size);
+    };
+    const t = requestAnimationFrame(() => {
+      measure();
+    });
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => {
+      cancelAnimationFrame(t);
+      ro.disconnect();
+    };
+  }, [cards, maxLabelLength]);
+
+  const getCardLabelFontSize = (_len: number) => {
+    if (cardFontSize !== null) return cardFontSize;
+    return Math.min(18, Math.max(10, 150 / maxLabelLength || 1));
+  };
+
   if (wordsLoading) {
     return (
       <div className="exercise-area">
@@ -439,9 +476,10 @@ const PairsExercise: React.FC = () => {
           <div className="cards-column" id="cards-column-english">
           {cards
             .filter((c) => c.type === "en")
-            .map((card) => (
+            .map((card, idx) => (
               <button
                 key={card.index}
+                ref={idx === 0 ? cardMeasureRef : undefined}
                 className={`card card--english ${card.matched ? "card--matched" : ""} ${
                   selectedIndex === card.index ? "card--selected" : ""
                 } ${wrongIndices.includes(card.index) ? "card--wrong" : ""}`}
@@ -459,7 +497,14 @@ const PairsExercise: React.FC = () => {
                     {card.accent === "UK" ? "🇬🇧 UK" : "🇺🇸 US"}
                   </span>
                 )}
-                <span className="card-label">{card.label}</span>
+                <span
+                  className="card-label"
+                  style={{
+                    fontSize: `${getCardLabelFontSize(card.label.length)}px`,
+                  }}
+                >
+                  {card.label}
+                </span>
               </button>
             ))}
           </div>
@@ -481,7 +526,14 @@ const PairsExercise: React.FC = () => {
                 }}
                 type="button"
               >
-                <span className="card-label">{card.label}</span>
+                <span
+                  className="card-label"
+                  style={{
+                    fontSize: `${getCardLabelFontSize(card.label.length)}px`,
+                  }}
+                >
+                  {card.label}
+                </span>
               </button>
             ))}
           </div>

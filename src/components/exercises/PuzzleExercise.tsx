@@ -96,6 +96,10 @@ const PuzzleExercise: React.FC = () => {
   const nextWordCooldownUntilRef = useRef(0);
   /** Блокировка повторного вызова goNextWord до следующего появления кнопки */
   const nextWordHandledRef = useRef(false);
+  /** Grace period: кнопка «Следующее слово» не реагирует первые N мс после появления (защита от «призрачного» тапа) */
+  const nextButtonReadyAtRef = useRef(0);
+  /** Grace period: кнопки модалки результатов не реагируют первые N мс после появления */
+  const resultModalReadyAtRef = useRef(0);
   const isMobile = useIsMobile();
   const isGameOnly = useGameOnlyLayout();
   const isCompact = isMobile || isGameOnly;
@@ -151,6 +155,7 @@ const PuzzleExercise: React.FC = () => {
     setTimerRunning(false);
     setLocked(true);
     setEndedByTime(true);
+    resultModalReadyAtRef.current = Date.now() + RESULT_MODAL_GRACE_MS;
     setShowResult(true);
     const earnedXp = sessionXpRef.current;
     const words = sessionWordsRef.current;
@@ -229,6 +234,8 @@ const PuzzleExercise: React.FC = () => {
 
   const LETTER_COOLDOWN_MS = 400;
   const NEXT_WORD_COOLDOWN_MS = 500;
+  const NEXT_BUTTON_GRACE_MS = 400;
+  const RESULT_MODAL_GRACE_MS = 400;
 
   const applyLetter = (letter: string, letterIndex?: number) => {
     if (!state || locked) return;
@@ -299,6 +306,7 @@ const PuzzleExercise: React.FC = () => {
       setTimeLeft((prev) => prev + 1);
       speakWord(currentWordData.en, currentWordData.accent || "both", undefined);
       setStatus("Отлично! Слово собрано верно.");
+      nextButtonReadyAtRef.current = Date.now() + NEXT_BUTTON_GRACE_MS;
       setShowNext(true);
       return;
     }
@@ -329,12 +337,20 @@ const PuzzleExercise: React.FC = () => {
     playErrorSound();
     setState({ ...updated, letters: [...updated.letters] });
     setStatus("Есть ошибки. Посмотри правильное слово.");
+    nextButtonReadyAtRef.current = Date.now() + NEXT_BUTTON_GRACE_MS;
     setShowNext(true);
+    // Сброс состояния выбора на мобильных (убирает «залипание» подсветки кнопки буквы), как в игре «Выбери пару»
+    const container = document.getElementById("puzzle-learning-area");
+    const active = document.activeElement;
+    if (container && active instanceof HTMLElement && container.contains(active)) {
+      active.blur();
+    }
   };
 
   const goNextWord = () => {
     if (nextWordHandledRef.current) return;
     if (Date.now() < nextWordCooldownUntilRef.current) return;
+    if (Date.now() < nextButtonReadyAtRef.current) return;
     nextWordHandledRef.current = true;
     nextWordCooldownUntilRef.current = Date.now() + NEXT_WORD_COOLDOWN_MS;
     setCurrentIndex((prev) => prev + 1);
@@ -343,6 +359,7 @@ const PuzzleExercise: React.FC = () => {
   };
 
   const restartGame = () => {
+    if (Date.now() < resultModalReadyAtRef.current) return;
     setShowResult(false);
     setSessionWords([]);
     setCurrentIndex(1);
@@ -629,7 +646,7 @@ const PuzzleExercise: React.FC = () => {
                 }
               }}
             >
-              Следующее слово (Enter)
+              {isCompact ? "Следующее слово" : "Следующее слово (Enter)"}
             </button>
           )}
         </div>
@@ -735,7 +752,10 @@ const PuzzleExercise: React.FC = () => {
               </button>
               <button
                 className="primary-btn puzzle-result-btn puzzle-result-btn--secondary"
-                onClick={() => navigate("/")}
+                onClick={() => {
+                  if (Date.now() < resultModalReadyAtRef.current) return;
+                  navigate("/");
+                }}
                 type="button"
               >
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
