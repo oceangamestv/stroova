@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useCallback, useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import type { Word } from "../../data/contracts/types";
 import { useDictionary } from "../../features/dictionary/useDictionary";
@@ -66,6 +66,18 @@ const PairsExercise: React.FC = () => {
   /** На мобильных: последний pointerDown по карточке — чтобы в click отличить дубликат (отложенный click) от отдельного тапа (только click). */
   const lastPointerDownCardRef = useRef<{ index: number; time: number } | null>(null);
   const CLICK_DEDUPE_MS = 450;
+  /** Таймеры вспышки неверной пары — очищаем при размонтировании и при новой ошибке. */
+  const wrongFlashTimeoutsRef = useRef<NodeJS.Timeout[]>([]);
+
+  /** Полностью снимает выделение со всех карточек: состояние + фокус + ref «последний тап». */
+  const clearAllCardSelection = useCallback(() => {
+    setSelectedIndex(null);
+    lastPointerDownCardRef.current = null;
+    const container = document.getElementById("pairs-exercise");
+    if (container) {
+      container.querySelectorAll<HTMLElement>("button.card").forEach((btn) => btn.blur());
+    }
+  }, []);
 
   useEffect(() => {
     sessionXpRef.current = sessionXp;
@@ -226,22 +238,33 @@ const PairsExercise: React.FC = () => {
       playErrorSound();
       setStatus("Не совсем так. Попробуй ещё раз.");
 
-      setWrongIndices([selected.index, card.index]);
+      const wrongPairIndices: [number, number] = [selected.index, card.index];
+      clearAllCardSelection();
+      setWrongIndices(wrongPairIndices);
+      setLocked(true);
       if (isMobile) {
         setCardsDisabledForBlur(true);
         setTimeout(() => setCardsDisabledForBlur(false), 0);
       }
-      setTimeout(() => {
+      wrongFlashTimeoutsRef.current.forEach((t) => clearTimeout(t));
+      wrongFlashTimeoutsRef.current = [];
+      const schedule = (ms: number, fn: () => void) => {
+        const id = setTimeout(fn, ms);
+        wrongFlashTimeoutsRef.current.push(id);
+      };
+      schedule(180, () => setWrongIndices([]));
+      schedule(280, () => setWrongIndices(wrongPairIndices));
+      schedule(380, () => setWrongIndices([]));
+      schedule(480, () => setWrongIndices(wrongPairIndices));
+      schedule(620, () => setWrongIndices([]));
+      schedule(700, () => {
+        clearAllCardSelection();
         setWrongIndices([]);
-        setSelectedIndex(null);
         setLocked(false);
         setStatus("Выбери новую пару карточек.");
         ignoreNextClickAfterWrongRef.current = true;
-        const container = document.getElementById("pairs-exercise");
-        if (container) {
-          container.querySelectorAll<HTMLElement>("button.card").forEach((btn) => btn.blur());
-        }
-      }, 700);
+        wrongFlashTimeoutsRef.current = [];
+      });
     }
   };
 
@@ -315,13 +338,15 @@ const PairsExercise: React.FC = () => {
     // Таймер очищается при смене stage (первый useEffect) и при размонтировании (отдельный эффект ниже).
   }, [matchedCount, stage]);
 
-  // Очистка таймера только при размонтировании компонента
+  // Очистка таймеров при размонтировании компонента
   useEffect(() => {
     return () => {
       if (stageTransitionTimeoutRef.current) {
         clearTimeout(stageTransitionTimeoutRef.current);
         stageTransitionTimeoutRef.current = null;
       }
+      wrongFlashTimeoutsRef.current.forEach((t) => clearTimeout(t));
+      wrongFlashTimeoutsRef.current = [];
     };
   }, []);
 
