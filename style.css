@@ -2390,6 +2390,17 @@ body::after {
     outline: none;
   }
 
+  /* На touch-устройствах убираем sticky-hover/sticky-active у нейтральных карточек.
+     Иначе последнее тапнутое слово визуально «залипает» как выбранное. */
+  .pairs-exercise--mobile .card:not(.card--selected):not(.card--wrong):not(.card--matched):hover,
+  .pairs-exercise--mobile .card:not(.card--selected):not(.card--wrong):not(.card--matched):active,
+  .pairs-exercise--mobile .card:not(.card--selected):not(.card--wrong):not(.card--matched):focus-visible {
+    transform: translateY(0);
+    box-shadow: var(--shadow-soft);
+    background: var(--bg-elevated);
+    border-color: var(--border-subtle);
+  }
+
   .pairs-exercise--mobile .card--selected {
     border-color: var(--accent);
     background: var(--accent-soft);
@@ -4131,11 +4142,13 @@ body::after {
   box-shadow: var(--shadow-soft);
 }
 
-.card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 24px rgba(255, 193, 7, 0.18);
-  background: var(--accent-soft);
-  border-color: var(--accent);
+@media (hover: hover) and (pointer: fine) {
+  .card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 24px rgba(255, 193, 7, 0.18);
+    background: var(--accent-soft);
+    border-color: var(--accent);
+  }
 }
 
 .card--english {
