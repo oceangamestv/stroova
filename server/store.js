@@ -19,6 +19,7 @@ function rowToUser(row) {
     username: row.username,
     displayName: row.display_name || row.username,
     passwordHash: row.password_hash,
+    isAdmin: !!row.is_admin,
     createdAt: row.created_at instanceof Date ? row.created_at.toISOString() : row.created_at,
     stats: row.stats && typeof row.stats === "object" ? row.stats : defaultStats(),
     wordProgress: row.word_progress && typeof row.word_progress === "object" ? row.word_progress : {},
@@ -52,11 +53,12 @@ export async function saveUser(user) {
   const gameSettings = JSON.stringify(user.gameSettings || {});
 
   await pool.query(
-    `INSERT INTO users (username, display_name, password_hash, created_at, stats, word_progress, personal_dictionary, game_settings)
-     VALUES ($1, $2, $3, $4::timestamptz, $5::jsonb, $6::jsonb, $7::jsonb, $8::jsonb)
+    `INSERT INTO users (username, display_name, password_hash, is_admin, created_at, stats, word_progress, personal_dictionary, game_settings)
+     VALUES ($1, $2, $3, $4, $5::timestamptz, $6::jsonb, $7::jsonb, $8::jsonb, $9::jsonb)
      ON CONFLICT (username) DO UPDATE SET
        display_name = EXCLUDED.display_name,
        password_hash = EXCLUDED.password_hash,
+       is_admin = EXCLUDED.is_admin,
        stats = EXCLUDED.stats,
        word_progress = EXCLUDED.word_progress,
        personal_dictionary = EXCLUDED.personal_dictionary,
@@ -65,6 +67,7 @@ export async function saveUser(user) {
       user.username,
       user.displayName ?? user.username,
       user.passwordHash,
+      !!user.isAdmin,
       user.createdAt || new Date().toISOString(),
       stats,
       wordProgress,
@@ -147,6 +150,7 @@ export function createDefaultUser(username, passwordHash) {
     username,
     displayName: username,
     passwordHash,
+    isAdmin: false,
     createdAt: new Date().toISOString(),
     stats: defaultStats(),
     wordProgress: {},

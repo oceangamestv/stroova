@@ -51,10 +51,18 @@ async function request<T>(
     let message = text;
     let details: Record<string, unknown> | undefined;
     try {
-      const json = JSON.parse(text) as { error?: string; message?: string; retryAfterSeconds?: number };
+      const json = JSON.parse(text) as {
+        error?: string;
+        message?: string;
+        retryAfterSeconds?: number;
+        details?: unknown;
+      };
       message = json.error ?? json.message ?? text;
       if (json.retryAfterSeconds !== undefined) {
         details = { retryAfterSeconds: json.retryAfterSeconds };
+      }
+      if (json.details !== undefined) {
+        details = { ...(details || {}), details: json.details };
       }
     } catch {
       // leave message as text

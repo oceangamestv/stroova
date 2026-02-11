@@ -75,6 +75,8 @@ export type User = {
   username: string;
   /** Отображаемое имя (никнейм). Можно менять свободно. Если нет — показывается username. */
   displayName?: string;
+  /** Админ-флаг (приходит с сервера; назначается вручную в БД). */
+  isAdmin?: boolean;
   passwordHash: string;
   createdAt: string;
   stats: UserStats;

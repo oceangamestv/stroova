@@ -22,6 +22,7 @@ CREATE TABLE IF NOT EXISTS users (
   username VARCHAR(255) UNIQUE NOT NULL,
   display_name VARCHAR(255) NOT NULL DEFAULT '',
   password_hash VARCHAR(255) NOT NULL,
+  is_admin BOOLEAN NOT NULL DEFAULT FALSE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   stats JSONB NOT NULL DEFAULT '{}',
   word_progress JSONB NOT NULL DEFAULT '{}',
@@ -73,6 +74,73 @@ CREATE INDEX IF NOT EXISTS idx_dictionary_entries_language ON dictionary_entries
 CREATE INDEX IF NOT EXISTS idx_dictionary_entries_level ON dictionary_entries(language_id, level);
 CREATE INDEX IF NOT EXISTS idx_dictionary_entries_frequency_rank ON dictionary_entries(frequency_rank);
 
+-- ===== Нормализованный словарь (v2) =====
+CREATE TABLE IF NOT EXISTS dictionary_lemmas (
+  id SERIAL PRIMARY KEY,
+  language_id INTEGER NOT NULL REFERENCES languages(id) ON DELETE CASCADE,
+  lemma_key TEXT NOT NULL,
+  lemma TEXT NOT NULL,
+  pos VARCHAR(30) NOT NULL DEFAULT '',
+  frequency_rank INT NOT NULL DEFAULT 15000,
+  rarity VARCHAR(20) NOT NULL DEFAULT 'не редкое',
+  accent VARCHAR(10) NOT NULL DEFAULT 'both',
+  ipa_uk VARCHAR(100) NOT NULL DEFAULT '',
+  ipa_us VARCHAR(100) NOT NULL DEFAULT '',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT chk_dictionary_lemmas_rarity CHECK (rarity IN ('не редкое', 'редкое', 'очень редкое'))
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_dictionary_lemmas_lang_key ON dictionary_lemmas(language_id, lemma_key);
+CREATE INDEX IF NOT EXISTS idx_dictionary_lemmas_frequency_rank ON dictionary_lemmas(frequency_rank);
+
+CREATE TABLE IF NOT EXISTS dictionary_senses (
+  id SERIAL PRIMARY KEY,
+  lemma_id INTEGER NOT NULL REFERENCES dictionary_lemmas(id) ON DELETE CASCADE,
+  sense_no INT NOT NULL DEFAULT 1,
+  level VARCHAR(10) NOT NULL DEFAULT 'A0',
+  register VARCHAR(20) NOT NULL DEFAULT 'разговорная',
+  gloss_ru VARCHAR(255) NOT NULL DEFAULT '',
+  definition_ru TEXT NOT NULL DEFAULT '',
+  usage_note TEXT NOT NULL DEFAULT '',
+  reviewed_at TIMESTAMPTZ DEFAULT NULL,
+  reviewed_by VARCHAR(255) DEFAULT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT chk_dictionary_senses_register CHECK (register IN ('официальная', 'разговорная'))
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_dictionary_senses_lemma_no ON dictionary_senses(lemma_id, sense_no);
+CREATE INDEX IF NOT EXISTS idx_dictionary_senses_level ON dictionary_senses(level);
+CREATE INDEX IF NOT EXISTS idx_dictionary_senses_register ON dictionary_senses(register);
+
+CREATE TABLE IF NOT EXISTS dictionary_examples (
+  id SERIAL PRIMARY KEY,
+  sense_id INTEGER NOT NULL REFERENCES dictionary_senses(id) ON DELETE CASCADE,
+  en TEXT NOT NULL DEFAULT '',
+  ru TEXT NOT NULL DEFAULT '',
+  is_main BOOLEAN NOT NULL DEFAULT FALSE,
+  sort_order INT NOT NULL DEFAULT 0
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_dictionary_examples_unique ON dictionary_examples(sense_id, en, ru);
+CREATE INDEX IF NOT EXISTS idx_dictionary_examples_sense ON dictionary_examples(sense_id);
+
+CREATE TABLE IF NOT EXISTS dictionary_forms (
+  id SERIAL PRIMARY KEY,
+  lemma_id INTEGER NOT NULL REFERENCES dictionary_lemmas(id) ON DELETE CASCADE,
+  form TEXT NOT NULL,
+  form_type VARCHAR(40) NOT NULL DEFAULT '',
+  is_irregular BOOLEAN NOT NULL DEFAULT FALSE,
+  notes TEXT NOT NULL DEFAULT ''
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_dictionary_forms_unique ON dictionary_forms(lemma_id, form, form_type);
+
+CREATE TABLE IF NOT EXISTS dictionary_entry_links (
+  entry_id INTEGER PRIMARY KEY REFERENCES dictionary_entries(id) ON DELETE CASCADE,
+  lemma_id INTEGER NOT NULL REFERENCES dictionary_lemmas(id) ON DELETE CASCADE,
+  sense_id INTEGER NOT NULL REFERENCES dictionary_senses(id) ON DELETE CASCADE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_dictionary_entry_links_lemma ON dictionary_entry_links(lemma_id);
+
 -- Активные дни и награды (механика «активных дней»)
 CREATE TABLE IF NOT EXISTS rewards (
   id SERIAL PRIMARY KEY,
@@ -92,6 +160,22 @@ CREATE TABLE IF NOT EXISTS rating_participants (
   opted_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- Аудит изменений словаря (админка)
+CREATE TABLE IF NOT EXISTS dictionary_audit_log (
+  id SERIAL PRIMARY KEY,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  username VARCHAR(255) NULL REFERENCES users(username) ON DELETE SET NULL,
+  action VARCHAR(30) NOT NULL,
+  entity_type VARCHAR(30) NOT NULL,
+  entity_id VARCHAR(64) NOT NULL DEFAULT '',
+  meta JSONB NOT NULL DEFAULT '{}'::jsonb,
+  before_json JSONB NOT NULL DEFAULT '{}'::jsonb,
+  after_json JSONB NOT NULL DEFAULT '{}'::jsonb
+);
+CREATE INDEX IF NOT EXISTS idx_dictionary_audit_log_created_at ON dictionary_audit_log (created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_dictionary_audit_log_entity ON dictionary_audit_log (entity_type, entity_id);
+CREATE INDEX IF NOT EXISTS idx_dictionary_audit_log_username ON dictionary_audit_log (username);
+
 INSERT INTO rewards (reward_key, config, description)
 VALUES ('active_day', '{"xp": 10}', '10 XP за активный день')
 ON CONFLICT (reward_key) DO NOTHING;
@@ -106,9 +190,60 @@ export async function initDb() {
   const client = await pool.connect();
   try {
     await client.query(INIT_SQL);
+    await client.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS is_admin BOOLEAN NOT NULL DEFAULT FALSE");
     await client.query("ALTER TABLE user_active_days ADD COLUMN IF NOT EXISTS max_streak INT NOT NULL DEFAULT 0");
     await client.query("ALTER TABLE languages ADD COLUMN IF NOT EXISTS version VARCHAR(32) DEFAULT NULL");
     await client.query(SEED_LANGUAGE_SQL);
+
+    // dictionary_senses: админ-проверка
+    await client.query("ALTER TABLE dictionary_senses ADD COLUMN IF NOT EXISTS reviewed_at TIMESTAMPTZ DEFAULT NULL");
+    await client.query("ALTER TABLE dictionary_senses ADD COLUMN IF NOT EXISTS reviewed_by VARCHAR(255) DEFAULT NULL");
+    await client.query(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_dictionary_senses_reviewed_by') THEN
+          ALTER TABLE dictionary_senses
+            ADD CONSTRAINT fk_dictionary_senses_reviewed_by
+            FOREIGN KEY (reviewed_by) REFERENCES users(username) ON DELETE SET NULL;
+        END IF;
+      END $$;
+    `);
+    await client.query("CREATE INDEX IF NOT EXISTS idx_dictionary_senses_reviewed_at ON dictionary_senses (reviewed_at DESC)");
+    await client.query("CREATE INDEX IF NOT EXISTS idx_dictionary_senses_unreviewed ON dictionary_senses (id) WHERE reviewed_at IS NULL");
+
+    // Логи AI-подсказок для админки словаря
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS dictionary_ai_suggestions (
+        id SERIAL PRIMARY KEY,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        username VARCHAR(255) NULL REFERENCES users(username) ON DELETE SET NULL,
+        lang_code VARCHAR(10) NOT NULL DEFAULT 'en',
+        input_json JSONB NOT NULL DEFAULT '{}'::jsonb,
+        output_json JSONB NOT NULL DEFAULT '{}'::jsonb,
+        model VARCHAR(100) NOT NULL DEFAULT '',
+        error TEXT NOT NULL DEFAULT ''
+      );
+    `);
+    await client.query("CREATE INDEX IF NOT EXISTS idx_dictionary_ai_suggestions_created_at ON dictionary_ai_suggestions (created_at DESC)");
+    await client.query("CREATE INDEX IF NOT EXISTS idx_dictionary_ai_suggestions_username ON dictionary_ai_suggestions (username)");
+
+    // Аудит изменений словаря
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS dictionary_audit_log (
+        id SERIAL PRIMARY KEY,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        username VARCHAR(255) NULL REFERENCES users(username) ON DELETE SET NULL,
+        action VARCHAR(30) NOT NULL,
+        entity_type VARCHAR(30) NOT NULL,
+        entity_id VARCHAR(64) NOT NULL DEFAULT '',
+        meta JSONB NOT NULL DEFAULT '{}'::jsonb,
+        before_json JSONB NOT NULL DEFAULT '{}'::jsonb,
+        after_json JSONB NOT NULL DEFAULT '{}'::jsonb
+      );
+    `);
+    await client.query("CREATE INDEX IF NOT EXISTS idx_dictionary_audit_log_created_at ON dictionary_audit_log (created_at DESC)");
+    await client.query("CREATE INDEX IF NOT EXISTS idx_dictionary_audit_log_entity ON dictionary_audit_log (entity_type, entity_id)");
+    await client.query("CREATE INDEX IF NOT EXISTS idx_dictionary_audit_log_username ON dictionary_audit_log (username)");
   } finally {
     client.release();
   }

@@ -12,7 +12,7 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import { pool, initDb } from "./db.js";
-import { updateDictionaryVersion } from "./dictionaryRepo.js";
+import { updateDictionaryVersion, syncDictionaryV2FromEntries } from "./dictionaryRepo.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DEFAULT_CSV = path.resolve(__dirname, "data", "dictionary_A0_A2_2000_unique_freq_register.csv");
@@ -136,6 +136,14 @@ async function seedFromCsv(client, filePath) {
   // Обновляем версию словаря после seed
   const version = await updateDictionaryVersion("en");
   console.log(`  Версия словаря обновлена: ${version}`);
+
+  // Синхронизируем нормализованный словарь (v2)
+  try {
+    await syncDictionaryV2FromEntries("en");
+    console.log(`  Словарь v2 синхронизирован`);
+  } catch (e) {
+    console.warn("  Не удалось синхронизировать словарь v2:", e);
+  }
   
   return inserted;
 }
@@ -190,6 +198,14 @@ async function seedFromTs(client) {
   // Обновляем версию словаря после seed
   const version = await updateDictionaryVersion("en");
   console.log(`Версия словаря обновлена: ${version}`);
+
+  // Синхронизируем нормализованный словарь (v2)
+  try {
+    await syncDictionaryV2FromEntries("en");
+    console.log(`Словарь v2 синхронизирован`);
+  } catch (e) {
+    console.warn("Не удалось синхронизировать словарь v2:", e);
+  }
 }
 
 async function seed() {

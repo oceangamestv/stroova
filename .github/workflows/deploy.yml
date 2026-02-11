@@ -5,10 +5,14 @@ name: Deploy
 on:
   push:
     branches: [main]
+  workflow_dispatch:
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    concurrency:
+      group: deploy-main
+      cancel-in-progress: true
     steps:
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.0.3
@@ -16,4 +20,10 @@ jobs:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          script: cd ${{ secrets.APP_DIR || '~/stroova' }} && ./deploy.sh
+          script: |
+            set -e
+            APP_DIR="${{ secrets.APP_DIR }}"
+            if [ -z "$APP_DIR" ]; then APP_DIR="$HOME/stroova"; fi
+            cd "$APP_DIR"
+            chmod +x deploy.sh || true
+            ./deploy.sh

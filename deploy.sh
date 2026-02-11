@@ -14,7 +14,10 @@ npm ci --ignore-scripts
 echo "→ npm run build"
 npm run build
 
-echo "→ pm2 restart stroova-api"
-pm2 restart stroova-api
+echo "→ pm2 startOrReload ecosystem.config.cjs --update-env"
+pm2 startOrReload ecosystem.config.cjs --update-env
+
+echo "→ pm2 save"
+pm2 save
 
 echo "Готово."

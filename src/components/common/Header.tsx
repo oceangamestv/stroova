@@ -61,6 +61,13 @@ const NavIcons = {
       <path d="M12 16v-4M12 8h.01" />
     </svg>
   ),
+  admin: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M12 2l3 6 6 .8-4.4 4.3 1 6-5.6-3-5.6 3 1-6L3 8.8 9 8l3-6z" />
+      <path d="M12 8v4" />
+      <path d="M12 16h.01" />
+    </svg>
+  ),
   soundOn: (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
       <path d="M11 5L6 9H2v6h4l5 4V5zM15.54 8.46a5 5 0 0 1 0 7.07M19.07 4.93a10 10 0 0 1 0 14.14" />
@@ -74,7 +81,7 @@ const NavIcons = {
 };
 
 /** Пункты сайдбара на десктопе: иконка + подпись, включая кнопку «Игры» */
-const SIDEBAR_ITEMS: { to: string; label: string; iconKey: keyof typeof NavIcons }[] = [
+const BASE_SIDEBAR_ITEMS: { to: string; label: string; iconKey: keyof typeof NavIcons }[] = [
   { to: "/", label: "Игры", iconKey: "games" },
   { to: "/dictionary", label: "Словарь", iconKey: "dictionary" },
   { to: "/rating", label: "Рейтинг", iconKey: "rating" },
@@ -161,6 +168,12 @@ const Header: React.FC = () => {
   /** На десктопе — сайдбар с кнопкой «Игры» и иконками; на мобильном — все группы в верхней шапке */
   const navGroups = isMobile ? NAV_GROUPS : NAV_GROUPS.filter((g) => g.id !== "games");
   const gamePaths = ["/pairs", "/puzzle", "/danetka", "/one-of-three"];
+  const sidebarItems = !isMobile
+    ? [
+        ...BASE_SIDEBAR_ITEMS,
+        ...(user?.isAdmin ? [{ to: "/admin/dictionary", label: "Админ", iconKey: "admin" as const }] : []),
+      ]
+    : [];
 
   return (
     <>
@@ -175,7 +188,7 @@ const Header: React.FC = () => {
             {!isMobile ? (
               <>
                 <ul className="site-header__nav-list site-header__nav-list--sidebar" role="list">
-                  {SIDEBAR_ITEMS.map((item) => {
+                  {sidebarItems.map((item) => {
                     const isGamesActive =
                       item.to === "/" &&
                       (location.pathname === "/" || gamePaths.includes(location.pathname));

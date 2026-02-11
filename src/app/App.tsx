@@ -5,11 +5,13 @@ import ProfilePage from "../pages/ProfilePage";
 import LoginPage from "../pages/LoginPage";
 import RatingsPage from "../pages/RatingsPage";
 import AboutPage from "../pages/AboutPage";
+import AdminDictionaryPage from "../pages/AdminDictionaryPage";
 import { AuthProvider, useAuth } from "../features/auth/AuthContext";
 import ThemeProvider from "../features/theme/ThemeProvider";
 import { authAdapter } from "../data/adapters/authAdapter";
 import { HomeOrHub, GameRoute } from "./RouteWrappers";
 import { initializeVoices } from "../utils/sounds";
+import { useIsMobile } from "../hooks/useIsMobile";
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user } = useAuth();
@@ -17,9 +19,26 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
   return <>{children}</>;
 };
 
+const AdminRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { user } = useAuth();
+  const isMobile = useIsMobile();
+  if (!user) return <Navigate to="/login" replace />;
+  if (isMobile) return <Navigate to="/" replace />;
+  if (!user.isAdmin) return <Navigate to="/" replace />;
+  return <>{children}</>;
+};
+
 const routeConfig = [
   { path: "/login", element: <LoginPage /> },
   { path: "/dictionary", element: <DictionaryPage /> },
+  {
+    path: "/admin/dictionary",
+    element: (
+      <AdminRoute>
+        <AdminDictionaryPage />
+      </AdminRoute>
+    ),
+  },
   {
     path: "/profile",
     element: (

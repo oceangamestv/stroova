@@ -19,9 +19,32 @@ import {
   recordFailedLogin,
   clearLoginLockout,
 } from "./store.js";
-import { getWordsByLanguage, getLanguages, getWordIdsByLevel, getDictionaryVersion } from "./dictionaryRepo.js";
+import {
+  getWordsByLanguage,
+  getLanguages,
+  getWordIdsByLevel,
+  getDictionaryVersion,
+  searchDictionaryEntries,
+  getDictionaryEntryById,
+  patchDictionaryEntry,
+  updateDictionaryVersion,
+  listDictionaryEntriesAdmin,
+  getEntryV2Admin,
+  setSenseReviewedAdmin,
+  createSenseAdmin,
+  patchSenseAdmin,
+  addExampleAdmin,
+  deleteExampleAdmin,
+  setMainExampleAdmin,
+  addFormAdmin,
+  deleteFormAdmin,
+  patchExampleAdmin,
+  patchFormAdmin,
+  deleteSenseAdmin,
+} from "./dictionaryRepo.js";
 import { getActiveDays, recordActivity } from "./activeDays.js";
 import { optIn, getLeaderboard } from "./rating.js";
+import { pool } from "./db.js";
 
 const PORT = Number(process.env.PORT) || 3000;
 const CORS_ORIGIN = process.env.CORS_ORIGIN || "http://localhost:5173";
@@ -99,6 +122,35 @@ function getAuthToken(req) {
   const h = req.headers.authorization;
   if (!h || !h.startsWith("Bearer ")) return null;
   return h.slice(7).trim();
+}
+
+async function requireAuthUser(req, res) {
+  const token = getAuthToken(req);
+  if (!token) {
+    send(res, 401, { error: "Требуется авторизация" });
+    return null;
+  }
+  const session = await getSessionByToken(token);
+  if (!session) {
+    send(res, 401, { error: "Требуется авторизация" });
+    return null;
+  }
+  const user = await getUser(session.username);
+  if (!user) {
+    send(res, 401, { error: "Пользователь не найден" });
+    return null;
+  }
+  return { user, session };
+}
+
+async function requireAdmin(req, res) {
+  const auth = await requireAuthUser(req, res);
+  if (!auth) return null;
+  if (!auth.user?.isAdmin) {
+    send(res, 403, { error: "Недостаточно прав" });
+    return null;
+  }
+  return auth;
 }
 
 const routes = {
@@ -261,6 +313,398 @@ const routes = {
     const lang = url.searchParams.get("lang") || "en";
     const version = await getDictionaryVersion(lang);
     send(res, 200, { version });
+  },
+
+  // ===== Admin: словарь (только для is_admin = true) =====
+  "GET /api/admin/dictionary/search": async (req, res, body, url) => {
+    const auth = await requireAdmin(req, res);
+    if (!auth) return;
+    const lang = url.searchParams.get("lang") || "en";
+    const q = url.searchParams.get("q") || "";
+    const limit = url.searchParams.get("limit") || "50";
+    if (!String(q).trim()) {
+      send(res, 400, { error: "Параметр q обязателен" });
+      return;
+    }
+    const items = await searchDictionaryEntries(lang, q, Number(limit));
+    send(res, 200, { items });
+  },
+
+  "GET /api/admin/dictionary/entry": async (req, res, body, url) => {
+    const auth = await requireAdmin(req, res);
+    if (!auth) return;
+    const lang = url.searchParams.get("lang") || "en";
+    const id = url.searchParams.get("id");
+    if (!id) {
+      send(res, 400, { error: "Параметр id обязателен" });
+      return;
+    }
+    const entry = await getDictionaryEntryById(lang, Number(id));
+    if (!entry) {
+      send(res, 404, { error: "Запись не найдена" });
+      return;
+    }
+    send(res, 200, { entry });
+  },
+
+  "PATCH /api/admin/dictionary/entry": async (req, res, body) => {
+    const auth = await requireAdmin(req, res);
+    if (!auth) return;
+    const lang = (body?.lang || "en").trim();
+    const id = body?.id;
+    const patch = body?.patch;
+    if (!id) {
+      send(res, 400, { error: "Поле id обязательно" });
+      return;
+    }
+    const updated = await patchDictionaryEntry(lang, Number(id), patch || {}, auth.user.username);
+    if (!updated) {
+      send(res, 404, { error: "Запись не найдена" });
+      return;
+    }
+    // Если правили словарь — обновим версию (для кэша на клиентах)
+    await updateDictionaryVersion(lang);
+    send(res, 200, { entry: updated });
+  },
+
+  "GET /api/admin/dictionary/list": async (req, res, body, url) => {
+    const auth = await requireAdmin(req, res);
+    if (!auth) return;
+    const lang = url.searchParams.get("lang") || "en";
+    const q = url.searchParams.get("q") || "";
+    const level = url.searchParams.get("level") || "all";
+    const register = url.searchParams.get("register") || "all";
+    const rarity = url.searchParams.get("rarity") || "all";
+    const reviewed = url.searchParams.get("reviewed") || "all"; // all|yes|no
+    const missingExample = url.searchParams.get("missingExample") === "1";
+    const missingIpa = url.searchParams.get("missingIpa") === "1";
+    const missingRu = url.searchParams.get("missingRu") === "1";
+    const offset = url.searchParams.get("offset") || "0";
+    const limit = url.searchParams.get("limit") || "100";
+    const order = url.searchParams.get("order") || "frequency";
+    const data = await listDictionaryEntriesAdmin(lang, {
+      q,
+      level,
+      register,
+      rarity,
+      reviewed,
+      missingExample,
+      missingIpa,
+      missingRu,
+      offset: Number(offset),
+      limit: Number(limit),
+      order,
+    });
+    send(res, 200, data);
+  },
+
+  "GET /api/admin/dictionary/entry-v2": async (req, res, body, url) => {
+    const auth = await requireAdmin(req, res);
+    if (!auth) return;
+    const lang = url.searchParams.get("lang") || "en";
+    const id = url.searchParams.get("id");
+    if (!id) {
+      send(res, 400, { error: "Параметр id обязателен" });
+      return;
+    }
+    const data = await getEntryV2Admin(lang, Number(id));
+    if (!data) {
+      send(res, 404, { error: "Запись не найдена" });
+      return;
+    }
+    send(res, 200, data);
+  },
+
+  "POST /api/admin/dictionary/review": async (req, res, body) => {
+    const auth = await requireAdmin(req, res);
+    if (!auth) return;
+    const lang = String(body?.lang || "en").trim() || "en";
+    const entryId = body?.entryId;
+    const reviewed = !!body?.reviewed;
+    if (!entryId) {
+      send(res, 400, { error: "Поле entryId обязательно" });
+      return;
+    }
+    const r = await setSenseReviewedAdmin(lang, Number(entryId), auth.user.username, reviewed);
+    if (!r) {
+      send(res, 404, { error: "Связанный sense не найден" });
+      return;
+    }
+    send(res, 200, { ok: true, review: r });
+  },
+
+  "POST /api/admin/dictionary/sense": async (req, res, body) => {
+    const auth = await requireAdmin(req, res);
+    if (!auth) return;
+    const lang = String(body?.lang || "en").trim() || "en";
+    const entryId = body?.entryId;
+    const sense = body?.sense;
+    if (!entryId) {
+      send(res, 400, { error: "Поле entryId обязательно" });
+      return;
+    }
+    const data = await createSenseAdmin(lang, Number(entryId), sense || {}, auth.user.username);
+    if (!data) {
+      send(res, 400, { error: "Не удалось создать значение" });
+      return;
+    }
+    send(res, 200, data);
+  },
+
+  "PATCH /api/admin/dictionary/sense": async (req, res, body) => {
+    const auth = await requireAdmin(req, res);
+    if (!auth) return;
+    const lang = String(body?.lang || "en").trim() || "en";
+    const senseId = body?.senseId;
+    const patch = body?.patch;
+    if (!senseId) {
+      send(res, 400, { error: "Поле senseId обязательно" });
+      return;
+    }
+    const updated = await patchSenseAdmin(lang, Number(senseId), patch || {}, auth.user.username);
+    if (!updated) {
+      send(res, 400, { error: "Не удалось обновить значение" });
+      return;
+    }
+    send(res, 200, { ok: true, sense: updated });
+  },
+
+  "POST /api/admin/dictionary/example": async (req, res, body) => {
+    const auth = await requireAdmin(req, res);
+    if (!auth) return;
+    const lang = String(body?.lang || "en").trim() || "en";
+    const senseId = body?.senseId;
+    const example = body?.example;
+    if (!senseId || !example) {
+      send(res, 400, { error: "Поля senseId и example обязательны" });
+      return;
+    }
+    const created = await addExampleAdmin(lang, Number(senseId), example, auth.user.username);
+    if (!created) {
+      send(res, 400, { error: "Не удалось добавить пример" });
+      return;
+    }
+    send(res, 200, { ok: true, example: created });
+  },
+
+  "PATCH /api/admin/dictionary/example": async (req, res, body) => {
+    const auth = await requireAdmin(req, res);
+    if (!auth) return;
+    const lang = String(body?.lang || "en").trim() || "en";
+    const id = body?.id;
+    const patch = body?.patch;
+    if (!id || !patch) {
+      send(res, 400, { error: "Поля id и patch обязательны" });
+      return;
+    }
+    const updated = await patchExampleAdmin(lang, Number(id), patch, auth.user.username);
+    if (!updated) {
+      send(res, 404, { error: "Пример не найден" });
+      return;
+    }
+    send(res, 200, { ok: true, example: updated });
+  },
+
+  "POST /api/admin/dictionary/example/delete": async (req, res, body) => {
+    const auth = await requireAdmin(req, res);
+    if (!auth) return;
+    const lang = String(body?.lang || "en").trim() || "en";
+    const id = body?.id;
+    if (!id) {
+      send(res, 400, { error: "Поле id обязательно" });
+      return;
+    }
+    const out = await deleteExampleAdmin(lang, Number(id), auth.user.username);
+    if (!out) {
+      send(res, 404, { error: "Пример не найден" });
+      return;
+    }
+    send(res, 200, { ok: true });
+  },
+
+  "POST /api/admin/dictionary/example/set-main": async (req, res, body) => {
+    const auth = await requireAdmin(req, res);
+    if (!auth) return;
+    const lang = String(body?.lang || "en").trim() || "en";
+    const id = body?.id;
+    if (!id) {
+      send(res, 400, { error: "Поле id обязательно" });
+      return;
+    }
+    const updated = await setMainExampleAdmin(lang, Number(id), auth.user.username);
+    if (!updated) {
+      send(res, 404, { error: "Пример не найден" });
+      return;
+    }
+    send(res, 200, { ok: true, example: updated });
+  },
+
+  "POST /api/admin/dictionary/form": async (req, res, body) => {
+    const auth = await requireAdmin(req, res);
+    if (!auth) return;
+    const lang = String(body?.lang || "en").trim() || "en";
+    const lemmaId = body?.lemmaId;
+    const form = body?.form;
+    if (!lemmaId || !form) {
+      send(res, 400, { error: "Поля lemmaId и form обязательны" });
+      return;
+    }
+    const created = await addFormAdmin(lang, Number(lemmaId), form, auth.user.username);
+    if (!created) {
+      send(res, 400, { error: "Не удалось добавить форму" });
+      return;
+    }
+    send(res, 200, { ok: true, form: created });
+  },
+
+  "PATCH /api/admin/dictionary/form": async (req, res, body) => {
+    const auth = await requireAdmin(req, res);
+    if (!auth) return;
+    const lang = String(body?.lang || "en").trim() || "en";
+    const id = body?.id;
+    const patch = body?.patch;
+    if (!id || !patch) {
+      send(res, 400, { error: "Поля id и patch обязательны" });
+      return;
+    }
+    const updated = await patchFormAdmin(lang, Number(id), patch, auth.user.username);
+    if (!updated) {
+      send(res, 404, { error: "Форма не найдена" });
+      return;
+    }
+    send(res, 200, { ok: true, form: updated });
+  },
+
+  "POST /api/admin/dictionary/form/delete": async (req, res, body) => {
+    const auth = await requireAdmin(req, res);
+    if (!auth) return;
+    const lang = String(body?.lang || "en").trim() || "en";
+    const id = body?.id;
+    if (!id) {
+      send(res, 400, { error: "Поле id обязательно" });
+      return;
+    }
+    const out = await deleteFormAdmin(lang, Number(id), auth.user.username);
+    if (!out) {
+      send(res, 404, { error: "Форма не найдена" });
+      return;
+    }
+    send(res, 200, { ok: true });
+  },
+
+  "POST /api/admin/dictionary/sense/delete": async (req, res, body) => {
+    const auth = await requireAdmin(req, res);
+    if (!auth) return;
+    const lang = String(body?.lang || "en").trim() || "en";
+    const id = body?.id;
+    if (!id) {
+      send(res, 400, { error: "Поле id обязательно" });
+      return;
+    }
+    const out = await deleteSenseAdmin(lang, Number(id), auth.user.username);
+    if (!out) {
+      send(res, 404, { error: "Значение не найдено" });
+      return;
+    }
+    if (out.error) {
+      send(res, 400, { error: out.error });
+      return;
+    }
+    send(res, 200, { ok: true });
+  },
+
+  /**
+   * AI-подсказка по слову для админки. Требует OPENAI_API_KEY.
+   * Возвращает suggestion в формате полей dictionary_entries.
+   */
+  "POST /api/admin/dictionary/ai-suggest": async (req, res, body) => {
+    const auth = await requireAdmin(req, res);
+    if (!auth) return;
+
+    const apiKey = process.env.OPENAI_API_KEY;
+    const baseUrl = (process.env.OPENAI_BASE_URL || "https://api.openai.com/v1").trim();
+    const model = process.env.OPENAI_MODEL || "gpt-4o-mini";
+    const lang = String(body?.lang || "en").trim() || "en";
+    const word = String(body?.word || "").trim();
+    const existing = body?.existing && typeof body.existing === "object" ? body.existing : null;
+
+    if (!word) {
+      send(res, 400, { error: "Поле word обязательно" });
+      return;
+    }
+    if (!apiKey) {
+      send(res, 400, { error: "OPENAI_API_KEY не задан на сервере" });
+      return;
+    }
+
+    const inputJson = { lang, word, existing };
+    let outputJson = {};
+    let errText = "";
+    try {
+      const prompt = [
+        "Ты помощник администратора словаря английских слов.",
+        "Сгенерируй JSON-объект ТОЛЬКО со следующими полями (можно пропускать неизвестные):",
+        "en, ru, level, accent, frequencyRank, rarity, register, example, exampleRu",
+        "Требования:",
+        "- en: исходное слово/выражение (как в запросе)",
+        "- ru: короткий, самый частотный перевод (1 вариант, без скобок и перечислений)",
+        "- level: A0|A1|A2|B1|B2|C1|C2 (примерно, по сложности)",
+        "- rarity: 'не редкое'|'редкое'|'очень редкое'",
+        "- register: 'официальная'|'разговорная'",
+        "- example/exampleRu: короткий пример на EN и естественный перевод на RU",
+        "Если existing задан — старайся улучшить/уточнить его, но не делай слишком длинно.",
+        "Верни СТРОГО JSON без пояснений и без markdown.",
+      ].join("\n");
+
+      const endpoint = `${baseUrl.replace(/\/$/, "")}/chat/completions`;
+      const response = await fetch(endpoint, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model,
+          messages: [
+            { role: "system", content: prompt },
+            { role: "user", content: JSON.stringify(inputJson) },
+          ],
+          temperature: 0.4,
+        }),
+      });
+
+      if (!response.ok) {
+        const t = await response.text();
+        throw new Error(`LLM error ${response.status}: ${t}`);
+      }
+      const data = await response.json();
+      const content = data?.choices?.[0]?.message?.content;
+      if (!content || typeof content !== "string") {
+        throw new Error("Пустой ответ от модели");
+      }
+      outputJson = JSON.parse(content);
+      send(res, 200, { suggestion: outputJson });
+    } catch (e) {
+      errText = e instanceof Error ? e.message : String(e);
+      send(res, 500, { error: "Не удалось получить AI-подсказку", details: errText });
+    } finally {
+      try {
+        await pool.query(
+          `INSERT INTO dictionary_ai_suggestions (username, lang_code, input_json, output_json, model, error)
+           VALUES ($1, $2, $3::jsonb, $4::jsonb, $5, $6)`,
+          [
+            auth.user.username,
+            lang,
+            JSON.stringify(inputJson || {}),
+            JSON.stringify(outputJson || {}),
+            model,
+            errText || "",
+          ]
+        );
+      } catch (logErr) {
+        console.warn("Не удалось записать лог AI:", logErr);
+      }
+    }
   },
 
   "POST /api/rating/participate": async (req, res) => {

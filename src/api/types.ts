@@ -2,7 +2,7 @@
  * Типы запросов и ответов API (контракт с бэкендом).
  */
 
-import type { User, UserGameSettings, UserStats, WordProgressMap } from "../data/contracts/types";
+import type { User, UserGameSettings, UserStats, Word, WordProgressMap } from "../data/contracts/types";
 
 /** Ответ логина / регистрации */
 export type AuthResponse = {
@@ -49,4 +49,66 @@ export type LeaderboardResponse = {
   week: LeaderboardPeriod;
   all: LeaderboardPeriod;
   participating: boolean;
+};
+
+// ===== Admin dictionary =====
+export type AdminDictionaryListItem = Word & {
+  reviewedAt?: string | null;
+  reviewedBy?: string | null;
+  senseUpdatedAt?: string | null;
+  hasIpa?: boolean;
+  hasExample?: boolean;
+};
+
+export type AdminDictionaryListResponse = {
+  items: AdminDictionaryListItem[];
+  total: number;
+};
+
+export type AdminDictionaryEntryV2Response = {
+  entry: Word;
+  lemma: {
+    id: number;
+    lemmaKey: string;
+    lemma: string;
+    pos: string;
+    frequencyRank: number;
+    rarity: string;
+    accent: string;
+    ipaUk: string;
+    ipaUs: string;
+    createdAt: string;
+    updatedAt: string;
+  } | null;
+  senses: Array<{
+    id: number;
+    lemmaId: number;
+    senseNo: number;
+    level: string;
+    register: string;
+    glossRu: string;
+    definitionRu: string;
+    usageNote: string;
+    reviewedAt: string | null;
+    reviewedBy: string | null;
+    createdAt: string;
+    updatedAt: string;
+    examples: Array<{
+      id: number;
+      senseId: number;
+      en: string;
+      ru: string;
+      isMain: boolean;
+      sortOrder: number;
+    }>;
+  }>;
+  forms: Array<{
+    id: number;
+    lemmaId: number;
+    form: string;
+    formType: string;
+    isIrregular: boolean;
+    notes: string;
+  }>;
+  linkedSenseId: number | null;
 };
