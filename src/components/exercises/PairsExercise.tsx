@@ -64,6 +64,8 @@ const PairsExercise: React.FC = () => {
   /** На мобильных: последний pointerDown по карточке — чтобы в click отличить дубликат (отложенный click) от отдельного тапа (только click). */
   const lastPointerDownCardRef = useRef<{ index: number; time: number } | null>(null);
   const CLICK_DEDUPE_MS = 450;
+  /** Жёсткий lock взаимодействий (защита от гонки событий tap/click между рендерами). */
+  const interactionLockRef = useRef<boolean>(false);
   /** Таймеры вспышки неверной пары — очищаем при размонтировании и при новой ошибке. */
   const wrongFlashTimeoutsRef = useRef<NodeJS.Timeout[]>([]);
 
@@ -76,6 +78,11 @@ const PairsExercise: React.FC = () => {
       container.querySelectorAll<HTMLElement>("button.card").forEach((btn) => btn.blur());
     }
   }, []);
+
+  const setInteractionLocked = (value: boolean) => {
+    interactionLockRef.current = value;
+    setLocked(value);
+  };
 
   useEffect(() => {
     sessionXpRef.current = sessionXp;
@@ -104,7 +111,7 @@ const PairsExercise: React.FC = () => {
   useEffect(() => {
     if (wordsLoading || dictionaryWords.length === 0) return;
     // Разблокируем карточки для нового этапа и сбрасываем выбранную карточку
-    setLocked(false);
+    setInteractionLocked(false);
     setSelectedIndex(null);
     if (prevStageRef.current !== stage) {
       justChangedStageRef.current = true;
@@ -130,7 +137,7 @@ const PairsExercise: React.FC = () => {
   }, [stage, dictionarySource, dictionaryWords, wordsLoading, user]);
 
   const handleCardClick = (index: number) => {
-    if (locked) return;
+    if (locked || interactionLockRef.current) return;
     const card = cards[index];
     if (!card || card.matched) return;
 
@@ -159,7 +166,7 @@ const PairsExercise: React.FC = () => {
       container.querySelectorAll<HTMLElement>("button.card").forEach((btn) => btn.blur());
     }
 
-    setLocked(true);
+    setInteractionLocked(true);
 
     if (isMatch(selected, card, stageWords)) {
       const updated = cards.map((c) =>
@@ -209,7 +216,7 @@ const PairsExercise: React.FC = () => {
       setStatus("Отлично! Ты нашёл правильную пару.");
       // Жёстко снимаем визуальное выделение (фокус) после любой пары, в т.ч. на touch-устройствах.
       clearAllCardSelection();
-      setLocked(false);
+      setInteractionLocked(false);
     } else {
       // За ошибку опыт не начисляется.
       setTotalErrors((prev) => prev + 1);
@@ -237,7 +244,7 @@ const PairsExercise: React.FC = () => {
       const wrongPairIndices: [number, number] = [selected.index, card.index];
       clearAllCardSelection();
       setWrongIndices(wrongPairIndices);
-      setLocked(true);
+      setInteractionLocked(true);
       if (isMobile) {
         setCardsDisabledForBlur(true);
         setTimeout(() => setCardsDisabledForBlur(false), 0);
@@ -256,7 +263,7 @@ const PairsExercise: React.FC = () => {
       schedule(700, () => {
         clearAllCardSelection();
         setWrongIndices([]);
-        setLocked(false);
+        setInteractionLocked(false);
         setStatus("Выбери новую пару карточек.");
         wrongFlashTimeoutsRef.current = [];
       });
@@ -278,7 +285,7 @@ const PairsExercise: React.FC = () => {
     const currentStage = stage;
     stageCompletedRef.current = currentStage;
     // Блокируем клики по карточкам до перехода на следующий этап (избегаем залипания подсветки из-за отложенного tap на мобильных)
-    setLocked(true);
+    setInteractionLocked(true);
     // Сбрасываем выбранную карточку при завершении этапа
     setSelectedIndex(null);
     if (process.env.NODE_ENV === "development") {
@@ -503,7 +510,7 @@ const PairsExercise: React.FC = () => {
                 className={`card card--english ${card.matched ? "card--matched" : ""} ${
                   selectedIndex === card.index ? "card--selected" : ""
                 } ${wrongIndices.includes(card.index) ? "card--wrong" : ""}`}
-                disabled={isMobile && cardsDisabledForBlur}
+                disabled={locked || cardsDisabledForBlur}
                 onClick={isMobile ? (e) => {
                   const dup = lastPointerDownCardRef.current?.index === card.index && Date.now() - lastPointerDownCardRef.current.time < CLICK_DEDUPE_MS;
                   if (dup) {
@@ -556,7 +563,7 @@ const PairsExercise: React.FC = () => {
                 className={`card card--russian ${card.matched ? "card--matched" : ""} ${
                   selectedIndex === card.index ? "card--selected" : ""
                 } ${wrongIndices.includes(card.index) ? "card--wrong" : ""}`}
-                disabled={isMobile && cardsDisabledForBlur}
+                disabled={locked || cardsDisabledForBlur}
                 onClick={isMobile ? (e) => {
                   const dup = lastPointerDownCardRef.current?.index === card.index && Date.now() - lastPointerDownCardRef.current.time < CLICK_DEDUPE_MS;
                   if (dup) {
@@ -671,7 +678,7 @@ const PairsExercise: React.FC = () => {
                   setTotalErrors(0);
                   setSessionWords([]);
                   setWordsWithErrorThisStage(new Set());
-                  setLocked(false);
+                  setInteractionLocked(false);
                   setSelectedIndex(null);
                   sessionXpRef.current = 0;
                   stageCompletedRef.current = 0;
