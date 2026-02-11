@@ -239,6 +239,11 @@ const PuzzleExercise: React.FC = () => {
   const NEXT_BUTTON_GRACE_MS = 400;
   const RESULT_MODAL_GRACE_MS = 400;
 
+  /** Тап по букве будет проигнорирован (охлаждение или grace после «Следующее слово») — сбрасываем подсветку и не ставим букву */
+  const isLetterTapIgnored = () =>
+    Date.now() < letterPanelGraceUntilRef.current ||
+    (difficulty === "easy" && Date.now() < letterCooldownUntilRef.current);
+
   const applyLetter = (letter: string, letterIndex?: number) => {
     if (!state || locked) return;
     if (difficulty === "easy" && Date.now() < letterCooldownUntilRef.current) return;
@@ -628,10 +633,22 @@ const PuzzleExercise: React.FC = () => {
                     key={`letter-${item.index}-${item.letter}`}
                     className={`puzzle-letter ${isUsed ? "puzzle-letter--used" : ""}`}
                     type="button"
-                    onClick={() => !isUsed && applyLetter(item.letter, item.index)}
+                    onClick={(e) => {
+                      if (isUsed) return;
+                      if (isLetterTapIgnored()) {
+                        e.preventDefault();
+                        (e.currentTarget as HTMLElement).blur();
+                        return;
+                      }
+                      applyLetter(item.letter, item.index);
+                    }}
                     onPointerDown={(e) => {
                       if (!isUsed && (e.pointerType === "touch" || e.pointerType === "pen")) {
                         e.preventDefault();
+                        if (isLetterTapIgnored()) {
+                          (e.currentTarget as HTMLElement).blur();
+                          return;
+                        }
                         applyLetter(item.letter, item.index);
                       }
                     }}
