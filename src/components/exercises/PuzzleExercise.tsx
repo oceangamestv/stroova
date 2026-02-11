@@ -90,6 +90,10 @@ const PuzzleExercise: React.FC = () => {
   const sessionWordsRef = useRef<SessionWordResult[]>([]);
   const hardInputRef = useRef<HTMLInputElement>(null);
   const learningAreaRef = useRef<HTMLDivElement>(null);
+  /** Охлаждение после нажатия буквы (мобильные: защита от множественного срабатывания) */
+  const letterCooldownUntilRef = useRef(0);
+  /** Охлаждение кнопки «Следующее слово» (защита от двойного тапа) */
+  const nextWordCooldownUntilRef = useRef(0);
   const isMobile = useIsMobile();
   const isGameOnly = useGameOnlyLayout();
   const isCompact = isMobile || isGameOnly;
@@ -220,11 +224,16 @@ const PuzzleExercise: React.FC = () => {
     return () => clearInterval(id);
   }, [timerRunning, showResult, endGameByTime]);
 
+  const LETTER_COOLDOWN_MS = 400;
+  const NEXT_WORD_COOLDOWN_MS = 500;
+
   const applyLetter = (letter: string, letterIndex?: number) => {
     if (!state || locked) return;
+    if (difficulty === "easy" && Date.now() < letterCooldownUntilRef.current) return;
     const emptySlotIndex = state.slots.findIndex((slot) => slot === null);
     if (emptySlotIndex === -1) return;
 
+    if (difficulty === "easy") letterCooldownUntilRef.current = Date.now() + LETTER_COOLDOWN_MS;
     const updated = placeLetterInSlot(state, letter, emptySlotIndex, difficulty, letterIndex);
     setState({ ...updated, letters: [...updated.letters] });
 
@@ -321,6 +330,8 @@ const PuzzleExercise: React.FC = () => {
   };
 
   const goNextWord = () => {
+    if (Date.now() < nextWordCooldownUntilRef.current) return;
+    nextWordCooldownUntilRef.current = Date.now() + NEXT_WORD_COOLDOWN_MS;
     setCurrentIndex((prev) => prev + 1);
     setLocked(false);
     setShowNext(false);
