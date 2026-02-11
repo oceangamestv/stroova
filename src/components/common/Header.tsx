@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import { useAuth } from "../../features/auth/AuthContext";
 import { getSoundEnabled, setSoundEnabled, setPreferredVoiceUri, VOICE_STORAGE_KEY_PREFIX } from "../../utils/sounds";
@@ -92,6 +92,54 @@ const GameSegmentIcons = [
   /* 1 из 3 — три точки */
   <svg key="one-of-three" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden><circle cx="8" cy="12" r="2" /><circle cx="12" cy="12" r="2" /><circle cx="16" cy="12" r="2" /></svg>,
 ];
+
+const BottomLinkMarqueeText: React.FC<{ text: string; enable?: boolean }> = ({ text, enable = true }) => {
+  const wrapRef = useRef<HTMLSpanElement>(null);
+  const innerRef = useRef<HTMLSpanElement>(null);
+  const [marquee, setMarquee] = useState(false);
+  const [shift, setShift] = useState(0);
+
+  useEffect(() => {
+    if (!enable) {
+      setMarquee(false);
+      setShift(0);
+      return;
+    }
+    const wrap = wrapRef.current;
+    const inner = innerRef.current;
+    if (!wrap || !inner) return;
+
+    const update = () => {
+      const smallScreen = window.matchMedia("(max-width: 420px)").matches;
+      const overflow = Math.ceil(inner.scrollWidth - wrap.clientWidth);
+      const shouldMarquee = smallScreen && overflow > 2;
+      setMarquee(shouldMarquee);
+      setShift(shouldMarquee ? overflow : 0);
+    };
+
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(wrap);
+    ro.observe(inner);
+    window.addEventListener("resize", update);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener("resize", update);
+    };
+  }, [enable, text]);
+
+  return (
+    <span
+      ref={wrapRef}
+      className={`site-header__bottom-link-text ${marquee ? "site-header__bottom-link-text--marquee" : ""}`}
+      style={{ "--marquee-shift": `${shift}px` } as React.CSSProperties}
+    >
+      <span ref={innerRef} className="site-header__bottom-link-text-inner">
+        {text}
+      </span>
+    </span>
+  );
+};
 
 const Header: React.FC = () => {
   const { user } = useAuth();
@@ -224,9 +272,10 @@ const Header: React.FC = () => {
             aria-label={user ? "Профиль" : "Войти"}
           >
             <span className="site-header__bottom-link-icon">{NavIcons.profile}</span>
-            <span className="site-header__bottom-link-text">
-              {user ? (user.displayName ?? user.username) : "Войти"}
-            </span>
+            <BottomLinkMarqueeText
+              text={user ? (user.displayName ?? user.username) : "Войти"}
+              enable={!!user}
+            />
           </NavLink>
           <NavLink
             to="/about"
@@ -235,7 +284,7 @@ const Header: React.FC = () => {
             aria-label="О проекте"
           >
             <span className="site-header__bottom-link-icon">{NavIcons.about}</span>
-            <span className="site-header__bottom-link-text">О проекте</span>
+            <BottomLinkMarqueeText text="О проекте" />
           </NavLink>
         </div>
 

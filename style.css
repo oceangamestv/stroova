@@ -749,6 +749,30 @@ body::after {
     line-height: 1.1;
   }
 
+  .site-header__bottom-link-text-inner {
+    display: inline-block;
+    max-width: 100%;
+    white-space: nowrap;
+  }
+
+  .site-header__bottom-link-text--marquee {
+    text-overflow: clip;
+  }
+
+  .site-header__bottom-link-text--marquee .site-header__bottom-link-text-inner {
+    animation: bottom-link-marquee 2.8s ease-in-out infinite alternate;
+    will-change: transform;
+  }
+
+  @keyframes bottom-link-marquee {
+    from {
+      transform: translateX(0);
+    }
+    to {
+      transform: translateX(calc(-1 * var(--marquee-shift, 0px)));
+    }
+  }
+
   .site-header__bottom-link:hover {
     background: var(--accent-soft);
     color: var(--text);
