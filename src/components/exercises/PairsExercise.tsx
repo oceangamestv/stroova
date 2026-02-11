@@ -70,6 +70,8 @@ const PairsExercise: React.FC = () => {
   /** Слова, по которым в текущем раунде уже была ошибка — при верной паре прогресс не увеличиваем */
   const [wordsWithErrorThisStage, setWordsWithErrorThisStage] = useState<Set<number>>(new Set());
   const [wrongIndices, setWrongIndices] = useState<number[]>([]);
+  /** Кратковременный disabled карточек на мобильных при ошибке — браузер снимает фокус с кнопки. */
+  const [cardsDisabledForBlur, setCardsDisabledForBlur] = useState(false);
   /** Динамический размер шрифта: по ширине ячейки и самому длинному слову, один для всех карточек */
   const [cardFontSize, setCardFontSize] = useState<number | null>(null);
   const cardMeasureRef = useRef<HTMLButtonElement>(null);
@@ -243,6 +245,10 @@ const PairsExercise: React.FC = () => {
       setStatus("Не совсем так. Попробуй ещё раз.");
 
       setWrongIndices([selected.index, card.index]);
+      if (isMobile) {
+        setCardsDisabledForBlur(true);
+        setTimeout(() => setCardsDisabledForBlur(false), 0);
+      }
       setTimeout(() => {
         setWrongIndices([]);
         setSelectedIndex(null);
@@ -495,7 +501,8 @@ const PairsExercise: React.FC = () => {
                 className={`card card--english ${card.matched ? "card--matched" : ""} ${
                   selectedIndex === card.index ? "card--selected" : ""
                 } ${wrongIndices.includes(card.index) ? "card--wrong" : ""}`}
-                onClick={isMobile ? (e) => { e.preventDefault(); e.stopPropagation(); } : () => handleCardClick(card.index)}
+                disabled={isMobile && cardsDisabledForBlur}
+                onClick={isMobile ? (e) => { e.preventDefault(); e.stopPropagation(); if (e.target instanceof HTMLElement) e.target.blur(); } : () => handleCardClick(card.index)}
                 onPointerDown={(e) => {
                   if (isMobile) {
                     e.preventDefault();
@@ -532,7 +539,8 @@ const PairsExercise: React.FC = () => {
                 className={`card card--russian ${card.matched ? "card--matched" : ""} ${
                   selectedIndex === card.index ? "card--selected" : ""
                 } ${wrongIndices.includes(card.index) ? "card--wrong" : ""}`}
-                onClick={isMobile ? (e) => { e.preventDefault(); e.stopPropagation(); } : () => handleCardClick(card.index)}
+                disabled={isMobile && cardsDisabledForBlur}
+                onClick={isMobile ? (e) => { e.preventDefault(); e.stopPropagation(); if (e.target instanceof HTMLElement) e.target.blur(); } : () => handleCardClick(card.index)}
                 onPointerDown={(e) => {
                   if (isMobile) {
                     e.preventDefault();

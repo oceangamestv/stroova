@@ -85,6 +85,8 @@ const PuzzleExercise: React.FC = () => {
   const [timeLeft, setTimeLeft] = useState(PUZZLE_TIMER_INITIAL_SEC);
   const [timerRunning, setTimerRunning] = useState(false);
   const [endedByTime, setEndedByTime] = useState(false);
+  /** Кратковременный disabled букв на мобильных при ошибке — браузер снимает фокус с кнопки. */
+  const [lettersDisabledForBlur, setLettersDisabledForBlur] = useState(false);
 
   const sessionXpRef = useRef(0);
   const sessionWordsRef = useRef<SessionWordResult[]>([]);
@@ -345,17 +347,27 @@ const PuzzleExercise: React.FC = () => {
     playErrorSound();
     setStatus("Есть ошибки. Посмотри правильное слово.");
     nextButtonReadyAtRef.current = Date.now() + NEXT_BUTTON_GRACE_MS;
-    // Сброс подсветки на мобильных до смены UI: снять фокус с кнопки буквы, чтобы не «залипала»
     if (isCompact) {
+      setLettersDisabledForBlur(true);
+      setTimeout(() => setLettersDisabledForBlur(false), 0);
+    }
+    // Сброс подсветки на мобильных: снять фокус со всех кнопок букв, чтобы не «залипала»
+    if (isCompact) {
+      const lettersEl = document.getElementById("puzzle-letters");
+      if (lettersEl) {
+        lettersEl.querySelectorAll<HTMLElement>("button.puzzle-letter").forEach((btn) => btn.blur());
+      }
       const container = document.getElementById("puzzle-learning-area");
       const active = document.activeElement;
       if (container && active instanceof HTMLElement && container.contains(active)) {
         (active as HTMLElement).blur();
       }
       requestAnimationFrame(() => {
-        const c = document.getElementById("puzzle-learning-area");
+        const c = document.getElementById("puzzle-letters");
+        if (c) c.querySelectorAll<HTMLElement>("button.puzzle-letter").forEach((btn) => btn.blur());
+        const area = document.getElementById("puzzle-learning-area");
         const a = document.activeElement;
-        if (c && a instanceof HTMLElement && c.contains(a)) {
+        if (area && a instanceof HTMLElement && area.contains(a)) {
           a.blur();
         }
       });
@@ -641,6 +653,7 @@ const PuzzleExercise: React.FC = () => {
                         return;
                       }
                       applyLetter(item.letter, item.index);
+                      if (isCompact) (e.currentTarget as HTMLElement).blur();
                     }}
                     onPointerDown={(e) => {
                       if (!isUsed && (e.pointerType === "touch" || e.pointerType === "pen")) {
@@ -650,10 +663,11 @@ const PuzzleExercise: React.FC = () => {
                           return;
                         }
                         applyLetter(item.letter, item.index);
+                        if (isCompact) (e.currentTarget as HTMLElement).blur();
                       }
                     }}
-                    disabled={isUsed}
-                    aria-disabled={isUsed}
+                    disabled={isUsed || (isCompact && lettersDisabledForBlur)}
+                    aria-disabled={isUsed || (isCompact && lettersDisabledForBlur)}
                   >
                     {item.letter === " " ? "␣" : item.letter}
                   </button>

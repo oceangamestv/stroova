@@ -2385,6 +2385,10 @@ body::after {
     border-style: solid;
   }
 
+  .pairs-exercise--mobile .card:focus {
+    outline: none;
+  }
+
   .pairs-exercise--mobile .card--selected {
     border-color: var(--accent);
     background: var(--accent-soft);
@@ -7902,6 +7906,9 @@ body::after {
   /* Мобильная версия Puzzle: убрать лишние отступы, центрировать контент */
   .puzzle-exercise--mobile {
     gap: 16px;
+  }
+  .puzzle-exercise--mobile .puzzle-letter:focus {
+    outline: none;
   }
 
   /* Мобильная версия Данетки: увеличить кнопки, улучшить читаемость */
