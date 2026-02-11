@@ -2367,6 +2367,7 @@ body::after {
     border-radius: 12px;
     box-shadow: var(--shadow-soft);
     background: var(--bg-elevated);
+    touch-action: manipulation;
   }
 
   [data-theme="dark"] .pairs-exercise--mobile .card {

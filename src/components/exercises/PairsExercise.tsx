@@ -495,9 +495,12 @@ const PairsExercise: React.FC = () => {
                 className={`card card--english ${card.matched ? "card--matched" : ""} ${
                   selectedIndex === card.index ? "card--selected" : ""
                 } ${wrongIndices.includes(card.index) ? "card--wrong" : ""}`}
-                onClick={() => handleCardClick(card.index)}
+                onClick={isMobile ? (e) => { e.preventDefault(); e.stopPropagation(); } : () => handleCardClick(card.index)}
                 onPointerDown={(e) => {
-                  if (e.pointerType === "touch" || e.pointerType === "pen") {
+                  if (isMobile) {
+                    e.preventDefault();
+                    handleCardClick(card.index);
+                  } else if (e.pointerType === "touch" || e.pointerType === "pen") {
                     e.preventDefault();
                     handleCardClick(card.index);
                   }
@@ -529,9 +532,12 @@ const PairsExercise: React.FC = () => {
                 className={`card card--russian ${card.matched ? "card--matched" : ""} ${
                   selectedIndex === card.index ? "card--selected" : ""
                 } ${wrongIndices.includes(card.index) ? "card--wrong" : ""}`}
-                onClick={() => handleCardClick(card.index)}
+                onClick={isMobile ? (e) => { e.preventDefault(); e.stopPropagation(); } : () => handleCardClick(card.index)}
                 onPointerDown={(e) => {
-                  if (e.pointerType === "touch" || e.pointerType === "pen") {
+                  if (isMobile) {
+                    e.preventDefault();
+                    handleCardClick(card.index);
+                  } else if (e.pointerType === "touch" || e.pointerType === "pen") {
                     e.preventDefault();
                     handleCardClick(card.index);
                   }
