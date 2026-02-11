@@ -13,6 +13,7 @@ import { useAuth } from "../../features/auth/AuthContext";
 import { calculateXp, formatXp } from "../../domain/xp";
 import { useIsMobile } from "../../hooks/useIsMobile";
 import { useGameOnlyLayout } from "../../contexts/GameOnlyLayoutContext";
+import { ResultWordTile } from "../common/ResultWordTile";
 
 const ONE_OF_THREE_TIMER_INITIAL_SEC = 60;
 /** Размеры этапов бонуса: 2, 4, 8, 16 правильных подряд. Каждый этап доступен 1 раз за игру. */
@@ -28,28 +29,6 @@ type SessionWordEntry = {
 };
 
 type Option = { ru: string; isCorrect: boolean };
-
-const AnimatedProgressBar: React.FC<{
-  progressBefore: number;
-  progressAfter: number;
-  hadError: boolean;
-}> = ({ progressBefore, progressAfter, hadError }) => {
-  const [displayProgress, setDisplayProgress] = useState(progressBefore);
-  useEffect(() => {
-    const id = requestAnimationFrame(() => {
-      requestAnimationFrame(() => setDisplayProgress(progressAfter));
-    });
-    return () => cancelAnimationFrame(id);
-  }, [progressAfter]);
-  return (
-    <div className="puzzle-result-progress-track">
-      <div
-        className={`puzzle-result-progress-fill ${hadError ? "puzzle-result-progress-fill--decrease" : "puzzle-result-progress-fill--increase"}`}
-        style={{ width: `${displayProgress}%` }}
-      />
-    </div>
-  );
-};
 
 function shuffle<T>(arr: T[]): T[] {
   const out = [...arr];
@@ -534,25 +513,14 @@ const OneOfThreeExercise: React.FC = () => {
                   <h3 className="puzzle-result-words-heading">Результаты по словам</h3>
                   <ul className="puzzle-result-words-grid" aria-label="Список слов и прогресс">
                     {sessionWords.map((item, index) => (
-                      <li
+                      <ResultWordTile
                         key={`${item.word.id}-${index}`}
-                        className={`puzzle-result-word-tile ${item.hadError ? "puzzle-result-word-tile--error" : "puzzle-result-word-tile--success"}`}
-                      >
-                        <div className="puzzle-result-word-tile-info">
-                          <span className="puzzle-result-word-tile-en">{item.word.en}</span>
-                          <span className="puzzle-result-word-tile-ru">{item.word.ru}</span>
-                        </div>
-                        <div className="puzzle-result-word-tile-progress">
-                          <span className="puzzle-result-word-tile-percent" aria-hidden>
-                            {item.progressBefore}% → {item.progressAfter}%
-                          </span>
-                          <AnimatedProgressBar
-                            progressBefore={item.progressBefore}
-                            progressAfter={item.progressAfter}
-                            hadError={item.hadError}
-                          />
-                        </div>
-                      </li>
+                        word={item.word}
+                        progressBefore={item.progressBefore}
+                        progressAfter={item.progressAfter}
+                        hadError={item.hadError}
+                        isLoggedIn={!!user}
+                      />
                     ))}
                   </ul>
                 </section>

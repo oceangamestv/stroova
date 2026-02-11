@@ -21,6 +21,7 @@ import { authService } from "../../services/authService";
 import { guestPendingResultService } from "../../services/guestPendingResultService";
 import { useAuth } from "../../features/auth/AuthContext";
 import { calculateXp, formatXp } from "../../domain/xp";
+import { ResultWordTile } from "../common/ResultWordTile";
 
 const PUZZLE_TIMER_INITIAL_SEC = 60;
 
@@ -29,28 +30,6 @@ type SessionWordResult = {
   progressBefore: number;
   progressAfter: number;
   hadError: boolean;
-};
-
-const AnimatedProgressBar: React.FC<{
-  progressBefore: number;
-  progressAfter: number;
-  hadError: boolean;
-}> = ({ progressBefore, progressAfter, hadError }) => {
-  const [displayProgress, setDisplayProgress] = useState(progressBefore);
-  useEffect(() => {
-    const id = requestAnimationFrame(() => {
-      requestAnimationFrame(() => setDisplayProgress(progressAfter));
-    });
-    return () => cancelAnimationFrame(id);
-  }, [progressAfter]);
-  return (
-    <div className="puzzle-result-progress-track">
-      <div
-        className={`puzzle-result-progress-fill ${hadError ? "puzzle-result-progress-fill--decrease" : "puzzle-result-progress-fill--increase"}`}
-        style={{ width: `${displayProgress}%` }}
-      />
-    </div>
-  );
 };
 
 const formatTimer = (seconds: number) => {
@@ -246,14 +225,14 @@ const PuzzleExercise: React.FC = () => {
     Date.now() < letterPanelGraceUntilRef.current ||
     (difficulty === "easy" && Date.now() < letterCooldownUntilRef.current);
 
-  const applyLetter = (letter: string, letterIndex?: number) => {
+  const applyLetter = (letter: string, letterIndex?: number, fromKeyboard?: boolean) => {
     if (!state || locked) return;
-    if (difficulty === "easy" && Date.now() < letterCooldownUntilRef.current) return;
+    if (!fromKeyboard && difficulty === "easy" && Date.now() < letterCooldownUntilRef.current) return;
     if (Date.now() < letterPanelGraceUntilRef.current) return;
     const emptySlotIndex = state.slots.findIndex((slot) => slot === null);
     if (emptySlotIndex === -1) return;
 
-    if (difficulty === "easy") letterCooldownUntilRef.current = Date.now() + LETTER_COOLDOWN_MS;
+    if (!fromKeyboard && difficulty === "easy") letterCooldownUntilRef.current = Date.now() + LETTER_COOLDOWN_MS;
     const updated = placeLetterInSlot(state, letter, emptySlotIndex, difficulty, letterIndex);
     setState({ ...updated, letters: [...updated.letters] });
 
@@ -425,8 +404,7 @@ const PuzzleExercise: React.FC = () => {
       if (difficulty === "easy") {
         const letterItem = state.letters.find((item) => item.letter === letter && !item.used);
         if (!letterItem) return;
-        // При использовании клавиатуры используем индекс найденной буквы
-        applyLetter(letter, letterItem.index);
+        applyLetter(letter, letterItem.index, true);
       } else {
         if (key === " ") event.preventDefault();
         applyLetter(letter);
@@ -748,25 +726,14 @@ const PuzzleExercise: React.FC = () => {
               <h3 className="puzzle-result-words-heading">Прогресс по словам</h3>
               <ul className="puzzle-result-words-grid" aria-label="Список слов и прогресс">
                 {sessionWords.map((item, index) => (
-                  <li
+                  <ResultWordTile
                     key={`${item.word.id}-${index}`}
-                    className={`puzzle-result-word-tile ${item.hadError ? "puzzle-result-word-tile--error" : "puzzle-result-word-tile--success"}`}
-                  >
-                    <div className="puzzle-result-word-tile-info">
-                      <span className="puzzle-result-word-tile-en">{item.word.en}</span>
-                      <span className="puzzle-result-word-tile-ru">{item.word.ru}</span>
-                    </div>
-                    <div className="puzzle-result-word-tile-progress">
-                      <span className="puzzle-result-word-tile-percent" aria-hidden>
-                        {item.progressBefore}% → {item.progressAfter}%
-                      </span>
-                      <AnimatedProgressBar
-                        progressBefore={item.progressBefore}
-                        progressAfter={item.progressAfter}
-                        hadError={item.hadError}
-                      />
-                    </div>
-                  </li>
+                    word={item.word}
+                    progressBefore={item.progressBefore}
+                    progressAfter={item.progressAfter}
+                    hadError={item.hadError}
+                    isLoggedIn={!!user}
+                  />
                 ))}
               </ul>
             </section>

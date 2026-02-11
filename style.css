@@ -5888,9 +5888,18 @@ body::after {
 .puzzle-result-word-tile-info {
   display: flex;
   flex-direction: column;
+  justify-content: center;
   gap: 2px;
   min-width: 0;
   flex: 1;
+  overflow: hidden;
+}
+
+.puzzle-result-word-tile-en,
+.puzzle-result-word-tile-ru {
+  overflow: hidden;
+  word-break: break-word;
+  min-width: 0;
 }
 
 .puzzle-result-word-tile-en {
@@ -5898,22 +5907,70 @@ body::after {
   font-weight: 700;
   color: var(--text);
   line-height: 1.3;
-  word-break: break-word;
+}
+
+/* Подгонка по длине, чтобы слово умещалось в блок */
+.puzzle-result-word-tile-en--medium {
+  font-size: 13px;
+}
+
+.puzzle-result-word-tile-en--long {
+  font-size: 12px;
+}
+
+.puzzle-result-word-tile-en--very-long {
+  font-size: 11px;
+}
+
+.puzzle-result-word-tile-en--extra-long {
+  font-size: 10px;
+}
+
+/* Длинные слова (>10 букв): одна строка, медленная бегущая строка влево-вправо */
+.puzzle-result-word-tile-en--marquee {
+  display: inline-block;
+  white-space: nowrap;
+  animation: puzzle-result-word-tile-marquee 8s ease-in-out infinite;
+}
+
+@keyframes puzzle-result-word-tile-marquee {
+  0% {
+    transform: translateX(0);
+  }
+  50% {
+    transform: translateX(calc(-1 * var(--marquee-scroll, 0px)));
+  }
+  100% {
+    transform: translateX(0);
+  }
 }
 
 .puzzle-result-word-tile-ru {
   font-size: 12px;
   color: var(--text-soft);
   line-height: 1.3;
-  word-break: break-word;
+}
+
+.puzzle-result-word-tile-ru--medium {
+  font-size: 11px;
+}
+
+.puzzle-result-word-tile-ru--long {
+  font-size: 10px;
+}
+
+.puzzle-result-word-tile-ru--very-long {
+  font-size: 9px;
 }
 
 .puzzle-result-word-tile-progress {
   display: flex;
   flex-direction: column;
-  align-items: flex-end;
+  align-items: center;
+  justify-content: center;
   gap: 4px;
   flex-shrink: 0;
+  min-width: 60px;
 }
 
 .puzzle-result-word-tile-percent {
@@ -5921,11 +5978,14 @@ body::after {
   font-weight: 600;
   color: var(--text-soft);
   white-space: nowrap;
+  width: 100%;
+  text-align: center;
 }
 
 .puzzle-result-progress-track {
   width: 60px;
   height: 8px;
+  flex-shrink: 0;
   background: var(--bg-elevated);
   border: 2px solid var(--border-subtle);
   border-radius: 8px;
@@ -5945,6 +6005,48 @@ body::after {
 
 .puzzle-result-progress-fill--decrease {
   background: var(--danger);
+}
+
+.puzzle-result-word-tile:has(.puzzle-result-word-tile-main) {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.puzzle-result-word-tile-main {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  width: 100%;
+}
+
+.puzzle-result-word-tile-dict-indicator {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  font-size: 22px;
+  line-height: 1;
+  color: var(--text-soft);
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: color var(--transition-fast), background-color var(--transition-fast), transform var(--transition-fast);
+}
+
+.puzzle-result-word-tile-dict-indicator:hover {
+  color: var(--accent);
+  background: rgba(255, 193, 7, 0.12);
+}
+
+.puzzle-result-word-tile-dict-indicator:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .puzzle-result-guest-cta {
@@ -6074,30 +6176,41 @@ body::after {
 
   .puzzle-result-words-grid {
     display: grid;
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(2, minmax(200px, 1fr));
+    grid-auto-flow: row;
     gap: 10px;
   }
 
-  .puzzle-result-word-tile {
+  /* Старая разметка (без .puzzle-result-word-tile-main): плитка — колонка, прогресс на всю ширину */
+  .puzzle-result-word-tile:not(:has(.puzzle-result-word-tile-main)) {
     flex-direction: column;
     align-items: flex-start;
     padding: 12px 14px;
   }
 
-  .puzzle-result-word-tile-progress {
+  .puzzle-result-word-tile:not(:has(.puzzle-result-word-tile-main)) .puzzle-result-word-tile-progress {
     align-items: flex-start;
     width: 100%;
   }
 
-  .puzzle-result-progress-track {
+  .puzzle-result-word-tile:not(:has(.puzzle-result-word-tile-main)) .puzzle-result-progress-track {
     width: 100%;
     max-width: none;
   }
-}
 
-@media (min-width: 700px) {
-  .puzzle-result-words-grid {
-    grid-template-columns: repeat(3, 1fr);
+  /* Новая разметка (с .puzzle-result-word-tile-main): строка не сжимать, текст горизонтально */
+  .puzzle-result-word-tile:has(.puzzle-result-word-tile-main) {
+    min-width: 0;
+  }
+
+  .puzzle-result-word-tile-main .puzzle-result-word-tile-progress {
+    width: auto;
+    flex-shrink: 0;
+  }
+
+  .puzzle-result-word-tile-main .puzzle-result-progress-track {
+    width: 60px;
+    max-width: 60px;
   }
 }
 

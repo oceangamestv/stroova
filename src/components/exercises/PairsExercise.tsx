@@ -14,34 +14,13 @@ import { useAuth } from "../../features/auth/AuthContext";
 import { calculateXp, formatXp } from "../../domain/xp";
 import { useIsMobile } from "../../hooks/useIsMobile";
 import { useGameOnlyLayout } from "../../contexts/GameOnlyLayoutContext";
+import { ResultWordTile } from "../common/ResultWordTile";
 
 /** Результат по слову за всю игру: одна запись на слово, progressAfter считаем при показе модалки */
 type SessionWordEntry = {
   word: Word;
   progressBefore: number;
   hadError: boolean;
-};
-
-const AnimatedProgressBar: React.FC<{
-  progressBefore: number;
-  progressAfter: number;
-  hadError: boolean;
-}> = ({ progressBefore, progressAfter, hadError }) => {
-  const [displayProgress, setDisplayProgress] = useState(progressBefore);
-  useEffect(() => {
-    const id = requestAnimationFrame(() => {
-      requestAnimationFrame(() => setDisplayProgress(progressAfter));
-    });
-    return () => cancelAnimationFrame(id);
-  }, [progressAfter]);
-  return (
-    <div className="puzzle-result-progress-track">
-      <div
-        className={`puzzle-result-progress-fill ${hadError ? "puzzle-result-progress-fill--decrease" : "puzzle-result-progress-fill--increase"}`}
-        style={{ width: `${displayProgress}%` }}
-      />
-    </div>
-  );
 };
 
 const PAIRS_STAGES_TOTAL = 5;
@@ -84,6 +63,9 @@ const PairsExercise: React.FC = () => {
   const prevStageRef = useRef<number>(1);
   /** После сброса из-за неверной пары — игнорируем один следующий клик (на мобильных это часто отложенный tap по первой карточке). */
   const ignoreNextClickAfterWrongRef = useRef<boolean>(false);
+  /** На мобильных: последний pointerDown по карточке — чтобы в click отличить дубликат (отложенный click) от отдельного тапа (только click). */
+  const lastPointerDownCardRef = useRef<{ index: number; time: number } | null>(null);
+  const CLICK_DEDUPE_MS = 450;
 
   useEffect(() => {
     sessionXpRef.current = sessionXp;
@@ -502,10 +484,23 @@ const PairsExercise: React.FC = () => {
                   selectedIndex === card.index ? "card--selected" : ""
                 } ${wrongIndices.includes(card.index) ? "card--wrong" : ""}`}
                 disabled={isMobile && cardsDisabledForBlur}
-                onClick={isMobile ? (e) => { e.preventDefault(); e.stopPropagation(); if (e.target instanceof HTMLElement) e.target.blur(); } : () => handleCardClick(card.index)}
+                onClick={isMobile ? (e) => {
+                  const dup = lastPointerDownCardRef.current?.index === card.index && Date.now() - lastPointerDownCardRef.current.time < CLICK_DEDUPE_MS;
+                  if (dup) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (e.target instanceof HTMLElement) e.target.blur();
+                    return;
+                  }
+                  handleCardClick(card.index);
+                  e.preventDefault();
+                  e.stopPropagation();
+                  if (e.target instanceof HTMLElement) e.target.blur();
+                } : () => handleCardClick(card.index)}
                 onPointerDown={(e) => {
                   if (isMobile) {
                     e.preventDefault();
+                    lastPointerDownCardRef.current = { index: card.index, time: Date.now() };
                     handleCardClick(card.index);
                   } else if (e.pointerType === "touch" || e.pointerType === "pen") {
                     e.preventDefault();
@@ -540,10 +535,23 @@ const PairsExercise: React.FC = () => {
                   selectedIndex === card.index ? "card--selected" : ""
                 } ${wrongIndices.includes(card.index) ? "card--wrong" : ""}`}
                 disabled={isMobile && cardsDisabledForBlur}
-                onClick={isMobile ? (e) => { e.preventDefault(); e.stopPropagation(); if (e.target instanceof HTMLElement) e.target.blur(); } : () => handleCardClick(card.index)}
+                onClick={isMobile ? (e) => {
+                  const dup = lastPointerDownCardRef.current?.index === card.index && Date.now() - lastPointerDownCardRef.current.time < CLICK_DEDUPE_MS;
+                  if (dup) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (e.target instanceof HTMLElement) e.target.blur();
+                    return;
+                  }
+                  handleCardClick(card.index);
+                  e.preventDefault();
+                  e.stopPropagation();
+                  if (e.target instanceof HTMLElement) e.target.blur();
+                } : () => handleCardClick(card.index)}
                 onPointerDown={(e) => {
                   if (isMobile) {
                     e.preventDefault();
+                    lastPointerDownCardRef.current = { index: card.index, time: Date.now() };
                     handleCardClick(card.index);
                   } else if (e.pointerType === "touch" || e.pointerType === "pen") {
                     e.preventDefault();
@@ -602,25 +610,14 @@ const PairsExercise: React.FC = () => {
                     "beginner"
                   );
                   return (
-                    <li
+                    <ResultWordTile
                       key={item.word.id}
-                      className={`puzzle-result-word-tile ${item.hadError ? "puzzle-result-word-tile--error" : "puzzle-result-word-tile--success"}`}
-                    >
-                      <div className="puzzle-result-word-tile-info">
-                        <span className="puzzle-result-word-tile-en">{item.word.en}</span>
-                        <span className="puzzle-result-word-tile-ru">{item.word.ru}</span>
-                      </div>
-                      <div className="puzzle-result-word-tile-progress">
-                        <span className="puzzle-result-word-tile-percent" aria-hidden>
-                          {item.progressBefore}% → {progressAfter}%
-                        </span>
-                        <AnimatedProgressBar
-                          progressBefore={item.progressBefore}
-                          progressAfter={progressAfter}
-                          hadError={item.hadError}
-                        />
-                      </div>
-                    </li>
+                      word={item.word}
+                      progressBefore={item.progressBefore}
+                      progressAfter={progressAfter}
+                      hadError={item.hadError}
+                      isLoggedIn={!!user}
+                    />
                   );
                 })}
               </ul>
