@@ -100,6 +100,8 @@ const PuzzleExercise: React.FC = () => {
   const nextButtonReadyAtRef = useRef(0);
   /** Grace period: кнопки модалки результатов не реагируют первые N мс после появления */
   const resultModalReadyAtRef = useRef(0);
+  /** После перехода по «Следующее слово» буквы не реагируют N мс (тап не должен попасть на букву под кнопкой) */
+  const letterPanelGraceUntilRef = useRef(0);
   const isMobile = useIsMobile();
   const isGameOnly = useGameOnlyLayout();
   const isCompact = isMobile || isGameOnly;
@@ -240,6 +242,7 @@ const PuzzleExercise: React.FC = () => {
   const applyLetter = (letter: string, letterIndex?: number) => {
     if (!state || locked) return;
     if (difficulty === "easy" && Date.now() < letterCooldownUntilRef.current) return;
+    if (Date.now() < letterPanelGraceUntilRef.current) return;
     const emptySlotIndex = state.slots.findIndex((slot) => slot === null);
     if (emptySlotIndex === -1) return;
 
@@ -335,16 +338,25 @@ const PuzzleExercise: React.FC = () => {
       });
     }
     playErrorSound();
-    setState({ ...updated, letters: [...updated.letters] });
     setStatus("Есть ошибки. Посмотри правильное слово.");
     nextButtonReadyAtRef.current = Date.now() + NEXT_BUTTON_GRACE_MS;
-    setShowNext(true);
-    // Сброс состояния выбора на мобильных (убирает «залипание» подсветки кнопки буквы), как в игре «Выбери пару»
-    const container = document.getElementById("puzzle-learning-area");
-    const active = document.activeElement;
-    if (container && active instanceof HTMLElement && container.contains(active)) {
-      active.blur();
+    // Сброс подсветки на мобильных до смены UI: снять фокус с кнопки буквы, чтобы не «залипала»
+    if (isCompact) {
+      const container = document.getElementById("puzzle-learning-area");
+      const active = document.activeElement;
+      if (container && active instanceof HTMLElement && container.contains(active)) {
+        (active as HTMLElement).blur();
+      }
+      requestAnimationFrame(() => {
+        const c = document.getElementById("puzzle-learning-area");
+        const a = document.activeElement;
+        if (c && a instanceof HTMLElement && c.contains(a)) {
+          a.blur();
+        }
+      });
     }
+    setState({ ...updated, letters: [...updated.letters] });
+    setShowNext(true);
   };
 
   const goNextWord = () => {
@@ -353,6 +365,7 @@ const PuzzleExercise: React.FC = () => {
     if (Date.now() < nextButtonReadyAtRef.current) return;
     nextWordHandledRef.current = true;
     nextWordCooldownUntilRef.current = Date.now() + NEXT_WORD_COOLDOWN_MS;
+    letterPanelGraceUntilRef.current = Date.now() + NEXT_BUTTON_GRACE_MS;
     setCurrentIndex((prev) => prev + 1);
     setLocked(false);
     setShowNext(false);

@@ -6150,6 +6150,7 @@ body::after {
   cursor: pointer;
   user-select: none;
   touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
   transition: all var(--transition-theme), transform var(--transition-fast), box-shadow var(--transition-fast);
   text-shadow: none;
   letter-spacing: 1px;
