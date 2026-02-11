@@ -8,8 +8,8 @@ cd "$(dirname "$0")"
 echo "→ git pull"
 git pull
 
-echo "→ npm ci"
-npm ci
+echo "→ npm ci --ignore-scripts"
+npm ci --ignore-scripts
 
 echo "→ npm run build"
 npm run build

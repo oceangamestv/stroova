@@ -80,6 +80,8 @@ const PairsExercise: React.FC = () => {
   // После смены этапа в том же цикле matchedCount ещё 5 (старый). Пропускаем завершение этапа только при реальной смене этапа.
   const justChangedStageRef = useRef<boolean>(false);
   const prevStageRef = useRef<number>(1);
+  /** После сброса из-за неверной пары — игнорируем один следующий клик (на мобильных это часто отложенный tap по первой карточке). */
+  const ignoreNextClickAfterWrongRef = useRef<boolean>(false);
 
   useEffect(() => {
     sessionXpRef.current = sessionXp;
@@ -135,6 +137,10 @@ const PairsExercise: React.FC = () => {
 
   const handleCardClick = (index: number) => {
     if (locked) return;
+    if (ignoreNextClickAfterWrongRef.current) {
+      ignoreNextClickAfterWrongRef.current = false;
+      return;
+    }
     const card = cards[index];
     if (!card || card.matched) return;
 
@@ -157,9 +163,10 @@ const PairsExercise: React.FC = () => {
     // Принудительный сброс выбора при выборе второй карточки (на мобильных убирает «залипание» подсветки)
     setSelectedIndex(null);
     const container = document.getElementById("pairs-exercise");
-    const active = document.activeElement;
-    if (container && active instanceof HTMLElement && container.contains(active)) {
-      active.blur();
+    if (container) {
+      const active = document.activeElement;
+      if (active instanceof HTMLElement && container.contains(active)) active.blur();
+      container.querySelectorAll<HTMLElement>("button.card").forEach((btn) => btn.blur());
     }
 
     setLocked(true);
@@ -241,6 +248,11 @@ const PairsExercise: React.FC = () => {
         setSelectedIndex(null);
         setLocked(false);
         setStatus("Выбери новую пару карточек.");
+        ignoreNextClickAfterWrongRef.current = true;
+        const container = document.getElementById("pairs-exercise");
+        if (container) {
+          container.querySelectorAll<HTMLElement>("button.card").forEach((btn) => btn.blur());
+        }
       }, 700);
     }
   };

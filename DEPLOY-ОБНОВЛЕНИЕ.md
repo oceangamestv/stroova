@@ -59,10 +59,10 @@ DATABASE_URL=postgresql://stroova:ТВОЙ_ПАРОЛЬ_БД@localhost:5432/stro
 
 ### Шаг E. Установить зависимости и собрать фронт заново
 
-Это пересоберёт папку `dist/` из текущего кода (Vite/React):
+Это пересоберёт папку `dist/` из текущего кода (Vite/React). На сервере генерация аудио не используется, поэтому зависимости ставим с `--ignore-scripts` (без долгого postinstall пакета onnxruntime-node):
 
 ```bash
-npm ci
+npm ci --ignore-scripts
 npm run build
 ```
 
@@ -138,7 +138,7 @@ git pull
 Установи зависимости и пересобери фронт, перезапусти API:
 
 ```bash
-npm ci
+npm ci --ignore-scripts
 npm run build
 pm2 restart stroova-api
 ```
@@ -149,7 +149,7 @@ pm2 restart stroova-api
 ./deploy.sh
 ```
 
-Но если перед этим `git pull` падал с ошибкой — сначала выполни `git checkout -- ...` и `git pull` вручную, как выше, затем уже `./deploy.sh` или вручную `npm ci`, `npm run build`, `pm2 restart stroova-api`.
+Но если перед этим `git pull` падал с ошибкой — сначала выполни `git checkout -- ...` и `git pull` вручную, как выше, затем уже `./deploy.sh` или вручную `npm ci --ignore-scripts`, `npm run build`, `pm2 restart stroova-api`.
 
 ### 3. Озвучка словаря (аудио)
 
@@ -157,8 +157,7 @@ pm2 restart stroova-api
 
 - **Куда загружать:** в каталог проекта на сервере — `public/audio/` (например `~/stroova/public/audio/`).
 - **Структура:** внутри должны быть папки `female/` и `male/` с WAV-файлами (имена — по английским словам, например `hello.wav`, `ice_cream.wav`). То есть у тебя локально: `public/audio/female/`, `public/audio/male/` — залей их содержимое в такие же папки на сервере.
-- **Когда:** один раз после первой настройки сервера и потом только когда обновляешь озвучку (добавил слова, перегенерировал). После загрузки аудио обязательно пересобери фронт на сервере, чтобы они попали в `dist/`:  
-  `npm run build` (или `./deploy.sh`).
+- **Когда:** один раз после первой настройки сервера и потом только когда обновляешь набор озвучки (заливаешь новые или изменённые WAV). После загрузки аудио пересобери фронт на сервере, чтобы файлы попали в `dist/`: `npm run build` (или `./deploy.sh`).
 
 Если аудио не загружать, сайт будет работать, но кнопки озвучки слов не будут воспроизводить звук.
 
@@ -177,7 +176,7 @@ pm2 restart stroova-api
 | Где | Команды |
 |-----|--------|
 | Компьютер | `cd d:\Cursor` → `git add .` → `git commit -m "описание"` → `git push` |
-| Сервер | `cd ~/stroova` → `git pull` (при ошибке: `git checkout -- node_modules/.package-lock.json` и снова `git pull`) → `npm ci` → `npm run build` → `pm2 restart stroova-api` |
+| Сервер | `cd ~/stroova` → `git pull` (при ошибке: `git checkout -- node_modules/.package-lock.json` и снова `git pull`) → `npm ci --ignore-scripts` → `npm run build` → `pm2 restart stroova-api` |
 
 ---
 
@@ -200,7 +199,7 @@ cd ~/stroova
 ./deploy.sh
 ```
 
-Скрипт [deploy.sh](deploy.sh) делает по порядку: `git pull` → `npm ci` → `npm run build` → `pm2 restart stroova-api`.
+Скрипт [deploy.sh](deploy.sh) делает по порядку: `git pull` → `npm ci --ignore-scripts` → `npm run build` → `pm2 restart stroova-api`.
 
 **Если `./deploy.sh` не срабатывает из‑за конфликта при pull** (см. раздел «Инструкция для будущих обновлений» выше): сначала на сервере выполни `git checkout -- node_modules/.package-lock.json` и `git pull`, затем снова `./deploy.sh`.
 
