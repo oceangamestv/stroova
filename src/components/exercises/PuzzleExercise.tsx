@@ -94,6 +94,8 @@ const PuzzleExercise: React.FC = () => {
   const letterCooldownUntilRef = useRef(0);
   /** Охлаждение кнопки «Следующее слово» (защита от двойного тапа) */
   const nextWordCooldownUntilRef = useRef(0);
+  /** Блокировка повторного вызова goNextWord до следующего появления кнопки */
+  const nextWordHandledRef = useRef(false);
   const isMobile = useIsMobile();
   const isGameOnly = useGameOnlyLayout();
   const isCompact = isMobile || isGameOnly;
@@ -208,6 +210,7 @@ const PuzzleExercise: React.FC = () => {
     );
     setLocked(false);
     setShowNext(false);
+    nextWordHandledRef.current = false;
   }, [randomWord, difficulty, currentIndex]);
 
   useEffect(() => {
@@ -330,7 +333,9 @@ const PuzzleExercise: React.FC = () => {
   };
 
   const goNextWord = () => {
+    if (nextWordHandledRef.current) return;
     if (Date.now() < nextWordCooldownUntilRef.current) return;
+    nextWordHandledRef.current = true;
     nextWordCooldownUntilRef.current = Date.now() + NEXT_WORD_COOLDOWN_MS;
     setCurrentIndex((prev) => prev + 1);
     setLocked(false);
@@ -511,9 +516,6 @@ const PuzzleExercise: React.FC = () => {
           )}
           <p className="puzzle-translation" id="puzzle-translation">
             {state?.translation || ""}
-            {state?.slotsState?.some((s) => s === "wrong") && state?.word && (
-              <span className="puzzle-translation-correct"> — {state.word}</span>
-            )}
           </p>
           {difficulty === "hard" && state && state.slots.length > 0 && (
             <p className="puzzle-hint-letter-count" aria-live="polite">
@@ -616,7 +618,10 @@ const PuzzleExercise: React.FC = () => {
             <button
               type="button"
               className="puzzle-letters puzzle-letters--next-btn puzzle-next-word-btn"
-              onClick={goNextWord}
+              onClick={(e) => {
+                e.preventDefault();
+                goNextWord();
+              }}
               onPointerDown={(e) => {
                 if (e.pointerType === "touch" || e.pointerType === "pen") {
                   e.preventDefault();
