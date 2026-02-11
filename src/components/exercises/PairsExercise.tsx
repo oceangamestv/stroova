@@ -61,8 +61,6 @@ const PairsExercise: React.FC = () => {
   // После смены этапа в том же цикле matchedCount ещё 5 (старый). Пропускаем завершение этапа только при реальной смене этапа.
   const justChangedStageRef = useRef<boolean>(false);
   const prevStageRef = useRef<number>(1);
-  /** После сброса из-за неверной пары — игнорируем один следующий клик (на мобильных это часто отложенный tap по первой карточке). */
-  const ignoreNextClickAfterWrongRef = useRef<boolean>(false);
   /** На мобильных: последний pointerDown по карточке — чтобы в click отличить дубликат (отложенный click) от отдельного тапа (только click). */
   const lastPointerDownCardRef = useRef<{ index: number; time: number } | null>(null);
   const CLICK_DEDUPE_MS = 450;
@@ -133,10 +131,6 @@ const PairsExercise: React.FC = () => {
 
   const handleCardClick = (index: number) => {
     if (locked) return;
-    if (ignoreNextClickAfterWrongRef.current) {
-      ignoreNextClickAfterWrongRef.current = false;
-      return;
-    }
     const card = cards[index];
     if (!card || card.matched) return;
 
@@ -213,6 +207,8 @@ const PairsExercise: React.FC = () => {
       speakWord(englishWord, wordData?.accent || "both", undefined);
 
       setStatus("Отлично! Ты нашёл правильную пару.");
+      // Жёстко снимаем визуальное выделение (фокус) после любой пары, в т.ч. на touch-устройствах.
+      clearAllCardSelection();
       setLocked(false);
     } else {
       // За ошибку опыт не начисляется.
@@ -262,7 +258,6 @@ const PairsExercise: React.FC = () => {
         setWrongIndices([]);
         setLocked(false);
         setStatus("Выбери новую пару карточек.");
-        ignoreNextClickAfterWrongRef.current = true;
         wrongFlashTimeoutsRef.current = [];
       });
     }
@@ -514,22 +509,24 @@ const PairsExercise: React.FC = () => {
                   if (dup) {
                     e.preventDefault();
                     e.stopPropagation();
-                    if (e.target instanceof HTMLElement) e.target.blur();
+                    (e.currentTarget as HTMLElement).blur();
                     return;
                   }
                   handleCardClick(card.index);
                   e.preventDefault();
                   e.stopPropagation();
-                  if (e.target instanceof HTMLElement) e.target.blur();
+                  (e.currentTarget as HTMLElement).blur();
                 } : () => handleCardClick(card.index)}
                 onPointerDown={(e) => {
                   if (isMobile) {
                     e.preventDefault();
                     lastPointerDownCardRef.current = { index: card.index, time: Date.now() };
                     handleCardClick(card.index);
+                    (e.currentTarget as HTMLElement).blur();
                   } else if (e.pointerType === "touch" || e.pointerType === "pen") {
                     e.preventDefault();
                     handleCardClick(card.index);
+                    (e.currentTarget as HTMLElement).blur();
                   }
                 }}
                 type="button"
@@ -565,22 +562,24 @@ const PairsExercise: React.FC = () => {
                   if (dup) {
                     e.preventDefault();
                     e.stopPropagation();
-                    if (e.target instanceof HTMLElement) e.target.blur();
+                    (e.currentTarget as HTMLElement).blur();
                     return;
                   }
                   handleCardClick(card.index);
                   e.preventDefault();
                   e.stopPropagation();
-                  if (e.target instanceof HTMLElement) e.target.blur();
+                  (e.currentTarget as HTMLElement).blur();
                 } : () => handleCardClick(card.index)}
                 onPointerDown={(e) => {
                   if (isMobile) {
                     e.preventDefault();
                     lastPointerDownCardRef.current = { index: card.index, time: Date.now() };
                     handleCardClick(card.index);
+                    (e.currentTarget as HTMLElement).blur();
                   } else if (e.pointerType === "touch" || e.pointerType === "pen") {
                     e.preventDefault();
                     handleCardClick(card.index);
+                    (e.currentTarget as HTMLElement).blur();
                   }
                 }}
                 type="button"

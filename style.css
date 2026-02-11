@@ -2368,6 +2368,7 @@ body::after {
     box-shadow: var(--shadow-soft);
     background: var(--bg-elevated);
     touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
   }
 
   [data-theme="dark"] .pairs-exercise--mobile .card {
