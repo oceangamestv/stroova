@@ -46,16 +46,18 @@ git reset --hard origin/main
 
 ### Шаг D. Проверить файл .env
 
-Должны быть все переменные (подставь свой пароль БД вместо `ТВОЙ_ПАРОЛЬ_БД`). **CORS_ORIGIN** — через запятую: сначала URL сайта, затем origin мобильного приложения (Capacitor):
+Должны быть все переменные (подставь свой пароль БД вместо `ТВОЙ_ПАРОЛЬ_БД`). **CORS_ORIGIN** — через запятую: сначала URL сайта, затем origin мобильного приложения (Capacitor). Для Telegram-бота нужны **TELEGRAM_BOT_TOKEN** (токен от @BotFather) и при необходимости **APP_URL** (URL сайта для кнопки Mini App, по умолчанию 147.45.196.155):
 
 ```
 VITE_API_URL=https://147.45.196.155/api
 PORT=3000
 CORS_ORIGIN=https://147.45.196.155,capacitor://localhost,http://localhost
 DATABASE_URL=postgresql://stroova:ТВОЙ_ПАРОЛЬ_БД@localhost:5432/stroova
+TELEGRAM_BOT_TOKEN=токен_от_BotFather
+APP_URL=https://147.45.196.155
 ```
 
-Если на сайте используется домен (например stroova.ru), добавь его в CORS_ORIGIN и в VITE_API_URL. Проверка: `cat .env`. Редактирование: `nano .env` (если nano нет — `sudo apt install -y nano` или `vi .env`). После правки .env перезапусти API с загрузкой переменных: `pm2 stop stroova-api && pm2 delete stroova-api`, затем `set -a && source .env && set +a && pm2 start server/index.js --name stroova-api` и `pm2 save`.
+Если на сайте используется домен (например stroova.ru), добавь его в CORS_ORIGIN, VITE_API_URL и при необходимости в APP_URL. Проверка: `cat .env`. Редактирование: `nano .env` (если nano нет — `sudo apt install -y nano` или `vi .env`). После правки .env перезапусти процессы: `pm2 delete stroova-api stroova-telegram-bot 2>/dev/null; set -a && source .env && set +a && pm2 start ecosystem.config.cjs` и `pm2 save`.
 
 ### Шаг E. Установить зависимости и собрать фронт заново
 
@@ -68,15 +70,15 @@ npm run build
 
 Дождись окончания без ошибок. После этого в `dist/` лежит актуальный фронт.
 
-### Шаг F. Запустить API с переменными из .env
+### Шаг F. Запустить API и Telegram-бота через PM2
 
-Чтобы процесс видел `DATABASE_URL` и остальное:
+Оба процесса подхватывают переменные из `.env` (API — DATABASE_URL и др., бот — TELEGRAM_BOT_TOKEN, APP_URL):
 
 ```bash
-set -a && source .env && set +a && pm2 start server/index.js --name stroova-api
+set -a && source .env && set +a && pm2 start ecosystem.config.cjs
 ```
 
-Проверка: `pm2 list` — stroova-api в статусе **online**. Логи: `pm2 logs stroova-api` (выход — Ctrl+C). В логах при успешном старте должно быть сообщение вроде «STroova API», «DB: PostgreSQL».
+Проверка: `pm2 list` — в списке должны быть **stroova-api** и **stroova-telegram-bot** в статусе **online**. Логи API: `pm2 logs stroova-api`; логи бота: `pm2 logs stroova-telegram-bot`. В логах API при успешном старте — «STroova API», «DB: PostgreSQL»; в логах бота — «Telegram-бот запущен».
 
 ### Шаг G. Сохранить список процессов PM2
 
@@ -111,11 +113,13 @@ git push
 
 ### 2. На сервере (подключись по SSH)
 
-Перейди в папку проекта:
+**Обязательно перейди в каталог проекта.** Все команды `npm` и `./deploy.sh` должны выполняться из этой папки. Если запускать их из `/root/`, будет ошибка вроде `ENOENT: no such file or directory, open '/root/package.json'` или `npm ci ... only install with an existing package-lock.json`.
 
 ```bash
 cd ~/stroova
 ```
+
+(Для пользователя root это то же самое, что `cd /root/stroova`. Проверка: после `cd` выполни `pwd` — должно быть что-то вроде `/root/stroova`; и `ls package.json` — файл должен находиться.)
 
 **Сначала обязательно подтяни код** — без `git pull` на сервере остаётся старый код, и визуально ничего не изменится:
 
@@ -143,13 +147,15 @@ npm run build
 pm2 restart stroova-api
 ```
 
-Либо вместо трёх команд выше можно один раз выполнить скрипт деплоя (он сделает то же самое, включая `git pull` и `npm ci`):
+Либо вместо трёх команд выше можно один раз выполнить скрипт деплоя (он сделает то же самое, включая `git pull`, `npm ci` и перезапуск обоих процессов PM2 — **stroova-api** и **stroova-telegram-bot**):
 
 ```bash
 ./deploy.sh
 ```
 
 Но если перед этим `git pull` падал с ошибкой — сначала выполни `git checkout -- ...` и `git pull` вручную, как выше, затем уже `./deploy.sh` или вручную `npm ci --ignore-scripts`, `npm run build`, `pm2 restart stroova-api`.
+
+**Если `npm ci` пишет**, что нужен `package-lock.json`, или `npm run build` — что не найден `package.json`: ты не в каталоге проекта. Выполни `cd ~/stroova` (или `cd /root/stroova`), затем снова `git pull` и команды выше. В репозитории есть `package-lock.json`, он появится на сервере после `git pull`, если ты в папке `stroova`.
 
 ### 3. Озвучка словаря (аудио)
 

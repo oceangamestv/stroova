@@ -154,13 +154,15 @@ cd stroova
 nano .env
 ```
 
-Откроется редактор. **Вставь** туда эти строки (в `DATABASE_URL` подставь **тот же пароль**, что задал при создании пользователя БД в шаге 2.5). Для доступа по IP используй `https://147.45.196.155`; когда будет свой домен — замени на него.
+Откроется редактор. **Вставь** туда эти строки (в `DATABASE_URL` подставь **тот же пароль**, что задал при создании пользователя БД в шаге 2.5). Для доступа по IP используй `https://147.45.196.155`; когда будет свой домен — замени на него. **TELEGRAM_BOT_TOKEN** — токен от @BotFather (если бот не нужен, строку можно не добавлять; тогда в PM2 будет запускаться только API).
 
 ```env
 VITE_API_URL=https://147.45.196.155/api
 PORT=3000
 CORS_ORIGIN=https://147.45.196.155,capacitor://localhost,http://localhost
 DATABASE_URL=postgresql://stroova:ТВОЙ_ПАРОЛЬ_БД@localhost:5432/stroova
+TELEGRAM_BOT_TOKEN=токен_от_BotFather
+APP_URL=https://147.45.196.155
 ```
 
 Сохранить и выйти (nano): **Ctrl+O**, Enter, **Ctrl+X**.
@@ -171,7 +173,7 @@ DATABASE_URL=postgresql://stroova:ТВОЙ_ПАРОЛЬ_БД@localhost:5432/stro
 cat .env
 ```
 
-Должны быть те же строки (VITE_API_URL, PORT, CORS_ORIGIN, DATABASE_URL).
+Должны быть строки VITE_API_URL, PORT, CORS_ORIGIN, DATABASE_URL и при необходимости TELEGRAM_BOT_TOKEN, APP_URL.
 
 ---
 
@@ -193,22 +195,22 @@ npm run build
 
 В конце должно быть что-то вроде «built in … ms». Появится папка `dist` с готовыми файлами.
 
-### Шаг 4.3. Запустить API через PM2 (с переменными из .env)
+### Шаг 4.3. Запустить API и Telegram-бота через PM2 (с переменными из .env)
 
-Выполни **одной строкой**:
+Выполни **одной строкой** (запустятся оба процесса из `ecosystem.config.cjs` — API и бот; если в .env нет TELEGRAM_BOT_TOKEN, бот упадёт при старте — тогда добавь токен в .env и выполни `pm2 restart stroova-telegram-bot`):
 
 ```bash
-set -a && source .env && set +a && pm2 start server/index.js --name stroova-api
+set -a && source .env && set +a && pm2 start ecosystem.config.cjs
 ```
 
-Должно появиться сообщение вроде «stroova-api» и «online».  
+Должны появиться сообщения о запуске «stroova-api» и «stroova-telegram-bot».  
 Проверка:
 
 ```bash
 pm2 list
 ```
 
-В списке должен быть `stroova-api` со статусом **online**.
+В списке должны быть `stroova-api` и `stroova-telegram-bot` со статусом **online**. Логи бота: `pm2 logs stroova-telegram-bot` — при успехе будет «Telegram-бот запущен».
 
 ### Шаг 4.4. Сохранить список процессов PM2 и включить автозапуск после перезагрузки
 
@@ -228,7 +230,7 @@ pm2 startup
 sudo env PATH=... PM2_HOME=... pm2 startup systemd -u пользователь --hp /home/пользователь
 ```
 
-**Скопируй и выполни эту команду целиком** (она будет своей у тебя). После этого при перезагрузке сервера API будет подниматься сам.
+**Скопируй и выполни эту команду целиком** (она будет своей у тебя). После этого при перезагрузке сервера API и Telegram-бот будут подниматься сами.
 
 ### Шаг 4.5. Сделать скрипт деплоя исполняемым
 
@@ -375,7 +377,7 @@ https://147.45.196.155
 
 ### Приложение открывается, но логин/API не работают
 
-- Проверь, что API запущен: `pm2 list` — stroova-api в статусе **online**.
+- Проверь, что API и при необходимости бот запущены: `pm2 list` — stroova-api (и stroova-telegram-bot) в статусе **online**.
 - Проверь `.env`: в нём должны быть правильные `VITE_API_URL`, `CORS_ORIGIN` и **`DATABASE_URL`** (PostgreSQL). Без `DATABASE_URL` сервер не стартует.
 - Логи API: `pm2 logs stroova-api` — при ошибке подключения к БД там будет сообщение вроде «Не задана переменная DATABASE_URL» или «connection refused».
 
@@ -403,7 +405,7 @@ https://147.45.196.155
 - [ ] Подключился по SSH
 - [ ] Установил: git, nginx, nodejs (20), pm2
 - [ ] Клонировал репо, создал `.env`, выполнил `npm ci` и `npm run build`
-- [ ] Запустил API через PM2, выполнил `pm2 save` и команду из `pm2 startup`
+- [ ] Запустил API и Telegram-бота через PM2 (`pm2 start ecosystem.config.cjs`), выполнил `pm2 save` и команду из `pm2 startup`
 - [ ] Настроил Nginx (конфиг с правильным путём `root`), включил сайт, перезагрузил nginx
 - [ ] Открыл сайт по http, потом поставил HTTPS через certbot
 - [ ] Открыл https://147.45.196.155 и проверил приложение

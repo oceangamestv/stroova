@@ -18,6 +18,17 @@ module.exports = {
         NODE_ENV: "production",
       },
     },
+    {
+      name: "stroova-telegram-bot",
+      script: "server/telegram-bot.js",
+      cwd: __dirname,
+      autorestart: true,
+      max_restarts: 10,
+      time: true,
+      env: {
+        NODE_ENV: "production",
+      },
+    },
   ],
 };
 
