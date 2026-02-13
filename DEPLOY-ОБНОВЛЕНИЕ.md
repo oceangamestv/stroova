@@ -57,7 +57,15 @@ TELEGRAM_BOT_TOKEN=токен_от_BotFather
 APP_URL=https://147.45.196.155
 ```
 
-Если на сайте используется домен (например stroova.ru), добавь его в CORS_ORIGIN, VITE_API_URL и при необходимости в APP_URL. Проверка: `cat .env`. Редактирование: `nano .env` (если nano нет — `sudo apt install -y nano` или `vi .env`). После правки .env перезапусти процессы: `pm2 delete stroova-api stroova-telegram-bot 2>/dev/null; set -a && source .env && set +a && pm2 start ecosystem.config.cjs` и `pm2 save`.
+**Если сайт открывается по домену (например https://stroova.ru):** в CORS_ORIGIN обязательно должен быть этот origin, иначе логин и запросы к API будут блокироваться CORS. Пример для stroova.ru:
+
+```
+CORS_ORIGIN=https://stroova.ru,https://www.stroova.ru,https://147.45.196.155,capacitor://localhost,http://localhost
+VITE_API_URL=https://stroova.ru/api
+APP_URL=https://stroova.ru
+```
+
+Без `https://stroova.ru` в CORS_ORIGIN браузер при запросах с https://stroova.ru получит «blocked by CORS policy». Проверка: `cat .env`. Редактирование: `nano .env` (если nano нет — `sudo apt install -y nano` или `vi .env`). **Важно:** PM2 не перечитывает `.env` при обычном `pm2 restart` — переменные берутся из окружения на момент старта. После правки .env перезапусти с подгрузкой файла: `cd ~/stroova && set -a && source .env && set +a && pm2 restart stroova-api stroova-telegram-bot --update-env` и `pm2 save`.
 
 ### Шаг E. Установить зависимости и собрать фронт заново
 

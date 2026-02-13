@@ -68,8 +68,10 @@ import {
 
 const PORT = Number(process.env.PORT) || 3000;
 const CORS_ORIGIN = process.env.CORS_ORIGIN || "http://localhost:5173";
-/** Список разрешённых origin (сайт + Capacitor Android/iOS) */
-const CORS_ORIGINS = CORS_ORIGIN.split(",").map((s) => s.trim()).filter(Boolean);
+/** Список разрешённых origin (сайт + Capacitor Android/iOS); убираем кавычки и пробелы */
+const CORS_ORIGINS = CORS_ORIGIN.split(",")
+  .map((s) => s.trim().replace(/^["']|["']$/g, "").trim())
+  .filter(Boolean);
 
 function getAllowedOrigin(req) {
   const origin = req?.headers?.origin;
@@ -1505,6 +1507,7 @@ const server = http.createServer(async (req, res) => {
       "Access-Control-Allow-Origin": allowOrigin,
       "Access-Control-Allow-Methods": "GET, POST, PATCH, OPTIONS",
       "Access-Control-Allow-Headers": "Content-Type, Authorization",
+      "Access-Control-Max-Age": "86400",
     });
     res.end();
     return;
