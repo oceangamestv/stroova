@@ -7,6 +7,8 @@ import { personalDictionaryService } from "../services/personalDictionaryService
 import { progressService } from "../services/progressService";
 import { speakWord as speakWordUtil } from "../utils/sounds";
 import { useAuth } from "../features/auth/AuthContext";
+import { authService } from "../services/authService";
+import { useNavigate } from "react-router-dom";
 import type { Word, WordProgressMap, Level } from "../data/contracts/types";
 
 type DictionaryTab = "general" | "personal";
@@ -53,6 +55,7 @@ const InMyDictionaryIcon: React.FC<{ className?: string; title?: string }> = ({ 
 
 const DictionaryPage: React.FC = () => {
   const isMobile = useIsMobile();
+  const navigate = useNavigate();
   const [tab, setTab] = useState<DictionaryTab>("general");
   const [filter, setFilter] = useState<Filter>("all");
   const [searchQuery, setSearchQuery] = useState("");
@@ -70,7 +73,7 @@ const DictionaryPage: React.FC = () => {
   const settingsRef = useRef<HTMLDivElement | null>(null);
 
   const { words: generalWords, loading: wordsLoading, error: wordsError } = useDictionary();
-  const { user } = useAuth();
+  const { user, refresh } = useAuth();
   const [personalIds, setPersonalIds] = useState<number[]>(() =>
     personalDictionaryService.getPersonalWordIds()
   );
@@ -225,6 +228,31 @@ const DictionaryPage: React.FC = () => {
       )}
       <main className="main">
         <div className={isMobile ? undefined : "page-card"}>
+          {!!user && (
+            <div className="dict-mode-switch" style={{ marginBottom: 12, display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "center" }}>
+              <button
+                type="button"
+                className={`dictionary-tab ${user?.gameSettings?.dictionaryViewMode !== "advanced" ? "active" : ""}`}
+                onClick={() => {
+                  authService.updateGameSettings({ dictionaryViewMode: "casual" });
+                  refresh();
+                  navigate("/dictionary");
+                }}
+              >
+                Казуально
+              </button>
+              <button
+                type="button"
+                className={`dictionary-tab ${user?.gameSettings?.dictionaryViewMode === "advanced" ? "active" : ""}`}
+                onClick={() => {
+                  authService.updateGameSettings({ dictionaryViewMode: "advanced" });
+                  refresh();
+                }}
+              >
+                Продвинуто
+              </button>
+            </div>
+          )}
           <section className={sectionClassName}>
             <div className="dictionary-header">
             {!isMobile && (

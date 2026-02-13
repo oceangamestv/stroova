@@ -114,13 +114,13 @@ function normalizeRegister(register) {
   return "разговорная";
 }
 
-async function ensureLemmaSenseLink(languageId, entry) {
+async function ensureLemmaSenseLink(languageId, entry, db = pool) {
   const en = String(entry?.en || "").trim();
   if (!en) return null;
   const lemmaKey = en.toLowerCase();
 
   // upsert lemma
-  const lemmaRes = await pool.query(
+  const lemmaRes = await db.query(
     `
       INSERT INTO dictionary_lemmas (language_id, lemma_key, lemma, frequency_rank, rarity, accent, ipa_uk, ipa_us, updated_at)
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
@@ -149,7 +149,7 @@ async function ensureLemmaSenseLink(languageId, entry) {
   if (!lemmaId) return null;
 
   // upsert sense #1
-  const senseRes = await pool.query(
+  const senseRes = await db.query(
     `
       INSERT INTO dictionary_senses (lemma_id, sense_no, level, register, gloss_ru, updated_at)
       VALUES ($1, 1, $2, $3, $4, NOW())
@@ -173,9 +173,9 @@ async function ensureLemmaSenseLink(languageId, entry) {
   // main example: keep in sync (simple policy: replace main example)
   const exEn = String(entry.example || "").trim();
   const exRu = String(entry.exampleRu || "").trim();
-  await pool.query(`DELETE FROM dictionary_examples WHERE sense_id = $1 AND is_main = TRUE`, [senseId]);
+  await db.query(`DELETE FROM dictionary_examples WHERE sense_id = $1 AND is_main = TRUE`, [senseId]);
   if (exEn) {
-    await pool.query(
+    await db.query(
       `INSERT INTO dictionary_examples (sense_id, en, ru, is_main, sort_order)
        VALUES ($1, $2, $3, TRUE, 0)
        ON CONFLICT (sense_id, en, ru) DO NOTHING`,
@@ -185,7 +185,7 @@ async function ensureLemmaSenseLink(languageId, entry) {
 
   // link entry -> lemma/sense
   if (entry.id != null) {
-    await pool.query(
+    await db.query(
       `
         INSERT INTO dictionary_entry_links (entry_id, lemma_id, sense_id)
         VALUES ($1, $2, $3)
@@ -359,8 +359,8 @@ export async function getDictionaryEntryById(langCode, id) {
  * Частичное обновление записи словаря (dictionary_entries).
  * Разрешённые поля: en, ru, accent, level, frequencyRank, rarity, register, ipaUk, ipaUs, example, exampleRu
  */
-export async function patchDictionaryEntry(langCode, id, patch, actorUsername) {
-  const langResult = await pool.query("SELECT id FROM languages WHERE code = $1", [langCode]);
+export async function patchDictionaryEntry(langCode, id, patch, actorUsername, db = pool) {
+  const langResult = await db.query("SELECT id FROM languages WHERE code = $1", [langCode]);
   if (langResult.rows.length === 0) return null;
   const languageId = langResult.rows[0].id;
 
@@ -409,7 +409,7 @@ export async function patchDictionaryEntry(langCode, id, patch, actorUsername) {
   params.push(languageId);
   params.push(Number(id));
 
-  const res = await pool.query(
+  const res = await db.query(
     `
       UPDATE dictionary_entries
       SET ${set.join(", ")}
@@ -424,11 +424,11 @@ export async function patchDictionaryEntry(langCode, id, patch, actorUsername) {
   if (updated) {
     // Синхронизируем нормализованную структуру (v2) для этой записи
     try {
-      await ensureLemmaSenseLink(languageId, updated);
+      await ensureLemmaSenseLink(languageId, updated, db);
     } catch (e) {
       console.warn("dictionary v2 sync failed:", e);
     }
-    await insertAudit(actorUsername, "update", "entry", updated.id, {}, updated, { langCode });
+    await insertAudit(actorUsername, "update", "entry", updated.id, {}, updated, { langCode }, db);
   }
   return updated;
 }
@@ -775,9 +775,9 @@ export async function patchSenseAdmin(langCode, senseId, patch, actorUsername) {
   return out;
 }
 
-async function insertAudit(username, action, entityType, entityId, beforeJson, afterJson, meta = {}) {
+async function insertAudit(username, action, entityType, entityId, beforeJson, afterJson, meta = {}, db = pool) {
   try {
-    await pool.query(
+    await db.query(
       `INSERT INTO dictionary_audit_log (username, action, entity_type, entity_id, meta, before_json, after_json)
        VALUES ($1, $2, $3, $4, $5::jsonb, $6::jsonb, $7::jsonb)`,
       [

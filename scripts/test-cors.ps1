@@ -1,8 +1,8 @@
 # CORS check: request with Origin as from Capacitor app
-# Run: .\scripts\test-cors.ps1   or   .\scripts\test-cors.ps1 -BaseUrl "https://stroova.ru/api"
+# Run: .\scripts\test-cors.ps1   or   .\scripts\test-cors.ps1 -BaseUrl "https://147.45.196.155/api"
 
 param(
-    [string]$BaseUrl = "https://stroova.ru/api"
+    [string]$BaseUrl = "https://147.45.196.155/api"
 )
 
 $uri = "$($BaseUrl.TrimEnd('/'))/me"

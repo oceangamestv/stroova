@@ -141,6 +141,116 @@ CREATE TABLE IF NOT EXISTS dictionary_entry_links (
 );
 CREATE INDEX IF NOT EXISTS idx_dictionary_entry_links_lemma ON dictionary_entry_links(lemma_id);
 
+-- ===== Связи/фразы/шаблоны (для пользовательской карточки слова) =====
+CREATE TABLE IF NOT EXISTS dictionary_links (
+  id SERIAL PRIMARY KEY,
+  language_id INTEGER NOT NULL REFERENCES languages(id) ON DELETE CASCADE,
+  from_lemma_id INTEGER NOT NULL REFERENCES dictionary_lemmas(id) ON DELETE CASCADE,
+  to_lemma_id INTEGER NOT NULL REFERENCES dictionary_lemmas(id) ON DELETE CASCADE,
+  link_type VARCHAR(40) NOT NULL DEFAULT 'related',
+  note_ru TEXT NOT NULL DEFAULT '',
+  rank INT NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_dictionary_links_from ON dictionary_links(from_lemma_id);
+CREATE INDEX IF NOT EXISTS idx_dictionary_links_to ON dictionary_links(to_lemma_id);
+CREATE INDEX IF NOT EXISTS idx_dictionary_links_type ON dictionary_links(link_type);
+
+CREATE TABLE IF NOT EXISTS dictionary_collocations (
+  id SERIAL PRIMARY KEY,
+  language_id INTEGER NOT NULL REFERENCES languages(id) ON DELETE CASCADE,
+  lemma_id INTEGER NOT NULL REFERENCES dictionary_lemmas(id) ON DELETE CASCADE,
+  phrase_en TEXT NOT NULL,
+  gloss_ru TEXT NOT NULL DEFAULT '',
+  level VARCHAR(10) NOT NULL DEFAULT 'A0',
+  register VARCHAR(20) NOT NULL DEFAULT 'разговорная',
+  example_en TEXT NOT NULL DEFAULT '',
+  example_ru TEXT NOT NULL DEFAULT '',
+  sort_order INT NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT chk_dictionary_collocations_register CHECK (register IN ('официальная', 'разговорная'))
+);
+CREATE INDEX IF NOT EXISTS idx_dictionary_collocations_lemma ON dictionary_collocations(lemma_id);
+CREATE INDEX IF NOT EXISTS idx_dictionary_collocations_level ON dictionary_collocations(level);
+
+CREATE TABLE IF NOT EXISTS dictionary_usage_patterns (
+  id SERIAL PRIMARY KEY,
+  sense_id INTEGER NOT NULL REFERENCES dictionary_senses(id) ON DELETE CASCADE,
+  tag VARCHAR(40) NOT NULL DEFAULT '',
+  en TEXT NOT NULL,
+  ru TEXT NOT NULL DEFAULT '',
+  sort_order INT NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_dictionary_usage_patterns_sense ON dictionary_usage_patterns(sense_id);
+
+-- ===== Коллекции (путь/темы) =====
+CREATE TABLE IF NOT EXISTS dictionary_collections (
+  id SERIAL PRIMARY KEY,
+  language_id INTEGER NOT NULL REFERENCES languages(id) ON DELETE CASCADE,
+  collection_key TEXT NOT NULL DEFAULT '',
+  title TEXT NOT NULL,
+  description TEXT NOT NULL DEFAULT '',
+  level_from VARCHAR(10) NOT NULL DEFAULT 'A0',
+  level_to VARCHAR(10) NOT NULL DEFAULT 'C2',
+  is_public BOOLEAN NOT NULL DEFAULT TRUE,
+  sort_order INT NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_dictionary_collections_lang_key ON dictionary_collections(language_id, collection_key);
+CREATE INDEX IF NOT EXISTS idx_dictionary_collections_lang ON dictionary_collections(language_id);
+
+CREATE TABLE IF NOT EXISTS dictionary_collection_items (
+  id SERIAL PRIMARY KEY,
+  collection_id INTEGER NOT NULL REFERENCES dictionary_collections(id) ON DELETE CASCADE,
+  sense_id INTEGER NOT NULL REFERENCES dictionary_senses(id) ON DELETE CASCADE,
+  sort_order INT NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_dictionary_collection_items_unique ON dictionary_collection_items(collection_id, sense_id);
+CREATE INDEX IF NOT EXISTS idx_dictionary_collection_items_collection ON dictionary_collection_items(collection_id);
+
+-- ===== Персональный словарь (нормализованный, совместим с legacy users.personal_dictionary) =====
+CREATE TABLE IF NOT EXISTS user_saved_senses (
+  username VARCHAR(255) NOT NULL REFERENCES users(username) ON DELETE CASCADE,
+  sense_id INTEGER NOT NULL REFERENCES dictionary_senses(id) ON DELETE CASCADE,
+  status VARCHAR(20) NOT NULL DEFAULT 'queue',
+  is_favorite BOOLEAN NOT NULL DEFAULT FALSE,
+  added_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  source VARCHAR(20) NOT NULL DEFAULT 'manual',
+  PRIMARY KEY (username, sense_id)
+);
+CREATE INDEX IF NOT EXISTS idx_user_saved_senses_username ON user_saved_senses(username);
+CREATE INDEX IF NOT EXISTS idx_user_saved_senses_status ON user_saved_senses(status);
+
+CREATE TABLE IF NOT EXISTS user_sense_progress (
+  username VARCHAR(255) NOT NULL REFERENCES users(username) ON DELETE CASCADE,
+  sense_id INTEGER NOT NULL REFERENCES dictionary_senses(id) ON DELETE CASCADE,
+  beginner INT NOT NULL DEFAULT 0,
+  experienced INT NOT NULL DEFAULT 0,
+  expert INT NOT NULL DEFAULT 0,
+  mistakes INT NOT NULL DEFAULT 0,
+  last_seen_at TIMESTAMPTZ DEFAULT NULL,
+  next_review_at TIMESTAMPTZ DEFAULT NULL,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  PRIMARY KEY (username, sense_id)
+);
+CREATE INDEX IF NOT EXISTS idx_user_sense_progress_username ON user_sense_progress(username);
+CREATE INDEX IF NOT EXISTS idx_user_sense_progress_next_review ON user_sense_progress(next_review_at);
+
+CREATE TABLE IF NOT EXISTS user_collection_state (
+  username VARCHAR(255) NOT NULL REFERENCES users(username) ON DELETE CASCADE,
+  collection_id INTEGER NOT NULL REFERENCES dictionary_collections(id) ON DELETE CASCADE,
+  started_at TIMESTAMPTZ DEFAULT NULL,
+  completed_at TIMESTAMPTZ DEFAULT NULL,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  PRIMARY KEY (username, collection_id)
+);
+CREATE INDEX IF NOT EXISTS idx_user_collection_state_username ON user_collection_state(username);
+
 -- Активные дни и награды (механика «активных дней»)
 CREATE TABLE IF NOT EXISTS rewards (
   id SERIAL PRIMARY KEY,
@@ -194,6 +304,76 @@ export async function initDb() {
     await client.query("ALTER TABLE user_active_days ADD COLUMN IF NOT EXISTS max_streak INT NOT NULL DEFAULT 0");
     await client.query("ALTER TABLE languages ADD COLUMN IF NOT EXISTS version VARCHAR(32) DEFAULT NULL");
     await client.query(SEED_LANGUAGE_SQL);
+
+    // Дефолтные коллекции (чтобы "путь" работал сразу)
+    await client.query(
+      `
+        INSERT INTO dictionary_collections (language_id, collection_key, title, description, level_from, level_to, is_public, sort_order)
+        VALUES
+          (1, 'a0_basics', 'A0: База', 'Самые нужные слова для старта (частотные и простые).', 'A0', 'A0', TRUE, 10),
+          (1, 'a1_basics', 'A1: Следующий шаг', 'База для общения: хочу/могу/буду и т.п.', 'A1', 'A1', TRUE, 20)
+        ON CONFLICT (language_id, collection_key) DO NOTHING;
+      `
+    );
+
+    // Автонаполнение коллекций, если они пустые и словарь уже засинчен в v2
+    // A0
+    try {
+      const a0 = await client.query(`SELECT id FROM dictionary_collections WHERE language_id = 1 AND collection_key = 'a0_basics' LIMIT 1`);
+      const a0Id = a0.rows[0]?.id;
+      if (a0Id) {
+        const has = await client.query(`SELECT 1 FROM dictionary_collection_items WHERE collection_id = $1 LIMIT 1`, [a0Id]);
+        if (has.rows.length === 0) {
+          await client.query(
+            `
+              INSERT INTO dictionary_collection_items (collection_id, sense_id, sort_order)
+              SELECT
+                $1,
+                s.id,
+                ROW_NUMBER() OVER (ORDER BY l.frequency_rank ASC, s.id ASC) - 1
+              FROM dictionary_senses s
+              JOIN dictionary_lemmas l ON l.id = s.lemma_id
+              WHERE l.language_id = 1 AND s.sense_no = 1 AND s.level = 'A0'
+              ORDER BY l.frequency_rank ASC, s.id ASC
+              LIMIT 80
+              ON CONFLICT (collection_id, sense_id) DO NOTHING
+            `,
+            [a0Id]
+          );
+        }
+      }
+    } catch (e) {
+      console.warn("A0 collection auto-fill failed:", e);
+    }
+
+    // A1
+    try {
+      const a1 = await client.query(`SELECT id FROM dictionary_collections WHERE language_id = 1 AND collection_key = 'a1_basics' LIMIT 1`);
+      const a1Id = a1.rows[0]?.id;
+      if (a1Id) {
+        const has = await client.query(`SELECT 1 FROM dictionary_collection_items WHERE collection_id = $1 LIMIT 1`, [a1Id]);
+        if (has.rows.length === 0) {
+          await client.query(
+            `
+              INSERT INTO dictionary_collection_items (collection_id, sense_id, sort_order)
+              SELECT
+                $1,
+                s.id,
+                ROW_NUMBER() OVER (ORDER BY l.frequency_rank ASC, s.id ASC) - 1
+              FROM dictionary_senses s
+              JOIN dictionary_lemmas l ON l.id = s.lemma_id
+              WHERE l.language_id = 1 AND s.sense_no = 1 AND s.level = 'A1'
+              ORDER BY l.frequency_rank ASC, s.id ASC
+              LIMIT 80
+              ON CONFLICT (collection_id, sense_id) DO NOTHING
+            `,
+            [a1Id]
+          );
+        }
+      }
+    } catch (e) {
+      console.warn("A1 collection auto-fill failed:", e);
+    }
 
     // dictionary_senses: админ-проверка
     await client.query("ALTER TABLE dictionary_senses ADD COLUMN IF NOT EXISTS reviewed_at TIMESTAMPTZ DEFAULT NULL");

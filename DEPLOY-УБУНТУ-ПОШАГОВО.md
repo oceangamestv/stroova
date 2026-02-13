@@ -1,6 +1,8 @@
 # Деплой STroova на чистую Ubuntu — пошаговая инструкция
 
-Инструкция для **чистой Ubuntu** (например 22.04). Репозиторий: **https://github.com/oceangamestv/stroova**. Хост: **5b5a1af3caf3.vps.myjino.ru**.
+Инструкция для **чистой Ubuntu** (например 22.04). Репозиторий: **https://github.com/oceangamestv/stroova**.
+
+**Боевой сервер:** IP **147.45.196.155**. Имя хоста: `vm1147925.cloud.nuxt.network` (может не пинговаться — подключайся по IP).
 
 Выполняй блоки по порядку. Команды вставляй в терминал по одной (или блоком, где написано «можно скопировать всё сразу»). После каждой команды смотри вывод — если будет ошибка, остановись и перечитай шаг.
 
@@ -9,8 +11,8 @@
 ## Что понадобится перед началом
 
 - Доступ по **SSH** к серверу: логин и пароль (или SSH-ключ).
-- Адрес сервера: `5b5a1af3caf3.vps.myjino.ru` (или тот, что дал хостинг).
-- Имя пользователя для SSH (часто `root` или то, что создал хостинг — уточни в панели или в письме от хостинга).
+- Адрес сервера: **147.45.196.155** (подключение по IP; DNS vm1147925.cloud.nuxt.network при необходимости).
+- Имя пользователя для SSH (часто `root`).
 
 ---
 
@@ -23,15 +25,13 @@
 
 ### Шаг 1.2. Подключись по SSH
 
-Введи (подставь **своё имя пользователя** вместо `пользователь`, если не `root`):
+Подключение по **IP** (DNS может не отвечать на ping):
 
 ```bash
-ssh пользователь@5b5a1af3caf3.vps.myjino.ru
+ssh пользователь@147.45.196.155
 ```
 
-Примеры:
-- `ssh root@5b5a1af3caf3.vps.myjino.ru`
-- `ssh ubuntu@5b5a1af3caf3.vps.myjino.ru`
+Пример: `ssh root@147.45.196.155`
 
 При первом подключении спросят про «authenticity of host» — введи **yes** и Enter.  
 Дальше введи пароль (если используешь ключ — пароль может не спросить).
@@ -148,25 +148,22 @@ cd stroova
 
 ### Шаг 3.4. Создать файл .env
 
-Введи:
+Если **nano** не установлен (`nano: command not found`), установи: `sudo apt install -y nano`. Либо создай файл через `vi .env` (i — ввод, Esc, затем `:wq` — сохранить и выйти).
 
 ```bash
 nano .env
 ```
 
-Откроется редактор. **Вставь** туда эти строки (хост уже подставлен; в `DATABASE_URL` подставь **тот же пароль**, что задал при создании пользователя БД в шаге 2.5):
+Откроется редактор. **Вставь** туда эти строки (в `DATABASE_URL` подставь **тот же пароль**, что задал при создании пользователя БД в шаге 2.5). Для доступа по IP используй `https://147.45.196.155`; когда будет свой домен — замени на него.
 
 ```env
-VITE_API_URL=https://5b5a1af3caf3.vps.myjino.ru/api
+VITE_API_URL=https://147.45.196.155/api
 PORT=3000
-CORS_ORIGIN=https://5b5a1af3caf3.vps.myjino.ru
+CORS_ORIGIN=https://147.45.196.155,capacitor://localhost,http://localhost
 DATABASE_URL=postgresql://stroova:ТВОЙ_ПАРОЛЬ_БД@localhost:5432/stroova
 ```
 
-Сохранить и выйти:
-1. **Ctrl+O** (буква O) — сохранить.
-2. **Enter** — подтвердить имя файла.
-3. **Ctrl+X** — выйти.
+Сохранить и выйти (nano): **Ctrl+O**, Enter, **Ctrl+X**.
 
 Проверь, что файл есть:
 
@@ -174,7 +171,7 @@ DATABASE_URL=postgresql://stroova:ТВОЙ_ПАРОЛЬ_БД@localhost:5432/stro
 cat .env
 ```
 
-Должны быть те же три строки.
+Должны быть те же строки (VITE_API_URL, PORT, CORS_ORIGIN, DATABASE_URL).
 
 ---
 
@@ -256,7 +253,7 @@ sudo nano /etc/nginx/sites-available/stroova
 ```text
 server {
     listen 80;
-    server_name 5b5a1af3caf3.vps.myjino.ru;
+    server_name 147.45.196.155 vm1147925.cloud.nuxt.network;
     root /root/stroova/dist;
     index index.html;
     location / {
@@ -317,7 +314,7 @@ sudo systemctl reload nginx
 Открой в браузере на своём компьютере:
 
 ```text
-http://5b5a1af3caf3.vps.myjino.ru
+http://147.45.196.155
 ```
 
 Должна открыться страница приложения (логин/регистрация). Если «сайт недоступен» — проверь firewall (ниже есть подсказка).
@@ -337,8 +334,10 @@ sudo apt install -y certbot python3-certbot-nginx
 ### Шаг 6.2. Получить сертификат и настроить Nginx
 
 ```bash
-sudo certbot --nginx -d 5b5a1af3caf3.vps.myjino.ru
+sudo certbot --nginx -d 147.45.196.155
 ```
+
+Если позже привяжешь домен (например stroova.ru), добавь его: `sudo certbot --nginx -d 147.45.196.155 -d stroova.ru -d www.stroova.ru`.
 
 - Введи email (для уведомлений о продлении).
 - Согласись с условиями (Y).
@@ -351,7 +350,7 @@ sudo certbot --nginx -d 5b5a1af3caf3.vps.myjino.ru
 Открой в браузере:
 
 ```text
-https://5b5a1af3caf3.vps.myjino.ru
+https://147.45.196.155
 ```
 
 Должно открыться приложение с замочком в адресной строке.
@@ -407,6 +406,6 @@ https://5b5a1af3caf3.vps.myjino.ru
 - [ ] Запустил API через PM2, выполнил `pm2 save` и команду из `pm2 startup`
 - [ ] Настроил Nginx (конфиг с правильным путём `root`), включил сайт, перезагрузил nginx
 - [ ] Открыл сайт по http, потом поставил HTTPS через certbot
-- [ ] Открыл https://5b5a1af3caf3.vps.myjino.ru и проверил приложение
+- [ ] Открыл https://147.45.196.155 и проверил приложение
 
 После этого сервер настроен; для обновлений достаточно пушить в Git и на сервере запускать `./deploy.sh`.

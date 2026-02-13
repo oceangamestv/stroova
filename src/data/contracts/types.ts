@@ -56,6 +56,8 @@ export type UserGameSettings = {
   keepLearnedWordsInGames?: boolean;
   /** Из какого словаря брать слова в играх: общий или мой. */
   dictionarySource?: "general" | "personal";
+  /** Режим интерфейса словаря: казуальный (по умолчанию) или продвинутый. */
+  dictionaryViewMode?: "casual" | "advanced";
   /** Сложность в Puzzle Words: лёгкий (подсказки) или сложный. */
   puzzleDifficulty?: "easy" | "hard";
 };

@@ -1,6 +1,8 @@
 import React, { useEffect } from "react";
 import { useRoutes, useLocation, Navigate } from "react-router-dom";
+import DictionaryCasualPage from "../pages/DictionaryCasualPage";
 import DictionaryPage from "../pages/DictionaryPage";
+import DictionaryWordPage from "../pages/DictionaryWordPage";
 import ProfilePage from "../pages/ProfilePage";
 import LoginPage from "../pages/LoginPage";
 import RatingsPage from "../pages/RatingsPage";
@@ -30,7 +32,9 @@ const AdminRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
 const routeConfig = [
   { path: "/login", element: <LoginPage /> },
-  { path: "/dictionary", element: <DictionaryPage /> },
+  { path: "/dictionary", element: <DictionaryCasualPage /> },
+  { path: "/dictionary/advanced", element: <DictionaryPage /> },
+  { path: "/dictionary/word/:senseId", element: <DictionaryWordPage /> },
   {
     path: "/admin/dictionary",
     element: (

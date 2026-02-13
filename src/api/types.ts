@@ -112,3 +112,53 @@ export type AdminDictionaryEntryV2Response = {
   }>;
   linkedSenseId: number | null;
 };
+
+export type AdminDictionaryAiDraft = {
+  entryPatch?: Partial<Word>;
+  lemmaPatch?: Partial<{
+    frequencyRank: number;
+    rarity: string;
+    accent: string;
+    ipaUk: string;
+    ipaUs: string;
+  }>;
+  senses?: Array<{
+    senseNo: number;
+    level?: string;
+    register?: string;
+    glossRu?: string;
+    definitionRu?: string;
+    usageNote?: string;
+    examples?: Array<{ en: string; ru?: string; isMain?: boolean }>;
+  }>;
+  forms?: Array<{
+    form: string;
+    formType: string;
+    isIrregular?: boolean;
+    notes?: string;
+  }>;
+  warnings?: string[];
+};
+
+export type AdminDictionaryAiDraftResponse = {
+  draft: AdminDictionaryAiDraft;
+};
+
+export type AdminDictionaryApplyDraftBody = {
+  lang?: string;
+  entryId: number;
+  draft: AdminDictionaryAiDraft;
+  apply?: {
+    entryPatch?: boolean;
+    lemmaPatch?: boolean;
+    selectedSenseNos?: number[];
+    applySense1Core?: boolean;
+    replaceExamples?: boolean;
+    selectedFormIndexes?: number[];
+  };
+};
+
+export type AdminDictionaryApplyDraftResponse = {
+  ok: true;
+  entry: AdminDictionaryEntryV2Response | null;
+};

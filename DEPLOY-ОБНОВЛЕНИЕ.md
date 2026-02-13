@@ -1,6 +1,8 @@
 # Заливка обновления на сервер
 
-Сервер настроен по инструкции **[DEPLOY-УБУНТУ-ПОШАГОВО.md](DEPLOY-УБУНТУ-ПОШАГОВО.md)**. Если понадобится заново поднять сервер с нуля (другой хост, переустановка) — используй тот же документ.
+Сервер настроен по инструкции **[DEPLOY-УБУНТУ-ПОШАГОВО.md](DEPLOY-УБУНТУ-ПОШАГОВО.md)**. Если понадобится заново поднять сервер с нуля — используй тот же документ.
+
+**Боевой сервер:** 147.45.196.155 (подключение по SSH по IP; DNS vm1147925.cloud.nuxt.network может не пинговаться).
 
 Данные хранятся в **PostgreSQL** (не в `server/data.json`). При обновлении БД не пересоздаётся, только подтягивается код, пересобирается фронт и перезапускается API.
 
@@ -15,11 +17,9 @@
 ### Шаг A. Подключиться к серверу и зайти в каталог проекта
 
 ```bash
-ssh root@5b5a1af3caf3.vps.myjino.ru
+ssh root@147.45.196.155
 cd ~/stroova
 ```
-
-(Подставь свой логин и хост, если другие.)
 
 ### Шаг B. Остановить и удалить старое приложение из PM2
 
@@ -46,16 +46,16 @@ git reset --hard origin/main
 
 ### Шаг D. Проверить файл .env
 
-Должны быть все переменные (подставь свой пароль БД вместо `ТВОЙ_ПАРОЛЬ_БД`). **CORS_ORIGIN** — через запятую, без пробелов: сначала сайт(ы), затем origin мобильного приложения (Capacitor):
+Должны быть все переменные (подставь свой пароль БД вместо `ТВОЙ_ПАРОЛЬ_БД`). **CORS_ORIGIN** — через запятую: сначала URL сайта, затем origin мобильного приложения (Capacitor):
 
 ```
-VITE_API_URL=https://stroova.ru/api
+VITE_API_URL=https://147.45.196.155/api
 PORT=3000
-CORS_ORIGIN=https://stroova.ru,https://5b5a1af3caf3.vps.myjino.ru,capacitor://localhost,http://localhost
+CORS_ORIGIN=https://147.45.196.155,capacitor://localhost,http://localhost
 DATABASE_URL=postgresql://stroova:ТВОЙ_ПАРОЛЬ_БД@localhost:5432/stroova
 ```
 
-Проверка: `cat .env`. Если чего-то нет — открыть `nano .env` и дописать/исправить, сохранить (Ctrl+O, Enter), выйти (Ctrl+X). После правки .env обязательно перезапустить API (см. обычное обновление ниже).
+Если на сайте используется домен (например stroova.ru), добавь его в CORS_ORIGIN и в VITE_API_URL. Проверка: `cat .env`. Редактирование: `nano .env` (если nano нет — `sudo apt install -y nano` или `vi .env`). После правки .env перезапусти API с загрузкой переменных: `pm2 stop stroova-api && pm2 delete stroova-api`, затем `set -a && source .env && set +a && pm2 start server/index.js --name stroova-api` и `pm2 save`.
 
 ### Шаг E. Установить зависимости и собрать фронт заново
 
@@ -86,7 +86,7 @@ pm2 save
 
 ### Шаг H. Проверить сайт
 
-Открой в браузере `https://5b5a1af3caf3.vps.myjino.ru` (или свой домен). Должна открыться текущая версия приложения (логин, словарь, упражнения). Если видишь старый интерфейс — очисти кэш браузера (Ctrl+Shift+R или «Жёсткое обновление») или открой в режиме инкогнито.
+Открой в браузере `https://147.45.196.155` (или свой домен). Должна открыться текущая версия приложения (логин, словарь, упражнения). Если видишь старый интерфейс — очисти кэш браузера (Ctrl+Shift+R или «Жёсткое обновление») или открой в режиме инкогнито.
 
 **Если Nginx отдаёт не ту папку:** проверь конфиг Nginx (`root` должен указывать на каталог `dist` внутри проекта, например `/root/stroova/dist`). Путь из DEPLOY-УБУНТУ-ПОШАГОВО: в конфиге сайта строка `root /root/stroova/dist;` (или `/home/пользователь/stroova/dist`). После изменений: `sudo nginx -t` и `sudo systemctl reload nginx`.
 
@@ -166,7 +166,7 @@ pm2 restart stroova-api
 Открой сайт в браузере и убедись, что всё работает. Логи API: `pm2 logs stroova-api` (выход — Ctrl+C).
 
 **CORS для мобильного приложения:** в логах при старте API должны быть строки:
-- `CORS_ORIGIN: https://stroova.ru,...`
+- `CORS_ORIGIN: https://147.45.196.155,...`
 - `CORS origins (4): ...` (число = сколько origin в списке). Если видишь только один origin — в `.env` поправь `CORS_ORIGIN` (несколько адресов через запятую). **Важно:** после изменения `.env` одного `pm2 restart` мало — окружение не перечитывается. Нужно перезапустить с загрузкой .env: `pm2 stop stroova-api && pm2 delete stroova-api`, затем `set -a && source .env && set +a && pm2 start server/index.js --name stroova-api` и `pm2 save`.
 
 **Озвучка слов в мобильном приложении:** приложение грузит WAV с сайта (`https://ваш-домен/audio/...`). Nginx по умолчанию не отдаёт CORS для статики, из‑за этого WebView блокирует загрузку. В конфиг Nginx (например `/etc/nginx/sites-available/stroova`) добавь блок **до** `location /`: `location /audio/ { add_header Access-Control-Allow-Origin *; }`. Затем `sudo nginx -t` и `sudo systemctl reload nginx`. Подробнее — в `docs/ANDROID-APK.md`.
@@ -238,6 +238,6 @@ set -a && source .env && set +a && npm run update-ipa
 
 ## Автодеплой по push (GitHub Actions)
 
-Если настроен автодеплой: при push в ветку `main` GitHub Actions подключается к серверу и выполняет `./deploy.sh` (см. [.github/workflows/deploy.yml](.github/workflows/deploy.yml)). В репозитории должны быть секреты: `SSH_HOST`, `SSH_USER`, `SSH_PRIVATE_KEY`; при необходимости — `APP_DIR` (путь к проекту на сервере).
+Если настроен автодеплой: при push в ветку `main` GitHub Actions подключается к серверу и выполняет `./deploy.sh` (см. [.github/workflows/deploy.yml](.github/workflows/deploy.yml)). Секреты: `SSH_HOST` = **147.45.196.155**, `SSH_USER`, `SSH_PRIVATE_KEY`; при необходимости — `APP_DIR` (путь к проекту на сервере).
 
 **Новые миграции** при автодеплое не применяются — их нужно один раз выполнить вручную по SSH (шаг 3 выше).

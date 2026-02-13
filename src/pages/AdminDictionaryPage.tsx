@@ -4,7 +4,7 @@ import { useIsMobile } from "../hooks/useIsMobile";
 import { useAuth } from "../features/auth/AuthContext";
 import type { Word } from "../data/contracts/types";
 import { adminDictionaryApi } from "../api/endpoints";
-import type { AdminDictionaryEntryV2Response, AdminDictionaryListItem } from "../api/types";
+import type { AdminDictionaryAiDraft, AdminDictionaryEntryV2Response, AdminDictionaryListItem } from "../api/types";
 import { ApiError } from "../api/client";
 
 type LoadState = "idle" | "loading" | "error";
@@ -135,6 +135,27 @@ const AdminDictionaryPage: React.FC = () => {
   const [aiError, setAiError] = useState<string | null>(null);
   const [aiJson, setAiJson] = useState<string>("");
 
+  const [aiDraftState, setAiDraftState] = useState<LoadState>("idle");
+  const [aiDraftError, setAiDraftError] = useState<string | null>(null);
+  const [aiDraftJson, setAiDraftJson] = useState<string>("");
+  const [aiDraft, setAiDraft] = useState<AdminDictionaryAiDraft | null>(null);
+  const [openaiCheckResult, setOpenaiCheckResult] = useState<{
+    keySet: boolean;
+    keyLength: number;
+    keyLengthRaw: number;
+    prefix: string | null;
+    suffix: string | null;
+    baseUrl: string;
+    model: string;
+  } | null>(null);
+  const [openaiCheckError, setOpenaiCheckError] = useState<string | null>(null);
+  const [applyDraftEntryPatch, setApplyDraftEntryPatch] = useState(true);
+  const [applyDraftLemmaPatch, setApplyDraftLemmaPatch] = useState(true);
+  const [applyDraftSenseNos, setApplyDraftSenseNos] = useState<number[]>([]);
+  const [applyDraftFormIndexes, setApplyDraftFormIndexes] = useState<number[]>([]);
+  const [applyDraftReplaceExamples, setApplyDraftReplaceExamples] = useState(false);
+  const [applyDraftSense1Core, setApplyDraftSense1Core] = useState(false);
+
   const [importText, setImportText] = useState("");
   const [importState, setImportState] = useState<LoadState>("idle");
   const [importLog, setImportLog] = useState<string>("");
@@ -154,6 +175,9 @@ const AdminDictionaryPage: React.FC = () => {
     }
     setAiJson("");
     setAiError(null);
+    setAiDraftJson("");
+    setAiDraftError(null);
+    setAiDraft(null);
     try {
       const { items, total } = await adminDictionaryApi.list({
         lang,
@@ -198,6 +222,9 @@ const AdminDictionaryPage: React.FC = () => {
     setFormEdit(null);
     setAiJson("");
     setAiError(null);
+    setAiDraftJson("");
+    setAiDraftError(null);
+    setAiDraft(null);
     try {
       const { entry } = await adminDictionaryApi.getEntry({ lang, id });
       setDraft(entry);
@@ -543,6 +570,17 @@ const AdminDictionaryPage: React.FC = () => {
     }
   };
 
+  const checkOpenAiKey = async () => {
+    setOpenaiCheckResult(null);
+    setOpenaiCheckError(null);
+    try {
+      const info = await adminDictionaryApi.openaiCheck();
+      setOpenaiCheckResult(info);
+    } catch (e) {
+      setOpenaiCheckError(formatApiError(e, "Не удалось проверить ключ"));
+    }
+  };
+
   const askAi = async () => {
     const w = (draft?.en || selected?.en || query).trim();
     if (!w) return;
@@ -560,6 +598,67 @@ const AdminDictionaryPage: React.FC = () => {
     } catch (e) {
       setAiState("error");
       setAiError(formatApiError(e, "Ошибка AI-подсказки"));
+    }
+  };
+
+  const askAiDraft = async () => {
+    const id = draft?.id || selected?.id || selectedId;
+    const w = (draft?.en || selected?.en || query).trim();
+    if (!id && !w) return;
+    setAiDraftState("loading");
+    setAiDraftError(null);
+    setAiDraftJson("");
+    setAiDraft(null);
+    try {
+      const { draft: out } = await adminDictionaryApi.aiDraft({
+        lang,
+        entryId: id ?? undefined,
+        word: id ? undefined : w,
+      });
+      setAiDraft(out || null);
+      setAiDraftJson(JSON.stringify(out || {}, null, 2));
+      const senseNos = Array.isArray(out?.senses)
+        ? out.senses.map((s) => Number(s?.senseNo)).filter((n) => Number.isFinite(n) && n > 0)
+        : [];
+      setApplyDraftSenseNos(senseNos);
+      const formIdx = Array.isArray(out?.forms) ? out.forms.map((_, idx) => idx) : [];
+      setApplyDraftFormIndexes(formIdx);
+      setApplyDraftEntryPatch(true);
+      setApplyDraftLemmaPatch(true);
+      setAiDraftState("idle");
+    } catch (e) {
+      setAiDraftState("error");
+      setAiDraftError(formatApiError(e, "Ошибка AI‑черновика"));
+    }
+  };
+
+  const applyAiDraft = async () => {
+    if (!draft?.id || !aiDraft) return;
+    setAiDraftState("loading");
+    setAiDraftError(null);
+    try {
+      const res = await adminDictionaryApi.applyDraft({
+        lang,
+        entryId: draft.id,
+        draft: aiDraft,
+        apply: {
+          entryPatch: applyDraftEntryPatch,
+          lemmaPatch: applyDraftLemmaPatch,
+          selectedSenseNos: applyDraftSenseNos,
+          selectedFormIndexes: applyDraftFormIndexes,
+          replaceExamples: applyDraftReplaceExamples,
+          applySense1Core: applyDraftSense1Core,
+        },
+      });
+      if (res?.entry) setV2(res.entry);
+      // Подтянем свежие данные и в форму карточки (legacy) — чтобы не расходиться с v2/примером.
+      const { entry } = await adminDictionaryApi.getEntry({ lang, id: draft.id });
+      setDraft(entry);
+      setAiDraftState("idle");
+      await loadList(true);
+    } catch (e) {
+      setAiDraftState("error");
+      setAiDraftError(formatApiError(e, "Не удалось применить AI‑черновик"));
     }
   };
 
@@ -930,7 +1029,36 @@ const AdminDictionaryPage: React.FC = () => {
                     >
                       {aiState === "loading" ? "AI…" : "AI‑подсказка"}
                     </button>
+                    <button
+                      type="button"
+                      className="word-action-btn"
+                      onClick={askAiDraft}
+                      disabled={aiDraftState === "loading"}
+                      title="Полный черновик: смыслы/примеры/формы. Требует OPENAI_API_KEY на сервере"
+                    >
+                      {aiDraftState === "loading" ? "Draft…" : "AI‑черновик"}
+                    </button>
+                    <button
+                      type="button"
+                      className="word-action-btn"
+                      onClick={checkOpenAiKey}
+                      title="Проверить, как сервер видит OPENAI_API_KEY (длина, префикс, суффикс)"
+                    >
+                      Проверить ключ
+                    </button>
                   </div>
+                  {(openaiCheckError || openaiCheckResult) && (
+                    <div className="admin-dict-help" style={{ marginTop: 8 }}>
+                      {openaiCheckError && (
+                        <div className="dictionary-error-banner" style={{ padding: "8px 12px" }}>{openaiCheckError}</div>
+                      )}
+                      {openaiCheckResult && (
+                        <pre style={{ margin: 0, fontSize: 12, whiteSpace: "pre-wrap", wordBreak: "break-all" }}>
+                          {JSON.stringify(openaiCheckResult, null, 2)}
+                        </pre>
+                      )}
+                    </div>
+                  )}
 
                   {(v2Error || v2) && (
                     <div className="admin-dict-section" style={{ marginTop: 14 }}>
@@ -1289,6 +1417,119 @@ const AdminDictionaryPage: React.FC = () => {
                   {aiError && (
                     <div className="dictionary-error-banner" style={{ padding: "8px 12px", marginTop: 8 }}>
                       {aiError}
+                    </div>
+                  )}
+                  {aiDraftError && (
+                    <div className="dictionary-error-banner" style={{ padding: "8px 12px", marginTop: 8 }}>
+                      {aiDraftError}
+                    </div>
+                  )}
+                  {aiDraftJson && (
+                    <div className="admin-dict-ai">
+                      <div className="admin-dict-results-title">AI draft (JSON)</div>
+                      <HelpText>
+                        Это <b>черновик</b>: смыслы/примеры/формы. Выбери, что применить в БД. По умолчанию <b>sense #1</b> не
+                        трогаем по core‑полям (уровень/регистр/глосс), чтобы не ломать legacy‑карточку.
+                      </HelpText>
+                      <textarea
+                        value={aiDraftJson}
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          setAiDraftJson(v);
+                          try {
+                            const parsed = JSON.parse(v);
+                            if (parsed && typeof parsed === "object") setAiDraft(parsed as AdminDictionaryAiDraft);
+                          } catch {
+                            // ignore parse errors while typing
+                          }
+                        }}
+                        rows={12}
+                      />
+
+                      <div className="admin-dict-form admin-dict-form--compact" style={{ marginTop: 10 }}>
+                        <div className="admin-dict-row" style={{ alignItems: "center" }}>
+                          <label className="admin-dict-qc-toggle">
+                            <input type="checkbox" checked={applyDraftEntryPatch} onChange={(e) => setApplyDraftEntryPatch(e.target.checked)} />
+                            <span>Применить entryPatch (legacy карточку)</span>
+                          </label>
+                          <label className="admin-dict-qc-toggle">
+                            <input type="checkbox" checked={applyDraftLemmaPatch} onChange={(e) => setApplyDraftLemmaPatch(e.target.checked)} />
+                            <span>Применить lemmaPatch (частотность/IPA…)</span>
+                          </label>
+                        </div>
+                        <div className="admin-dict-row" style={{ alignItems: "center" }}>
+                          <label className="admin-dict-qc-toggle">
+                            <input type="checkbox" checked={applyDraftReplaceExamples} onChange={(e) => setApplyDraftReplaceExamples(e.target.checked)} />
+                            <span>Заменять примеры (иначе только добавлять/обновлять)</span>
+                          </label>
+                          <label className="admin-dict-qc-toggle">
+                            <input type="checkbox" checked={applyDraftSense1Core} onChange={(e) => setApplyDraftSense1Core(e.target.checked)} />
+                            <span>Разрешить core‑правки для sense #1</span>
+                          </label>
+                        </div>
+
+                        {aiDraft?.senses && aiDraft.senses.length > 0 && (
+                          <div className="admin-dict-field">
+                            <span className="admin-dict-label">Смыслы (какие применить)</span>
+                            <div className="admin-dict-row" style={{ flexWrap: "wrap", gap: 10 }}>
+                              {aiDraft.senses.map((s) => {
+                                const no = Number(s.senseNo);
+                                const checked = applyDraftSenseNos.includes(no);
+                                return (
+                                  <label key={no} className="admin-dict-qc-toggle">
+                                    <input
+                                      type="checkbox"
+                                      checked={checked}
+                                      onChange={(e) => {
+                                        const on = e.target.checked;
+                                        setApplyDraftSenseNos((prev) => (on ? Array.from(new Set([...prev, no])) : prev.filter((x) => x !== no)));
+                                      }}
+                                    />
+                                    <span>
+                                      #{no} {s.glossRu ? `— ${s.glossRu}` : ""}
+                                    </span>
+                                  </label>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+
+                        {aiDraft?.forms && aiDraft.forms.length > 0 && (
+                          <div className="admin-dict-field">
+                            <span className="admin-dict-label">Формы (какие применить)</span>
+                            <div className="admin-dict-row" style={{ flexWrap: "wrap", gap: 10 }}>
+                              {aiDraft.forms.map((f, idx) => {
+                                const checked = applyDraftFormIndexes.includes(idx);
+                                return (
+                                  <label key={`${f.form}-${f.formType}-${idx}`} className="admin-dict-qc-toggle">
+                                    <input
+                                      type="checkbox"
+                                      checked={checked}
+                                      onChange={(e) => {
+                                        const on = e.target.checked;
+                                        setApplyDraftFormIndexes((prev) => (on ? Array.from(new Set([...prev, idx])) : prev.filter((x) => x !== idx)));
+                                      }}
+                                    />
+                                    <span>
+                                      {f.form} <span className="admin-dict-muted">({f.formType})</span>
+                                    </span>
+                                  </label>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+
+                        <button
+                          type="button"
+                          className="word-action-btn word-action-add-personal"
+                          onClick={applyAiDraft}
+                          disabled={aiDraftState === "loading" || !draft?.id || !aiDraft}
+                        >
+                          {aiDraftState === "loading" ? "Применяем…" : "Применить выбранное в БД"}
+                        </button>
+                      </div>
                     </div>
                   )}
                   {aiJson && (

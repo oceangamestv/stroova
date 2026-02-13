@@ -1,9 +1,12 @@
 # Пример конфига Nginx для STroova.
 # Скопировать на сервер: /etc/nginx/sites-available/stroova
 # После правок: sudo nginx -t && sudo systemctl reload nginx
+#
+# Боевой сервер: 147.45.196.155. Когда привяжешь домен — добавь его в server_name
+# и получи сертификат: sudo certbot --nginx -d 147.45.196.155 -d твой-домен.ru
 
 server {
-    server_name 5b5a1af3caf3.vps.myjino.ru stroova.ru www.stroova.ru;
+    server_name 147.45.196.155 vm1147925.cloud.nuxt.network;
     root /root/stroova/dist;
     index index.html;
 
@@ -25,9 +28,12 @@ server {
         proxy_set_header X-Forwarded-Proto $scheme;
     }
 
-    listen 443 ssl;
-    ssl_certificate /etc/letsencrypt/live/stroova.ru/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/stroova.ru/privkey.pem;
-    include /etc/letsencrypt/options-ssl-nginx.conf;
-    ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
+    listen 80;
 }
+
+# После certbot появится блок listen 443 ssl с путями к сертификатам, например:
+# listen 443 ssl;
+# ssl_certificate /etc/letsencrypt/live/147.45.196.155/fullchain.pem;
+# ssl_certificate_key /etc/letsencrypt/live/147.45.196.155/privkey.pem;
+# include /etc/letsencrypt/options-ssl-nginx.conf;
+# ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;

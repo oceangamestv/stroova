@@ -16,6 +16,9 @@ import type {
   LeaderboardResponse,
   AdminDictionaryEntryV2Response,
   AdminDictionaryListResponse,
+  AdminDictionaryAiDraftResponse,
+  AdminDictionaryApplyDraftBody,
+  AdminDictionaryApplyDraftResponse,
 } from "./types";
 import { api } from "./client";
 
@@ -49,6 +52,68 @@ export const dictionaryApi = {
   getVersion: (lang?: string) => {
     const q = lang ? `?lang=${encodeURIComponent(lang)}` : "";
     return api.get<{ version: string }>(`/dictionary/version${q}`);
+  },
+  getCard: (params: { lang?: string; id: number }) => {
+    const search = new URLSearchParams();
+    if (params?.lang) search.set("lang", params.lang);
+    search.set("id", String(params.id));
+    return api.get<any>(`/dictionary/card?${search.toString()}`);
+  },
+  getCardBySense: (params: { lang?: string; senseId: number }) => {
+    const search = new URLSearchParams();
+    if (params?.lang) search.set("lang", params.lang);
+    search.set("senseId", String(params.senseId));
+    return api.get<any>(`/dictionary/card-v2?${search.toString()}`);
+  },
+  lookup: (params: { lang?: string; term: string; limit?: number }) => {
+    const search = new URLSearchParams();
+    if (params?.lang) search.set("lang", params.lang);
+    search.set("term", params.term);
+    if (params?.limit != null) search.set("limit", String(params.limit));
+    return api.get<{ items: any[] }>(`/dictionary/lookup?${search.toString()}`);
+  },
+};
+
+export const userDictionaryApi = {
+  today: (params?: { lang?: string }) => {
+    const search = new URLSearchParams();
+    if (params?.lang) search.set("lang", params.lang);
+    const q = search.toString();
+    return api.get<{ due: any[]; new: any[]; currentCollection?: any }>(`/user-dictionary/today${q ? `?${q}` : ""}`);
+  },
+  myWords: (params?: { lang?: string; q?: string; status?: "all" | "queue" | "learning" | "known" | "hard"; offset?: number; limit?: number }) => {
+    const search = new URLSearchParams();
+    if (params?.lang) search.set("lang", params.lang);
+    if (params?.q) search.set("q", params.q);
+    if (params?.status) search.set("status", params.status);
+    if (params?.offset != null) search.set("offset", String(params.offset));
+    if (params?.limit != null) search.set("limit", String(params.limit));
+    return api.get<{ items: any[]; total: number }>(`/user-dictionary/my-words?${search.toString()}`);
+  },
+  collections: (params?: { lang?: string }) => {
+    const search = new URLSearchParams();
+    if (params?.lang) search.set("lang", params.lang);
+    const q = search.toString();
+    return api.get<{ items: any[] }>(`/user-dictionary/collections${q ? `?${q}` : ""}`);
+  },
+  getCollection: (params: { lang?: string; id: number }) => {
+    const search = new URLSearchParams();
+    if (params?.lang) search.set("lang", params.lang);
+    search.set("id", String(params.id));
+    return api.get<{ collection: any; items: any[] }>(`/user-dictionary/collection?${search.toString()}`);
+  },
+  add: (body: { lang?: string; entryId: number }) => api.post<{ ok: true; senseId: number; lemmaId: number }>(`/user-dictionary/add`, body),
+  addSense: (body: { senseId: number }) => api.post<{ ok: true }>(`/user-dictionary/add-sense`, body),
+  remove: (body: { lang?: string; entryId: number }) => api.post<{ ok: boolean }>(`/user-dictionary/remove`, body),
+  removeSense: (body: { senseId: number }) => api.post<{ ok: boolean }>(`/user-dictionary/remove-sense`, body),
+  addAllFromCollection: (body: { lang?: string; collectionId: number }) =>
+    api.post<{ ok: boolean; inserted?: number }>(`/user-dictionary/collection/add-all`, body),
+  setStatus: (body: { senseId: number; status: "queue" | "learning" | "known" | "hard" }) =>
+    api.post<{ ok: true; status: string }>(`/user-dictionary/status`, body),
+  getSenseState: (params: { senseId: number }) => {
+    const search = new URLSearchParams();
+    search.set("senseId", String(params.senseId));
+    return api.get<{ isSaved: boolean; status: string | null }>(`/user-dictionary/sense-state?${search.toString()}`);
   },
 };
 
@@ -129,8 +194,16 @@ export const adminDictionaryApi = {
     api.post<{ ok: true }>(`/admin/dictionary/form/delete`, body),
   deleteSense: (body: { lang?: string; id: number }) =>
     api.post<{ ok: true }>(`/admin/dictionary/sense/delete`, body),
+  openaiCheck: () =>
+    api.get<{ keySet: boolean; keyLength: number; keyLengthRaw: number; prefix: string | null; suffix: string | null; baseUrl: string; model: string }>(
+      "/admin/openai-check"
+    ),
   aiSuggest: (body: { lang?: string; word: string; existing?: Partial<Word> | null }) =>
     api.post<{ suggestion: Partial<Word> }>(`/admin/dictionary/ai-suggest`, body),
+  aiDraft: (body: { lang?: string; entryId?: number; word?: string }) =>
+    api.post<AdminDictionaryAiDraftResponse>(`/admin/dictionary/ai-draft`, body),
+  applyDraft: (body: AdminDictionaryApplyDraftBody) =>
+    api.post<AdminDictionaryApplyDraftResponse>(`/admin/dictionary/apply-draft`, body),
 };
 
 export const ratingApi = {
