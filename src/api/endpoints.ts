@@ -79,7 +79,16 @@ export const userDictionaryApi = {
     const search = new URLSearchParams();
     if (params?.lang) search.set("lang", params.lang);
     const q = search.toString();
-    return api.get<{ due: any[]; new: any[]; currentCollection?: any }>(`/user-dictionary/today${q ? `?${q}` : ""}`);
+    return api.get<{
+      due: any[];
+      new: any[];
+      hardOfDay?: any | null;
+      currentCollection?: any;
+      startProfile?: string;
+      startCollectionKey?: string;
+    }>(
+      `/user-dictionary/today${q ? `?${q}` : ""}`
+    );
   },
   myWords: (params?: { lang?: string; q?: string; status?: "all" | "queue" | "learning" | "known" | "hard"; offset?: number; limit?: number }) => {
     const search = new URLSearchParams();
@@ -115,6 +124,11 @@ export const userDictionaryApi = {
     search.set("senseId", String(params.senseId));
     return api.get<{ isSaved: boolean; status: string | null }>(`/user-dictionary/sense-state?${search.toString()}`);
   },
+  setStartProfile: (body: { lang?: string; profile: "beginner" | "basic_sentences" | "everyday_topics" }) =>
+    api.post<{ ok: true; profile: string; collectionKey: string; currentCollection?: any; due?: any[]; new?: any[] }>(
+      `/user-dictionary/start-profile`,
+      body
+    ),
 };
 
 export const adminDictionaryApi = {

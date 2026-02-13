@@ -153,23 +153,8 @@ export async function syncUserDictionaryFromMePatch(username, langCode, patch, d
         [u, senseIds]
       );
     }
-
-    // удалим то, что больше не в personalDictionary (только в рамках языка)
-    const languageId = await getLanguageId(langCode, db);
-    if (languageId) {
-      await db.query(
-        `
-          DELETE FROM user_saved_senses us
-          USING dictionary_senses s, dictionary_lemmas l
-          WHERE us.username = $1
-            AND us.sense_id = s.id
-            AND s.lemma_id = l.id
-            AND l.language_id = $2
-            AND NOT (us.sense_id = ANY($3::int[]))
-        `,
-        [u, languageId, senseIds.length ? senseIds : [0]]
-      );
-    }
+    // Важно: не удаляем из user_saved_senses записи, отсутствующие в legacy personalDictionary.
+    // Legacy-данные могут быть устаревшими и иначе "затирают" новые добавления из user-dictionary API.
   }
 
   if (wordProgress && typeof wordProgress === "object") {
@@ -717,19 +702,47 @@ export async function setSavedStatus(username, senseId, status, db = pool) {
   return res.rows[0] || null;
 }
 
-export async function listCollections(langCode, db = pool) {
+export async function listCollections(langCode, username = null, db = pool) {
   const languageId = await getLanguageId(langCode, db);
   if (!languageId) return [];
+  const u = username ? String(username).trim() : null;
+  if (!u) {
+    const res = await db.query(
+      `
+        SELECT c.id, c.collection_key AS "key", c.title, c.description,
+               c.level_from AS "levelFrom", c.level_to AS "levelTo",
+               c.sort_order AS "sortOrder",
+               (SELECT COUNT(*)::int FROM dictionary_collection_items i
+                JOIN dictionary_senses s ON s.id = i.sense_id
+                JOIN dictionary_lemmas l ON l.id = s.lemma_id
+                WHERE i.collection_id = c.id AND l.language_id = c.language_id) AS total
+        FROM dictionary_collections c
+        WHERE c.language_id = $1 AND c.is_public = TRUE
+        ORDER BY c.sort_order ASC, c.id ASC
+      `,
+      [languageId]
+    );
+    return res.rows.map((r) => ({ ...r, saved: null }));
+  }
   const res = await db.query(
     `
-      SELECT id, collection_key AS "key", title, description,
-             level_from AS "levelFrom", level_to AS "levelTo",
-             sort_order AS "sortOrder"
-      FROM dictionary_collections
-      WHERE language_id = $1 AND is_public = TRUE
-      ORDER BY sort_order ASC, id ASC
+      SELECT c.id, c.collection_key AS "key", c.title, c.description,
+             c.level_from AS "levelFrom", c.level_to AS "levelTo",
+             c.sort_order AS "sortOrder",
+             (SELECT COUNT(*)::int FROM dictionary_collection_items i
+              JOIN dictionary_senses s ON s.id = i.sense_id
+              JOIN dictionary_lemmas l ON l.id = s.lemma_id
+              WHERE i.collection_id = c.id AND l.language_id = c.language_id) AS total,
+             (SELECT COUNT(*)::int FROM dictionary_collection_items i
+              JOIN dictionary_senses s ON s.id = i.sense_id
+              JOIN dictionary_lemmas l ON l.id = s.lemma_id
+              LEFT JOIN user_saved_senses us ON us.username = $2 AND us.sense_id = i.sense_id
+              WHERE i.collection_id = c.id AND l.language_id = c.language_id AND us.sense_id IS NOT NULL) AS saved
+      FROM dictionary_collections c
+      WHERE c.language_id = $1 AND c.is_public = TRUE
+      ORDER BY c.sort_order ASC, c.id ASC
     `,
-    [languageId]
+    [languageId, u]
   );
   return res.rows;
 }
@@ -800,10 +813,229 @@ export async function getUserSenseState(username, senseId, db = pool) {
   return { isSaved: true, ...res.rows[0] };
 }
 
+function stableStringHash(text) {
+  const s = String(text || "");
+  let h = 2166136261 >>> 0; // FNV-1a
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 16777619) >>> 0;
+  }
+  return h >>> 0;
+}
+
+function buildHardHint(row) {
+  const hasPron = !!row?.hardPronunciation;
+  const hasGrammar = !!row?.hardGrammar;
+  if (hasPron && hasGrammar) return "Сложное произношение и грамматика";
+  if (hasPron) return "Сложное произношение";
+  if (hasGrammar) return "Сложная грамматика";
+  return "Сложное слово";
+}
+
+async function getServerDayKey(db = pool) {
+  const r = await db.query(`SELECT CURRENT_DATE::text AS "dayKey"`);
+  return String(r.rows[0]?.dayKey || "");
+}
+
+async function getHardWordOfDay(username, langCode, db = pool) {
+  const u = String(username || "").trim();
+  const languageId = await getLanguageId(langCode, db);
+  if (!u || !languageId) return null;
+  const dayKey = await getServerDayKey(db);
+  if (!dayKey) return null;
+
+  // 1) Если уже выбирали слово на сегодня — возвращаем его.
+  const saved = await db.query(
+    `
+      SELECT
+        h.sense_id AS "senseId",
+        s.lemma_id AS "lemmaId",
+        l.lemma AS "en",
+        s.gloss_ru AS "ru",
+        s.level AS "level",
+        s.register AS "register",
+        l.frequency_rank AS "frequencyRank",
+        l.ipa_uk AS "ipaUk",
+        l.ipa_us AS "ipaUs",
+        COALESCE(ex.en, '') AS "example",
+        COALESCE(ex.ru, '') AS "exampleRu",
+        h.meta AS "meta"
+      FROM user_daily_highlights h
+      JOIN dictionary_senses s ON s.id = h.sense_id
+      JOIN dictionary_lemmas l ON l.id = s.lemma_id
+      LEFT JOIN dictionary_examples ex ON ex.sense_id = s.id AND ex.is_main = TRUE
+      WHERE h.username = $1
+        AND h.lang_code = $2
+        AND h.day_key = $3::date
+        AND h.kind = 'hard_word'
+      LIMIT 1
+    `,
+    [u, String(langCode || "en"), dayKey]
+  );
+  if (saved.rows[0]) {
+    const row = saved.rows[0];
+    const meta = row.meta && typeof row.meta === "object" ? row.meta : {};
+    return {
+      senseId: Number(row.senseId),
+      lemmaId: Number(row.lemmaId),
+      en: row.en,
+      ru: row.ru,
+      level: row.level,
+      register: row.register,
+      frequencyRank: Number(row.frequencyRank) || null,
+      ipaUk: row.ipaUk || "",
+      ipaUs: row.ipaUs || "",
+      example: row.example || "",
+      exampleRu: row.exampleRu || "",
+      difficultyHint: String(meta.difficultyHint || "Сложное слово"),
+      difficultyType: String(meta.difficultyType || "mixed"),
+    };
+  }
+
+  // 2) Подбираем кандидатов: top-2000 + сложные по произношению/грамматике, исключая "known".
+  const candidates = await db.query(
+    `
+      SELECT
+        s.id AS "senseId",
+        s.lemma_id AS "lemmaId",
+        l.lemma AS "en",
+        s.gloss_ru AS "ru",
+        s.level AS "level",
+        s.register AS "register",
+        l.frequency_rank AS "frequencyRank",
+        l.ipa_uk AS "ipaUk",
+        l.ipa_us AS "ipaUs",
+        COALESCE(ex.en, '') AS "example",
+        COALESCE(ex.ru, '') AS "exampleRu",
+        (
+          COALESCE(l.ipa_uk, '') ~ '(θ|ð|ʒ|tʃ|dʒ|ŋ|əː|ɜː)'
+          OR COALESCE(l.ipa_us, '') ~ '(θ|ð|ʒ|tʃ|dʒ|ŋ|ɝ|ɚ)'
+        ) AS "hardPronunciation",
+        (
+          s.level IN ('A2', 'B1', 'B2', 'C1', 'C2')
+          OR s.register = 'официальная'
+          OR EXISTS (
+            SELECT 1
+            FROM dictionary_forms f
+            WHERE f.lemma_id = s.lemma_id
+              AND f.is_irregular = TRUE
+          )
+        ) AS "hardGrammar",
+        (
+          CASE s.level
+            WHEN 'A2' THEN 1
+            WHEN 'B1' THEN 2
+            WHEN 'B2' THEN 3
+            WHEN 'C1' THEN 4
+            WHEN 'C2' THEN 5
+            ELSE 0
+          END
+          + CASE WHEN s.register = 'официальная' THEN 1 ELSE 0 END
+          + CASE
+              WHEN (
+                COALESCE(l.ipa_uk, '') ~ '(θ|ð|ʒ|tʃ|dʒ|ŋ|əː|ɜː)'
+                OR COALESCE(l.ipa_us, '') ~ '(θ|ð|ʒ|tʃ|dʒ|ŋ|ɝ|ɚ)'
+              ) THEN 3 ELSE 0
+            END
+          + CASE WHEN EXISTS (
+              SELECT 1 FROM dictionary_forms f WHERE f.lemma_id = s.lemma_id AND f.is_irregular = TRUE
+            ) THEN 2 ELSE 0 END
+        ) AS "difficultyScore"
+      FROM dictionary_senses s
+      JOIN dictionary_lemmas l ON l.id = s.lemma_id
+      LEFT JOIN dictionary_examples ex ON ex.sense_id = s.id AND ex.is_main = TRUE
+      WHERE l.language_id = $1
+        AND s.sense_no = 1
+        AND l.frequency_rank <= 2000
+        AND (
+          (
+            COALESCE(l.ipa_uk, '') ~ '(θ|ð|ʒ|tʃ|dʒ|ŋ|əː|ɜː)'
+            OR COALESCE(l.ipa_us, '') ~ '(θ|ð|ʒ|tʃ|dʒ|ŋ|ɝ|ɚ)'
+          )
+          OR s.level IN ('A2', 'B1', 'B2', 'C1', 'C2')
+          OR s.register = 'официальная'
+          OR EXISTS (
+            SELECT 1
+            FROM dictionary_forms f
+            WHERE f.lemma_id = s.lemma_id
+              AND f.is_irregular = TRUE
+          )
+        )
+        AND NOT EXISTS (
+          SELECT 1
+          FROM user_saved_senses us
+          WHERE us.username = $2
+            AND us.sense_id = s.id
+            AND us.status = 'known'
+        )
+        AND NOT EXISTS (
+          SELECT 1
+          FROM user_daily_highlights h
+          WHERE h.username = $2
+            AND h.lang_code = $3
+            AND h.kind = 'hard_word'
+            AND h.sense_id = s.id
+            AND h.day_key >= (CURRENT_DATE - INTERVAL '14 days')
+        )
+      ORDER BY "difficultyScore" DESC, l.frequency_rank ASC, s.id ASC
+      LIMIT 400
+    `,
+    [languageId, u, String(langCode || "en")]
+  );
+  if (!candidates.rows.length) return null;
+
+  // 3) Детерминированный выбор по пользователю и дню.
+  const seed = stableStringHash(`${u}|${String(langCode || "en")}|${dayKey}|hard_word`);
+  const idx = seed % candidates.rows.length;
+  const picked = candidates.rows[idx];
+
+  const difficultyType = picked.hardPronunciation && picked.hardGrammar
+    ? "pronunciation_and_grammar"
+    : picked.hardPronunciation
+      ? "pronunciation"
+      : "grammar";
+  const difficultyHint = buildHardHint(picked);
+
+  // 4) Фиксируем выбор на день.
+  await db.query(
+    `
+      INSERT INTO user_daily_highlights (username, lang_code, day_key, kind, sense_id, meta)
+      VALUES ($1, $2, $3::date, 'hard_word', $4, $5::jsonb)
+      ON CONFLICT (username, lang_code, day_key, kind)
+      DO UPDATE SET
+        sense_id = EXCLUDED.sense_id,
+        meta = EXCLUDED.meta
+    `,
+    [
+      u,
+      String(langCode || "en"),
+      dayKey,
+      Number(picked.senseId),
+      JSON.stringify({ difficultyType, difficultyHint }),
+    ]
+  );
+
+  return {
+    senseId: Number(picked.senseId),
+    lemmaId: Number(picked.lemmaId),
+    en: picked.en,
+    ru: picked.ru,
+    level: picked.level,
+    register: picked.register,
+    frequencyRank: Number(picked.frequencyRank) || null,
+    ipaUk: picked.ipaUk || "",
+    ipaUs: picked.ipaUs || "",
+    example: picked.example || "",
+    exampleRu: picked.exampleRu || "",
+    difficultyHint,
+    difficultyType,
+  };
+}
+
 export async function getTodayPack(username, langCode, db = pool) {
   const u = String(username || "").trim();
   const languageId = await getLanguageId(langCode, db);
-  if (!u || !languageId) return { due: [], new: [] };
+  if (!u || !languageId) return { due: [], new: [], hardOfDay: null };
 
   // 1) due: сохранённые слова с низким прогрессом (простая эвристика)
   const dueRes = await db.query(
@@ -868,7 +1100,9 @@ export async function getTodayPack(username, langCode, db = pool) {
     [u, languageId]
   );
 
-  return { due: dueRes.rows, new: newRes.rows };
+  const hardOfDay = await getHardWordOfDay(u, langCode, db);
+
+  return { due: dueRes.rows, new: newRes.rows, hardOfDay };
 }
 
 export async function lookupDictionaryTerm(langCode, term, limit = 5, db = pool) {

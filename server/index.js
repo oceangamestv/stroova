@@ -154,23 +154,23 @@ function getAuthToken(req) {
   return h.slice(7).trim();
 }
 
-async function requireAuthUser(req, res) {
+async function getOptionalAuthUser(req) {
   const token = getAuthToken(req);
-  if (!token) {
-    send(res, 401, { error: "Требуется авторизация" });
-    return null;
-  }
+  if (!token) return null;
   const session = await getSessionByToken(token);
-  if (!session) {
+  if (!session) return null;
+  const user = await getUser(session.username);
+  if (!user) return null;
+  return { user, session };
+}
+
+async function requireAuthUser(req, res) {
+  const auth = await getOptionalAuthUser(req);
+  if (!auth) {
     send(res, 401, { error: "Требуется авторизация" });
     return null;
   }
-  const user = await getUser(session.username);
-  if (!user) {
-    send(res, 401, { error: "Пользователь не найден" });
-    return null;
-  }
-  return { user, session };
+  return auth;
 }
 
 async function requireAdmin(req, res) {
@@ -181,6 +181,24 @@ async function requireAdmin(req, res) {
     return null;
   }
   return auth;
+}
+
+const START_PROFILE_TO_COLLECTION = {
+  beginner: "a0_basics",
+  basic_sentences: "a1_basics",
+  everyday_topics: "a2_basics",
+};
+
+function normalizeStartProfile(v) {
+  const s = String(v || "").trim();
+  if (s === "beginner" || s === "basic_sentences" || s === "everyday_topics") return s;
+  return null;
+}
+
+function getStartCollectionByUser(user) {
+  const profile = normalizeStartProfile(user?.gameSettings?.dictionaryStartProfile);
+  if (!profile) return { profile: null, collectionKey: null };
+  return { profile, collectionKey: START_PROFILE_TO_COLLECTION[profile] || null };
 }
 
 const routes = {
@@ -343,15 +361,47 @@ const routes = {
     if (!auth) return;
     const lang = url.searchParams.get("lang") || "en";
     await ensureUserDictionaryBackfilled(auth.user.username, lang);
-    // Первый этап: автоподключаем коллекцию A0, чтобы словарь не был пустым
-    try {
-      await ensureDefaultCollectionEnrolled(auth.user.username, lang, "a0_basics");
-    } catch (e) {
-      console.warn("default collection enroll failed:", e);
+    const { profile, collectionKey } = getStartCollectionByUser(auth.user);
+    // Автоподключаем стартовую коллекцию только после явного выбора профиля.
+    if (collectionKey) {
+      try {
+        await ensureDefaultCollectionEnrolled(auth.user.username, lang, collectionKey);
+      } catch (e) {
+        console.warn("default collection enroll failed:", e);
+      }
     }
     const pack = await getTodayPack(auth.user.username, lang);
-    const currentCollection = await getCollectionProgress(auth.user.username, lang, "a0_basics");
-    send(res, 200, { ...pack, currentCollection });
+    const currentCollection = collectionKey
+      ? await getCollectionProgress(auth.user.username, lang, collectionKey)
+      : null;
+    send(res, 200, { ...pack, currentCollection, startProfile: profile, startCollectionKey: collectionKey });
+  },
+
+  "POST /api/user-dictionary/start-profile": async (req, res, body) => {
+    const auth = await requireAuthUser(req, res);
+    if (!auth) return;
+    const lang = String(body?.lang || "en").trim() || "en";
+    const profile = normalizeStartProfile(body?.profile);
+    if (!profile) {
+      send(res, 400, { error: "Поле profile обязательно (beginner | basic_sentences | everyday_topics)" });
+      return;
+    }
+    const collectionKey = START_PROFILE_TO_COLLECTION[profile] || "a0_basics";
+    const user = auth.user;
+    user.gameSettings = {
+      ...(user.gameSettings && typeof user.gameSettings === "object" ? user.gameSettings : {}),
+      dictionaryStartProfile: profile,
+    };
+    await saveUser(user);
+    await ensureUserDictionaryBackfilled(user.username, lang);
+    try {
+      await ensureDefaultCollectionEnrolled(user.username, lang, collectionKey);
+    } catch (e) {
+      console.warn("start profile enroll failed:", e);
+    }
+    const pack = await getTodayPack(user.username, lang);
+    const currentCollection = await getCollectionProgress(user.username, lang, collectionKey);
+    send(res, 200, { ok: true, profile, collectionKey, currentCollection, ...pack });
   },
 
   "GET /api/user-dictionary/my-words": async (req, res, body, url) => {
@@ -369,7 +419,8 @@ const routes = {
 
   "GET /api/user-dictionary/collections": async (req, res, body, url) => {
     const lang = url.searchParams.get("lang") || "en";
-    const items = await listCollections(lang);
+    const auth = await getOptionalAuthUser(req);
+    const items = await listCollections(lang, auth?.user?.username ?? null);
     send(res, 200, { items });
   },
 

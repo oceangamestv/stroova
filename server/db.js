@@ -251,6 +251,21 @@ CREATE TABLE IF NOT EXISTS user_collection_state (
 );
 CREATE INDEX IF NOT EXISTS idx_user_collection_state_username ON user_collection_state(username);
 
+-- Ежедневные персональные подборки (например «сложное слово дня»).
+CREATE TABLE IF NOT EXISTS user_daily_highlights (
+  id SERIAL PRIMARY KEY,
+  username VARCHAR(255) NOT NULL REFERENCES users(username) ON DELETE CASCADE,
+  lang_code VARCHAR(10) NOT NULL DEFAULT 'en',
+  day_key DATE NOT NULL,
+  kind VARCHAR(40) NOT NULL,
+  sense_id INTEGER NOT NULL REFERENCES dictionary_senses(id) ON DELETE CASCADE,
+  meta JSONB NOT NULL DEFAULT '{}'::jsonb,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (username, lang_code, day_key, kind)
+);
+CREATE INDEX IF NOT EXISTS idx_user_daily_highlights_lookup ON user_daily_highlights(username, lang_code, day_key, kind);
+CREATE INDEX IF NOT EXISTS idx_user_daily_highlights_sense ON user_daily_highlights(sense_id);
+
 -- Активные дни и награды (механика «активных дней»)
 CREATE TABLE IF NOT EXISTS rewards (
   id SERIAL PRIMARY KEY,
@@ -311,7 +326,8 @@ export async function initDb() {
         INSERT INTO dictionary_collections (language_id, collection_key, title, description, level_from, level_to, is_public, sort_order)
         VALUES
           (1, 'a0_basics', 'A0: База', 'Самые нужные слова для старта (частотные и простые).', 'A0', 'A0', TRUE, 10),
-          (1, 'a1_basics', 'A1: Следующий шаг', 'База для общения: хочу/могу/буду и т.п.', 'A1', 'A1', TRUE, 20)
+          (1, 'a1_basics', 'A1: Следующий шаг', 'База для общения: хочу/могу/буду и т.п.', 'A1', 'A1', TRUE, 20),
+          (1, 'a2_basics', 'A2: Повседневное общение', 'Слова и фразы для уверенного общения на бытовые темы.', 'A2', 'A2', TRUE, 30)
         ON CONFLICT (language_id, collection_key) DO NOTHING;
       `
     );
@@ -373,6 +389,35 @@ export async function initDb() {
       }
     } catch (e) {
       console.warn("A1 collection auto-fill failed:", e);
+    }
+
+    // A2
+    try {
+      const a2 = await client.query(`SELECT id FROM dictionary_collections WHERE language_id = 1 AND collection_key = 'a2_basics' LIMIT 1`);
+      const a2Id = a2.rows[0]?.id;
+      if (a2Id) {
+        const has = await client.query(`SELECT 1 FROM dictionary_collection_items WHERE collection_id = $1 LIMIT 1`, [a2Id]);
+        if (has.rows.length === 0) {
+          await client.query(
+            `
+              INSERT INTO dictionary_collection_items (collection_id, sense_id, sort_order)
+              SELECT
+                $1,
+                s.id,
+                ROW_NUMBER() OVER (ORDER BY l.frequency_rank ASC, s.id ASC) - 1
+              FROM dictionary_senses s
+              JOIN dictionary_lemmas l ON l.id = s.lemma_id
+              WHERE l.language_id = 1 AND s.sense_no = 1 AND s.level = 'A2'
+              ORDER BY l.frequency_rank ASC, s.id ASC
+              LIMIT 80
+              ON CONFLICT (collection_id, sense_id) DO NOTHING
+            `,
+            [a2Id]
+          );
+        }
+      }
+    } catch (e) {
+      console.warn("A2 collection auto-fill failed:", e);
     }
 
     // dictionary_senses: админ-проверка

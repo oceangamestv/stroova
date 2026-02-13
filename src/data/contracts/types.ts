@@ -58,6 +58,10 @@ export type UserGameSettings = {
   dictionarySource?: "general" | "personal";
   /** Режим интерфейса словаря: казуальный (по умолчанию) или продвинутый. */
   dictionaryViewMode?: "casual" | "advanced";
+  /** Стартовый профиль для казуального словаря: влияет на стартовую коллекцию A0/A1/A2. */
+  dictionaryStartProfile?: "beginner" | "basic_sentences" | "everyday_topics";
+  /** Как добавлять новые слова в личный словарь: спрашивать, добавлять сразу, или через «знакомство». */
+  dictionaryAddMode?: "ask" | "instant" | "onboarding";
   /** Сложность в Puzzle Words: лёгкий (подсказки) или сложный. */
   puzzleDifficulty?: "easy" | "hard";
 };

@@ -70,6 +70,7 @@ function loadCsv(filePath) {
 
 const DEFAULT_RARITY = "не редкое";
 const DEFAULT_REGISTER = "разговорная";
+const EN_LANGUAGE_ID = 1;
 
 function normRarity(v) {
   const s = (v || "").trim();
@@ -87,6 +88,80 @@ function normRegister(v) {
 function hasRealIpa(str) {
   if (!str || !str.trim()) return false;
   return /[əɔɪʊɜːˈˌθðŋɑɒæʃʒʔɛʌ]/.test(str);
+}
+
+async function rebuildDefaultCollections(client) {
+  await client.query(
+    `
+      INSERT INTO dictionary_collections (language_id, collection_key, title, description, level_from, level_to, is_public, sort_order)
+      VALUES
+        ($1, 'a0_basics', 'A0: База', 'Самые нужные слова для старта (частотные и простые).', 'A0', 'A0', TRUE, 10),
+        ($1, 'a1_basics', 'A1: Следующий шаг', 'База для общения: хочу/могу/буду и т.п.', 'A1', 'A1', TRUE, 20),
+        ($1, 'a2_basics', 'A2: Повседневное общение', 'Слова и фразы для уверенного общения на бытовые темы.', 'A2', 'A2', TRUE, 30)
+      ON CONFLICT (language_id, collection_key) DO UPDATE SET
+        title = EXCLUDED.title,
+        description = EXCLUDED.description,
+        level_from = EXCLUDED.level_from,
+        level_to = EXCLUDED.level_to,
+        is_public = EXCLUDED.is_public,
+        sort_order = EXCLUDED.sort_order,
+        updated_at = NOW()
+    `,
+    [EN_LANGUAGE_ID]
+  );
+
+  const presets = [
+    { key: "a0_basics", level: "A0", limit: 80 },
+    { key: "a1_basics", level: "A1", limit: 80 },
+    { key: "a2_basics", level: "A2", limit: 80 },
+  ];
+
+  for (const preset of presets) {
+    const colRes = await client.query(
+      `SELECT id FROM dictionary_collections WHERE language_id = $1 AND collection_key = $2 LIMIT 1`,
+      [EN_LANGUAGE_ID, preset.key]
+    );
+    const collectionId = colRes.rows[0]?.id;
+    if (!collectionId) continue;
+
+    await client.query(`DELETE FROM dictionary_collection_items WHERE collection_id = $1`, [collectionId]);
+    await client.query(
+      `
+        INSERT INTO dictionary_collection_items (collection_id, sense_id, sort_order)
+        SELECT
+          $1 AS collection_id,
+          s.id AS sense_id,
+          ROW_NUMBER() OVER (ORDER BY l.frequency_rank ASC, s.id ASC) - 1 AS sort_order
+        FROM dictionary_senses s
+        JOIN dictionary_lemmas l ON l.id = s.lemma_id
+        WHERE l.language_id = $2
+          AND s.sense_no = 1
+          AND s.level = $3
+        ORDER BY l.frequency_rank ASC, s.id ASC
+        LIMIT $4
+      `,
+      [collectionId, EN_LANGUAGE_ID, preset.level, preset.limit]
+    );
+  }
+}
+
+async function finalizeSeed(client) {
+  const version = await updateDictionaryVersion("en");
+  console.log(`Версия словаря обновлена: ${version}`);
+
+  try {
+    await syncDictionaryV2FromEntries("en");
+    console.log("Словарь v2 синхронизирован");
+  } catch (e) {
+    console.warn("Не удалось синхронизировать словарь v2:", e);
+  }
+
+  try {
+    await rebuildDefaultCollections(client);
+    console.log("Коллекции A0/A1/A2 пересобраны");
+  } catch (e) {
+    console.warn("Не удалось пересобрать коллекции A0/A1/A2:", e);
+  }
 }
 
 async function seedFromCsv(client, filePath) {
@@ -133,17 +208,7 @@ async function seedFromCsv(client, filePath) {
   );
   console.log(`  Вставлено: ${inserted} слов.`);
   
-  // Обновляем версию словаря после seed
-  const version = await updateDictionaryVersion("en");
-  console.log(`  Версия словаря обновлена: ${version}`);
-
-  // Синхронизируем нормализованный словарь (v2)
-  try {
-    await syncDictionaryV2FromEntries("en");
-    console.log(`  Словарь v2 синхронизирован`);
-  } catch (e) {
-    console.warn("  Не удалось синхронизировать словарь v2:", e);
-  }
+  await finalizeSeed(client);
   
   return inserted;
 }
@@ -195,17 +260,7 @@ async function seedFromTs(client) {
   const total = A0_DICTIONARY.length + A1_DICTIONARY.length + A2_DICTIONARY.length;
   console.log(`Итого: ${total} слов.`);
   
-  // Обновляем версию словаря после seed
-  const version = await updateDictionaryVersion("en");
-  console.log(`Версия словаря обновлена: ${version}`);
-
-  // Синхронизируем нормализованный словарь (v2)
-  try {
-    await syncDictionaryV2FromEntries("en");
-    console.log(`Словарь v2 синхронизирован`);
-  } catch (e) {
-    console.warn("Не удалось синхронизировать словарь v2:", e);
-  }
+  await finalizeSeed(client);
 }
 
 async function seed() {

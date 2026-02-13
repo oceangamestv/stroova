@@ -2,14 +2,14 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import Header from "../components/common/Header";
 import { useIsMobile } from "../hooks/useIsMobile";
 import { useDictionary } from "../features/dictionary/useDictionary";
-import { dictionaryService } from "../services/dictionaryService";
-import { personalDictionaryService } from "../services/personalDictionaryService";
 import { progressService } from "../services/progressService";
 import { speakWord as speakWordUtil } from "../utils/sounds";
 import { useAuth } from "../features/auth/AuthContext";
 import { authService } from "../services/authService";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import type { Word, WordProgressMap, Level } from "../data/contracts/types";
+import { userDictionaryApi } from "../api/endpoints";
+import { ApiError } from "../api/client";
 
 type DictionaryTab = "general" | "personal";
 const LEVELS: Level[] = ["A0", "A1", "A2", "B1", "B2", "C1", "C2"];
@@ -32,6 +32,21 @@ const defaultViewSettings: Record<ViewSettingKey, boolean> = {
   exampleRu: true,
   level: true,
 };
+
+type SavedStatus = "queue" | "learning" | "known" | "hard";
+type AdvancedWord = Word & { senseId?: number; status?: SavedStatus; isPersonal?: boolean };
+
+function formatApiError(e: unknown, fallback: string) {
+  if (e instanceof ApiError) {
+    const details = e.details?.details;
+    if (details) {
+      const d = typeof details === "string" ? details : JSON.stringify(details);
+      return `${e.message}\n\n${d}`;
+    }
+    return e.message;
+  }
+  return e instanceof Error ? e.message : fallback;
+}
 
 function highlightWordInExample(example: string, word: string): string {
   if (!example || !word) return example;
@@ -56,9 +71,15 @@ const InMyDictionaryIcon: React.FC<{ className?: string; title?: string }> = ({ 
 const DictionaryPage: React.FC = () => {
   const isMobile = useIsMobile();
   const navigate = useNavigate();
+  const location = useLocation();
   const [tab, setTab] = useState<DictionaryTab>("general");
   const [filter, setFilter] = useState<Filter>("all");
   const [searchQuery, setSearchQuery] = useState("");
+
+  useEffect(() => {
+    const q = (location.state as { searchQuery?: string } | null)?.searchQuery;
+    if (typeof q === "string" && q.trim()) setSearchQuery(q.trim());
+  }, [location.state]);
   const [viewSettings, setViewSettings] = useState<Record<ViewSettingKey, boolean>>(() => {
     try {
       const stored = localStorage.getItem("dictionaryViewSettings");
@@ -74,36 +95,79 @@ const DictionaryPage: React.FC = () => {
 
   const { words: generalWords, loading: wordsLoading, error: wordsError } = useDictionary();
   const { user, refresh } = useAuth();
-  const [personalIds, setPersonalIds] = useState<number[]>(() =>
-    personalDictionaryService.getPersonalWordIds()
+  const [personalWords, setPersonalWords] = useState<AdvancedWord[]>([]);
+  const [personalLoading, setPersonalLoading] = useState(false);
+  const [personalError, setPersonalError] = useState<string | null>(null);
+  const [pendingAddIds, setPendingAddIds] = useState<Set<number>>(new Set());
+  const personalLemmaSet = useMemo(
+    () => new Set(personalWords.map((w) => String(w.en || "").trim().toLowerCase()).filter(Boolean)),
+    [personalWords]
   );
-  const personalWords = useMemo(() => {
-    const set = new Set(personalIds);
-    return generalWords.filter((w) => set.has(w.id));
-  }, [generalWords, personalIds]);
-
-  // Обновляем personalIds когда загружается пользователь или изменяются его данные
-  useEffect(() => {
-    const ids = personalDictionaryService.getPersonalWordIds();
-    setPersonalIds(ids);
-  }, [user]);
-
-  const dictionary = tab === "general" ? generalWords : personalWords;
+  const dictionary: AdvancedWord[] = tab === "general"
+    ? generalWords.map((w) => ({ ...w, isPersonal: personalLemmaSet.has(String(w.en || "").trim().toLowerCase()) }))
+    : personalWords;
   const [progress, setProgress] = useState<WordProgressMap>(
     () => progressService.getWordProgress()
   );
 
+  const loadPersonalWords = async () => {
+    if (!user) {
+      setPersonalWords([]);
+      setPersonalError(null);
+      return;
+    }
+    setPersonalLoading(true);
+    setPersonalError(null);
+    try {
+      const out = await userDictionaryApi.myWords({ lang: "en", offset: 0, limit: 500, status: "all" });
+      const items = Array.isArray(out?.items) ? out.items : [];
+      const mapped: AdvancedWord[] = items.map((it: any) => ({
+        id: Number(it.senseId || 0),
+        senseId: Number(it.senseId || 0),
+        en: String(it.en || ""),
+        ru: String(it.ru || ""),
+        accent: it.accent || "both",
+        level: it.level || "A0",
+        ipaUk: String(it.ipaUk || ""),
+        ipaUs: String(it.ipaUs || ""),
+        example: String(it.example || ""),
+        exampleRu: String(it.exampleRu || ""),
+        status: (it.status || "queue") as SavedStatus,
+        isPersonal: true,
+      }));
+      setPersonalWords(mapped.filter((w) => Number.isFinite(w.senseId) && Number(w.senseId) > 0));
+    } catch (e) {
+      setPersonalError(formatApiError(e, "Не удалось загрузить «Мой словарь»"));
+      setPersonalWords([]);
+    } finally {
+      setPersonalLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void loadPersonalWords();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
+
   const filteredWords = useMemo(() => {
     let words = [...dictionary];
     if (LEVELS.includes(filter as Level)) words = words.filter((w) => w.level === filter);
-    if (filter === "learned") words = words.filter((w) => progressService.isWordLearned(w.id));
+    if (filter === "learned") {
+      words = tab === "personal"
+        ? words.filter((w) => w.status === "known")
+        : words.filter((w) => progressService.isWordLearned(w.id));
+    }
     if (filter === "learning") {
-      words = words.filter((w) => {
-        const b = progressService.getWordProgressValue(w.id, "beginner");
-        const e = progressService.getWordProgressValue(w.id, "experienced");
-        const learned = progressService.isWordLearned(w.id);
-        return (b > 0 || e > 0) && !learned;
-      });
+      if (tab === "personal") {
+        words = words.filter((w) => w.status === "learning");
+      } else {
+        words = words.filter((w) => {
+          const b = progressService.getWordProgressValue(w.id, "beginner");
+          const e = progressService.getWordProgressValue(w.id, "experienced");
+          const learned = progressService.isWordLearned(w.id);
+          return (b > 0 || e > 0) && !learned;
+        });
+      }
     }
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase().trim();
@@ -116,50 +180,110 @@ const DictionaryPage: React.FC = () => {
       );
     }
     return words;
-  }, [dictionary, filter, progress, searchQuery]);
+  }, [dictionary, filter, progress, searchQuery, tab]);
 
   const stats = useMemo(() => {
     const total = dictionary.length;
-    const learned = dictionary.filter((w) => progressService.isWordLearned(w.id)).length;
+    const learned = tab === "personal"
+      ? dictionary.filter((w) => w.status === "known").length
+      : dictionary.filter((w) => progressService.isWordLearned(w.id)).length;
     let totalProgress = 0;
-    dictionary.forEach((w) => {
-      const b = progressService.getWordProgressValue(w.id, "beginner");
-      const e = progressService.getWordProgressValue(w.id, "experienced");
-      totalProgress += (b + e) / 2;
-    });
+    if (tab === "personal") {
+      totalProgress = learned;
+    } else {
+      dictionary.forEach((w) => {
+        const b = progressService.getWordProgressValue(w.id, "beginner");
+        const e = progressService.getWordProgressValue(w.id, "experienced");
+        totalProgress += (b + e) / 2;
+      });
+    }
     const avgProgress = total > 0 ? Math.round(totalProgress / total) : 0;
     return { total, learned, avgProgress };
-  }, [dictionary, progress]);
+  }, [dictionary, progress, tab]);
 
-  const addToPersonal = (word: Word) => {
-    personalDictionaryService.addWord(word.id);
-    setPersonalIds(personalDictionaryService.getPersonalWordIds());
+  const addToPersonal = async (word: AdvancedWord) => {
+    if (!user) return;
+    if (pendingAddIds.has(word.id)) return;
+    setPendingAddIds((prev) => new Set(prev).add(word.id));
+    try {
+      const out = await userDictionaryApi.add({ lang: "en", entryId: word.id });
+      await userDictionaryApi.setStatus({ senseId: Number(out.senseId), status: "learning" });
+      await loadPersonalWords();
+    } catch (e) {
+      setPersonalError(formatApiError(e, "Не удалось добавить слово в «Мой словарь»"));
+    } finally {
+      setPendingAddIds((prev) => {
+        const next = new Set(prev);
+        next.delete(word.id);
+        return next;
+      });
+    }
   };
 
-  const addAllFilteredToPersonal = () => {
-    const toAdd = filteredWords.filter((w) => !personalIds.includes(w.id));
+  const addAllFilteredToPersonal = async () => {
+    if (!user) return;
+    const toAdd = filteredWords.filter((w) => !w.isPersonal);
     if (toAdd.length === 0) {
       return;
     }
     const message = `Добавить в мой словарь ${toAdd.length} ${toAdd.length === 1 ? "слово" : toAdd.length < 5 ? "слова" : "слов"} из текущего списка?`;
     if (!confirm(message)) return;
-    toAdd.forEach((w) => personalDictionaryService.addWord(w.id));
-    setPersonalIds(personalDictionaryService.getPersonalWordIds());
-  };
-
-  const removeFromPersonal = (word: Word) => {
-    personalDictionaryService.removeWord(word.id);
-    setPersonalIds(personalDictionaryService.getPersonalWordIds());
-  };
-
-  const resetWord = (word: Word) => {
-    if (confirm("Сбросить прогресс этого слова до 0%?")) {
-      progressService.resetWordProgress(word.id);
-      setProgress(progressService.getWordProgress());
+    setPersonalLoading(true);
+    setPersonalError(null);
+    try {
+      for (const w of toAdd) {
+        const out = await userDictionaryApi.add({ lang: "en", entryId: w.id });
+        await userDictionaryApi.setStatus({ senseId: Number(out.senseId), status: "learning" });
+      }
+      await loadPersonalWords();
+    } catch (e) {
+      setPersonalError(formatApiError(e, "Не удалось добавить часть слов в «Мой словарь»"));
+    } finally {
+      setPersonalLoading(false);
     }
   };
 
-  const markKnown = (word: Word) => {
+  const removeFromPersonal = async (word: AdvancedWord) => {
+    if (!user) return;
+    const senseId = Number(word.senseId || word.id);
+    if (!Number.isFinite(senseId) || senseId <= 0) return;
+    try {
+      await userDictionaryApi.removeSense({ senseId });
+      await loadPersonalWords();
+    } catch (e) {
+      setPersonalError(formatApiError(e, "Не удалось удалить слово из «Моего словаря»"));
+    }
+  };
+
+  const resetWord = async (word: AdvancedWord) => {
+    if (!confirm("Сбросить прогресс этого слова до 0%?")) return;
+    if (tab === "personal") {
+      const senseId = Number(word.senseId || word.id);
+      if (!Number.isFinite(senseId) || senseId <= 0) return;
+      try {
+        await userDictionaryApi.setStatus({ senseId, status: "queue" });
+        await loadPersonalWords();
+      } catch (e) {
+        setPersonalError(formatApiError(e, "Не удалось обновить статус слова"));
+      }
+      return;
+    }
+    progressService.resetWordProgress(word.id);
+    setProgress(progressService.getWordProgress());
+  };
+
+  const markKnown = async (word: AdvancedWord) => {
+    if (tab === "personal") {
+      const senseId = Number(word.senseId || word.id);
+      if (!Number.isFinite(senseId) || senseId <= 0) return;
+      try {
+        await userDictionaryApi.setStatus({ senseId, status: "known" });
+        await loadPersonalWords();
+      } catch (e) {
+        setPersonalError(formatApiError(e, "Не удалось обновить статус слова"));
+      }
+      return;
+    }
     progressService.setWordAsKnown(word.id);
     setProgress(progressService.getWordProgress());
   };
@@ -224,6 +348,11 @@ const DictionaryPage: React.FC = () => {
       {wordsError && (
         <div className="dictionary-error-banner" style={{ padding: "8px 16px", background: "#fff3cd", margin: "8px" }}>
           {wordsError}
+        </div>
+      )}
+      {personalError && (
+        <div className="dictionary-error-banner" style={{ padding: "8px 16px", background: "#fff3cd", margin: "8px" }}>
+          {personalError}
         </div>
       )}
       <main className="main">
@@ -345,12 +474,13 @@ const DictionaryPage: React.FC = () => {
               />
             </div>
             {tab === "general" && (() => {
-              const canAddCount = filteredWords.filter((w) => !personalIds.includes(w.id)).length;
+              const canAddCount = filteredWords.filter((w) => !w.isPersonal).length;
               return canAddCount > 0 ? (
                 <button
                   type="button"
                   className="word-action-btn word-action-add-personal"
                   onClick={addAllFilteredToPersonal}
+                  disabled={!user || personalLoading}
                 >
                   Добавить все из списка ({canAddCount})
                 </button>
@@ -393,7 +523,9 @@ const DictionaryPage: React.FC = () => {
           <div className="words-grid">
             {filteredWords.length === 0 && (
               <div className="empty-state">
-                {tab === "personal" && personalWords.length === 0 ? (
+                {tab === "personal" && personalLoading ? (
+                  <p>Загрузка «Моего словаря»…</p>
+                ) : tab === "personal" && personalWords.length === 0 ? (
                   <p>В вашем словаре пока нет слов. Откройте «Общий словарь» и добавляйте слова кнопкой «Добавить в мой словарь».</p>
                 ) : (
                   <p>Слова не найдены</p>
@@ -420,7 +552,7 @@ const DictionaryPage: React.FC = () => {
                       <span className={`word-level-badge word-level-${word.level}`}>
                         {word.level}
                       </span>
-                      {personalIds.includes(word.id) && (
+                      {word.isPersonal && (
                         <InMyDictionaryIcon className="word-level-in-dict-icon" title="В моём словаре" />
                       )}
                     </div>
@@ -510,11 +642,12 @@ const DictionaryPage: React.FC = () => {
                     </div>
                     <div className="word-card-actions">
                       {tab === "general" ? (
-                        personalIds.includes(word.id) ? null : (
+                        word.isPersonal ? null : (
                           <button
                             type="button"
                             className="word-action-btn word-action-add-personal"
                             onClick={() => addToPersonal(word)}
+                            disabled={!user || pendingAddIds.has(word.id)}
                           >
                             Добавить в мой словарь
                           </button>
