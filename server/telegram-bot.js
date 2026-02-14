@@ -7,7 +7,7 @@ import "dotenv/config";
 import { Telegraf, Markup } from "telegraf";
 
 const token = process.env.TELEGRAM_BOT_TOKEN;
-const appUrl = process.env.APP_URL || "https://147.45.196.155";
+const appUrl = process.env.APP_URL || "https://stroova.ru";
 
 if (!token) {
   console.error("Не задан TELEGRAM_BOT_TOKEN в .env");

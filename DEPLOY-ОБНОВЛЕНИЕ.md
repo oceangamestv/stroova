@@ -2,7 +2,7 @@
 
 Сервер настроен по инструкции **[DEPLOY-УБУНТУ-ПОШАГОВО.md](DEPLOY-УБУНТУ-ПОШАГОВО.md)**. Если понадобится заново поднять сервер с нуля — используй тот же документ.
 
-**Боевой сервер:** 147.45.196.155 (подключение по SSH по IP; DNS vm1147925.cloud.nuxt.network может не пинговаться).
+**Боевой сервер:** https://stroova.ru (подключение по SSH: `ssh root@stroova.ru`).
 
 Данные хранятся в **PostgreSQL** (не в `server/data.json`). При обновлении БД не пересоздаётся, только подтягивается код, пересобирается фронт и перезапускается API.
 
@@ -17,7 +17,7 @@
 ### Шаг A. Подключиться к серверу и зайти в каталог проекта
 
 ```bash
-ssh root@147.45.196.155
+ssh root@stroova.ru
 cd ~/stroova
 ```
 
@@ -46,22 +46,14 @@ git reset --hard origin/main
 
 ### Шаг D. Проверить файл .env
 
-Должны быть все переменные (подставь свой пароль БД вместо `ТВОЙ_ПАРОЛЬ_БД`). **CORS_ORIGIN** — через запятую: сначала URL сайта, затем origin мобильного приложения (Capacitor). Для Telegram-бота нужны **TELEGRAM_BOT_TOKEN** (токен от @BotFather) и при необходимости **APP_URL** (URL сайта для кнопки Mini App, по умолчанию 147.45.196.155):
+Должны быть все переменные (подставь свой пароль БД вместо `ТВОЙ_ПАРОЛЬ_БД`). **CORS_ORIGIN** — через запятую: сначала URL сайта, затем origin мобильного приложения (Capacitor). Для Telegram-бота нужны **TELEGRAM_BOT_TOKEN** (токен от @BotFather) и при необходимости **APP_URL** (URL сайта для кнопки Mini App):
 
 ```
-VITE_API_URL=https://147.45.196.155/api
+VITE_API_URL=https://stroova.ru/api
 PORT=3000
-CORS_ORIGIN=https://147.45.196.155,capacitor://localhost,http://localhost
+CORS_ORIGIN=https://stroova.ru,https://www.stroova.ru,capacitor://localhost,http://localhost
 DATABASE_URL=postgresql://stroova:ТВОЙ_ПАРОЛЬ_БД@localhost:5432/stroova
 TELEGRAM_BOT_TOKEN=токен_от_BotFather
-APP_URL=https://147.45.196.155
-```
-
-**Если сайт открывается по домену (например https://stroova.ru):** в CORS_ORIGIN обязательно должен быть этот origin, иначе логин и запросы к API будут блокироваться CORS. Пример для stroova.ru:
-
-```
-CORS_ORIGIN=https://stroova.ru,https://www.stroova.ru,https://147.45.196.155,capacitor://localhost,http://localhost
-VITE_API_URL=https://stroova.ru/api
 APP_URL=https://stroova.ru
 ```
 
@@ -96,7 +88,7 @@ pm2 save
 
 ### Шаг H. Проверить сайт
 
-Открой в браузере `https://147.45.196.155` (или свой домен). Должна открыться текущая версия приложения (логин, словарь, упражнения). Если видишь старый интерфейс — очисти кэш браузера (Ctrl+Shift+R или «Жёсткое обновление») или открой в режиме инкогнито.
+Открой в браузере https://stroova.ru. Должна открыться текущая версия приложения (логин, словарь, упражнения). Если видишь старый интерфейс — очисти кэш браузера (Ctrl+Shift+R или «Жёсткое обновление») или открой в режиме инкогнито.
 
 **Если Nginx отдаёт не ту папку:** проверь конфиг Nginx (`root` должен указывать на каталог `dist` внутри проекта, например `/root/stroova/dist`). Путь из DEPLOY-УБУНТУ-ПОШАГОВО: в конфиге сайта строка `root /root/stroova/dist;` (или `/home/пользователь/stroova/dist`). После изменений: `sudo nginx -t` и `sudo systemctl reload nginx`.
 
@@ -180,10 +172,10 @@ pm2 restart stroova-api
 Открой сайт в браузере и убедись, что всё работает. Логи API: `pm2 logs stroova-api` (выход — Ctrl+C).
 
 **CORS для мобильного приложения:** в логах при старте API должны быть строки:
-- `CORS_ORIGIN: https://147.45.196.155,...`
+- `CORS_ORIGIN: https://stroova.ru,...`
 - `CORS origins (4): ...` (число = сколько origin в списке). Если видишь только один origin — в `.env` поправь `CORS_ORIGIN` (несколько адресов через запятую). **Важно:** после изменения `.env` одного `pm2 restart` мало — окружение не перечитывается. Нужно перезапустить с загрузкой .env: `pm2 stop stroova-api && pm2 delete stroova-api`, затем `set -a && source .env && set +a && pm2 start server/index.js --name stroova-api` и `pm2 save`.
 
-**CORS при доступе по домену (stroova.ru):** если сайт открыт по `https://stroova.ru`, а в консоли браузера ошибка «blocked by CORS policy» или «No 'Access-Control-Allow-Origin' header» — сделай два шага. (1) В `.env` в **CORS_ORIGIN** должен быть домен: `CORS_ORIGIN=https://stroova.ru,https://www.stroova.ru,https://147.45.196.155,capacitor://localhost,http://localhost`. Перезапусти API с загрузкой .env: `pm2 stop stroova-api && pm2 delete stroova-api`, затем `set -a && source .env && set +a && pm2 start server/index.js --name stroova-api` и `pm2 save`. (2) **Nginx:** preflight (OPTIONS) должен получать CORS-заголовки. В конфиге сайта (и для **HTTP**, и для **HTTPS** — оба блока `server`) нужен один и тот же `location /api` с обработкой OPTIONS. Пример полного блока — в `docs/nginx-stroova.conf.example`. В начале файла добавь `map $http_origin $api_cors_origin { ... }` (список origin как в примере), в `location /api` — блок `if ($request_method = OPTIONS) { add_header Access-Control-Allow-Origin $api_cors_origin; ... return 204; }` и `proxy_pass` на порт 3000. Проверка: `sudo nginx -t`, затем `sudo systemctl reload nginx`.
+**CORS при доступе по домену (stroova.ru):** если сайт открыт по `https://stroova.ru`, а в консоли браузера ошибка «blocked by CORS policy» или «No 'Access-Control-Allow-Origin' header» — сделай два шага. (1) В `.env` в **CORS_ORIGIN** должен быть домен: `CORS_ORIGIN=https://stroova.ru,https://www.stroova.ru,capacitor://localhost,http://localhost`. Перезапусти API с загрузкой .env: `pm2 stop stroova-api && pm2 delete stroova-api`, затем `set -a && source .env && set +a && pm2 start server/index.js --name stroova-api` и `pm2 save`. (2) **Nginx:** preflight (OPTIONS) должен получать CORS-заголовки. В конфиге сайта (и для **HTTP**, и для **HTTPS** — оба блока `server`) нужен один и тот же `location /api` с обработкой OPTIONS. Пример полного блока — в `docs/nginx-stroova.conf.example`. В начале файла добавь `map $http_origin $api_cors_origin { ... }` (список origin как в примере), в `location /api` — блок `if ($request_method = OPTIONS) { add_header Access-Control-Allow-Origin $api_cors_origin; ... return 204; }` и `proxy_pass` на порт 3000. Проверка: `sudo nginx -t`, затем `sudo systemctl reload nginx`.
 
 **Озвучка слов в мобильном приложении:** приложение грузит WAV с сайта (`https://ваш-домен/audio/...`). Nginx по умолчанию не отдаёт CORS для статики, из‑за этого WebView блокирует загрузку. В конфиг Nginx (например `/etc/nginx/sites-available/stroova`) добавь блок **до** `location /`: `location /audio/ { add_header Access-Control-Allow-Origin *; }`. Затем `sudo nginx -t` и `sudo systemctl reload nginx`. Подробнее — в `docs/ANDROID-APK.md`.
 
@@ -254,6 +246,6 @@ set -a && source .env && set +a && npm run update-ipa
 
 ## Автодеплой по push (GitHub Actions)
 
-Если настроен автодеплой: при push в ветку `main` GitHub Actions подключается к серверу и выполняет `./deploy.sh` (см. [.github/workflows/deploy.yml](.github/workflows/deploy.yml)). Секреты: `SSH_HOST` = **147.45.196.155**, `SSH_USER`, `SSH_PRIVATE_KEY`; при необходимости — `APP_DIR` (путь к проекту на сервере).
+Если настроен автодеплой: при push в ветку `main` GitHub Actions подключается к серверу и выполняет `./deploy.sh` (см. [.github/workflows/deploy.yml](.github/workflows/deploy.yml)). Секреты: `SSH_HOST` = **stroova.ru**, `SSH_USER`, `SSH_PRIVATE_KEY`; при необходимости — `APP_DIR` (путь к проекту на сервере).
 
 **Новые миграции** при автодеплое не применяются — их нужно один раз выполнить вручную по SSH (шаг 3 выше).

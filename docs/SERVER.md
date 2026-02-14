@@ -6,17 +6,17 @@
 
 | Параметр | Значение |
 |----------|----------|
-| **IP** | 147.45.196.155 |
-| **DNS** | vm1147925.cloud.nuxt.network (может не пинговаться — подключаться по IP) |
-| **SSH** | `ssh root@147.45.196.155` |
+| **Сайт** | https://stroova.ru |
+| **SSH** | `ssh root@stroova.ru` |
 | **Каталог проекта** | `/root/stroova` (или `~/stroova`) |
 
 ## URL
 
-- Сайт по IP: https://147.45.196.155  
-- API: https://147.45.196.155/api  
+- Сайт: https://stroova.ru  
+- Сайт с www: https://www.stroova.ru  
+- API: https://stroova.ru/api  
 
-После привязки домена (например stroova.ru) — использовать домен в CORS_ORIGIN, VITE_API_URL и в Nginx.
+В CORS_ORIGIN, VITE_API_URL и в Nginx используются только домены stroova.ru и www.stroova.ru.
 
 ## Документация
 

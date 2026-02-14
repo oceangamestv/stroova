@@ -2,21 +2,20 @@
 # Скопировать на сервер: /etc/nginx/sites-available/stroova
 # После правок: sudo nginx -t && sudo systemctl reload nginx
 #
-# Боевой сервер: 147.45.196.155. Когда привяжешь домен — добавь его в server_name
-# и получи сертификат: sudo certbot --nginx -d 147.45.196.155 -d твой-домен.ru
+# Боевой сервер: stroova.ru и www.stroova.ru.
+# Сертификат: sudo certbot --nginx -d stroova.ru -d www.stroova.ru
 #
 # CORS: список origin должен совпадать с CORS_ORIGIN в .env приложения.
 map $http_origin $api_cors_origin {
     default "";
     "~^https://stroova\.ru$" $http_origin;
     "~^https://www\.stroova\.ru$" $http_origin;
-    "~^https://147\.45\.196\.155$" $http_origin;
     "~^capacitor://localhost$" $http_origin;
     "~^http://localhost(:[0-9]+)?$" $http_origin;
 }
 
 server {
-    server_name 147.45.196.155 vm1147925.cloud.nuxt.network stroova.ru www.stroova.ru;
+    server_name stroova.ru www.stroova.ru;
     root /root/stroova/dist;
     index index.html;
 
@@ -52,7 +51,7 @@ server {
 
 # После certbot появится блок listen 443 ssl с путями к сертификатам, например:
 # listen 443 ssl;
-# ssl_certificate /etc/letsencrypt/live/147.45.196.155/fullchain.pem;
-# ssl_certificate_key /etc/letsencrypt/live/147.45.196.155/privkey.pem;
+# ssl_certificate /etc/letsencrypt/live/stroova.ru/fullchain.pem;
+# ssl_certificate_key /etc/letsencrypt/live/stroova.ru/privkey.pem;
 # include /etc/letsencrypt/options-ssl-nginx.conf;
 # ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;

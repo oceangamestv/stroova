@@ -19,7 +19,7 @@
 ### Деплой на боевой сервер
 
 - **Первый раз** (чистая Ubuntu): [DEPLOY-УБУНТУ-ПОШАГОВО.md](DEPLOY-УБУНТУ-ПОШАГОВО.md)
-- **Обновление:** [DEPLOY-ОБНОВЛЕНИЕ.md](DEPLOY-ОБНОВЛЕНИЕ.md). Сервер: 147.45.196.155 — см. [docs/SERVER.md](docs/SERVER.md)
+- **Обновление:** [DEPLOY-ОБНОВЛЕНИЕ.md](DEPLOY-ОБНОВЛЕНИЕ.md). Сервер: https://stroova.ru — см. [docs/SERVER.md](docs/SERVER.md)
 
 ## Технологии
 

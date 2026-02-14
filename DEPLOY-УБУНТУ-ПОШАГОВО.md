@@ -2,7 +2,7 @@
 
 Инструкция для **чистой Ubuntu** (например 22.04). Репозиторий: **https://github.com/oceangamestv/stroova**.
 
-**Боевой сервер:** IP **147.45.196.155**. Имя хоста: `vm1147925.cloud.nuxt.network` (может не пинговаться — подключайся по IP).
+**Боевой сервер:** https://stroova.ru (подключение по SSH: `ssh root@stroova.ru`).
 
 Выполняй блоки по порядку. Команды вставляй в терминал по одной (или блоком, где написано «можно скопировать всё сразу»). После каждой команды смотри вывод — если будет ошибка, остановись и перечитай шаг.
 
@@ -11,7 +11,7 @@
 ## Что понадобится перед началом
 
 - Доступ по **SSH** к серверу: логин и пароль (или SSH-ключ).
-- Адрес сервера: **147.45.196.155** (подключение по IP; DNS vm1147925.cloud.nuxt.network при необходимости).
+- Адрес сервера: **stroova.ru** (сайт и SSH по домену).
 - Имя пользователя для SSH (часто `root`).
 
 ---
@@ -28,10 +28,10 @@
 Подключение по **IP** (DNS может не отвечать на ping):
 
 ```bash
-ssh пользователь@147.45.196.155
+ssh пользователь@stroova.ru
 ```
 
-Пример: `ssh root@147.45.196.155`
+Пример: `ssh root@stroova.ru`
 
 При первом подключении спросят про «authenticity of host» — введи **yes** и Enter.  
 Дальше введи пароль (если используешь ключ — пароль может не спросить).
@@ -154,15 +154,15 @@ cd stroova
 nano .env
 ```
 
-Откроется редактор. **Вставь** туда эти строки (в `DATABASE_URL` подставь **тот же пароль**, что задал при создании пользователя БД в шаге 2.5). Для доступа по IP используй `https://147.45.196.155`; когда будет свой домен — замени на него. **TELEGRAM_BOT_TOKEN** — токен от @BotFather (если бот не нужен, строку можно не добавлять; тогда в PM2 будет запускаться только API).
+Откроется редактор. **Вставь** туда эти строки (в `DATABASE_URL` подставь **тот же пароль**, что задал при создании пользователя БД в шаге 2.5). Используй домен сайта (например `https://stroova.ru`). **TELEGRAM_BOT_TOKEN** — токен от @BotFather (если бот не нужен, строку можно не добавлять; тогда в PM2 будет запускаться только API).
 
 ```env
-VITE_API_URL=https://147.45.196.155/api
+VITE_API_URL=https://stroova.ru/api
 PORT=3000
-CORS_ORIGIN=https://147.45.196.155,capacitor://localhost,http://localhost
+CORS_ORIGIN=https://stroova.ru,https://www.stroova.ru,capacitor://localhost,http://localhost
 DATABASE_URL=postgresql://stroova:ТВОЙ_ПАРОЛЬ_БД@localhost:5432/stroova
 TELEGRAM_BOT_TOKEN=токен_от_BotFather
-APP_URL=https://147.45.196.155
+APP_URL=https://stroova.ru
 ```
 
 Сохранить и выйти (nano): **Ctrl+O**, Enter, **Ctrl+X**.
@@ -255,7 +255,7 @@ sudo nano /etc/nginx/sites-available/stroova
 ```text
 server {
     listen 80;
-    server_name 147.45.196.155 vm1147925.cloud.nuxt.network;
+    server_name stroova.ru www.stroova.ru;
     root /root/stroova/dist;
     index index.html;
     location / {
@@ -316,7 +316,7 @@ sudo systemctl reload nginx
 Открой в браузере на своём компьютере:
 
 ```text
-http://147.45.196.155
+https://stroova.ru
 ```
 
 Должна открыться страница приложения (логин/регистрация). Если «сайт недоступен» — проверь firewall (ниже есть подсказка).
@@ -336,10 +336,10 @@ sudo apt install -y certbot python3-certbot-nginx
 ### Шаг 6.2. Получить сертификат и настроить Nginx
 
 ```bash
-sudo certbot --nginx -d 147.45.196.155
+sudo certbot --nginx -d stroova.ru -d www.stroova.ru
 ```
 
-Если позже привяжешь домен (например stroova.ru), добавь его: `sudo certbot --nginx -d 147.45.196.155 -d stroova.ru -d www.stroova.ru`.
+Сертификат уже выдан для stroova.ru и www.stroova.ru. Если добавишь другой домен — расширь: `sudo certbot --nginx -d stroova.ru -d www.stroova.ru -d другой-домен.ru`.
 
 - Введи email (для уведомлений о продлении).
 - Согласись с условиями (Y).
@@ -352,7 +352,7 @@ sudo certbot --nginx -d 147.45.196.155
 Открой в браузере:
 
 ```text
-https://147.45.196.155
+https://stroova.ru
 ```
 
 Должно открыться приложение с замочком в адресной строке.
@@ -408,6 +408,6 @@ https://147.45.196.155
 - [ ] Запустил API и Telegram-бота через PM2 (`pm2 start ecosystem.config.cjs`), выполнил `pm2 save` и команду из `pm2 startup`
 - [ ] Настроил Nginx (конфиг с правильным путём `root`), включил сайт, перезагрузил nginx
 - [ ] Открыл сайт по http, потом поставил HTTPS через certbot
-- [ ] Открыл https://147.45.196.155 и проверил приложение
+- [ ] Открыл https://stroova.ru и проверил приложение
 
 После этого сервер настроен; для обновлений достаточно пушить в Git и на сервере запускать `./deploy.sh`.
