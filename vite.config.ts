@@ -23,5 +23,12 @@ export default defineConfig({
   ],
   server: {
     port: 5173,
+    proxy: {
+      // Если фронт ходит по относительному /api (без VITE_API_URL), запросы уходят на бэкенд
+      "/api": {
+        target: "http://localhost:3000",
+        changeOrigin: true,
+      },
+    },
   },
 });

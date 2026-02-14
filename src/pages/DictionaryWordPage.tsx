@@ -4,6 +4,8 @@ import Header from "../components/common/Header";
 import { dictionaryApi, userDictionaryApi } from "../api/endpoints";
 import { ApiError } from "../api/client";
 import { useAuth } from "../features/auth/AuthContext";
+import { speakWord } from "../utils/sounds";
+import { useIsMobile } from "../hooks/useIsMobile";
 
 type LoadState = "idle" | "loading" | "error";
 
@@ -79,8 +81,22 @@ const DictionaryWordPage: React.FC = () => {
 
   const [senseState, setSenseState] = useState<{ isSaved: boolean; status: string | null } | null>(null);
   const [senseStateError, setSenseStateError] = useState<string | null>(null);
+  const [backFabCompact, setBackFabCompact] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const isMobile = useIsMobile();
 
   const isLoggedIn = !!user;
+
+  useEffect(() => {
+    if (!isMobile) {
+      setBackFabCompact(false);
+      return;
+    }
+    const onScroll = () => setBackFabCompact(window.scrollY > 24);
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, [isMobile]);
 
   const trail = useMemo(() => {
     const items = trailParam
@@ -161,14 +177,16 @@ const DictionaryWordPage: React.FC = () => {
     }
   };
 
-  const onRemove = async () => {
-    if (!isLoggedIn) return;
+  const onRemove = async (): Promise<boolean> => {
+    if (!isLoggedIn) return false;
     try {
       await userDictionaryApi.removeSense({ senseId });
       await loadSenseState();
       refresh();
+      return true;
     } catch (e) {
       setSenseStateError(formatApiError(e, "Не удалось удалить слово"));
+      return false;
     }
   };
 
@@ -215,11 +233,30 @@ const DictionaryWordPage: React.FC = () => {
         <div className="page-card dict-adv-card">
           {/* Шапка: назад, слово, бейджи, действия */}
           <header className="dict-adv-header">
-            <button type="button" className="dict-adv-back" onClick={() => navigate(-1)} aria-label="Назад">
-              ← Назад
+            <button
+              type="button"
+              className={`dict-adv-back${isMobile ? " dict-adv-back--fab" : ""}${backFabCompact ? " dict-adv-back--compact" : ""}`}
+              onClick={() => navigate(-1)}
+              aria-label="Назад"
+            >
+              <svg className="dict-adv-back__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <path d="M19 12H5M12 19l-7-7 7-7" />
+              </svg>
+              <span className="dict-adv-back__label">Назад</span>
             </button>
             <div className="dict-adv-header__main">
-              <h1 className="dict-adv-header__title">{entry?.en || card?.lemma?.lemma || "Слово"}</h1>
+              <div className="dict-adv-header__title-row">
+                <h1 className="dict-adv-header__title">{entry?.en || card?.lemma?.lemma || "Слово"}</h1>
+                <button
+                  type="button"
+                  className="dict-adv-header__speak-btn"
+                  onClick={() => speakWord(entry?.en || card?.lemma?.lemma || "", "both")}
+                  title="Озвучить слово"
+                  aria-label="Озвучить слово"
+                >
+                  🔊
+                </button>
+              </div>
               <div className="dict-adv-header__badges">
                 {currentSense?.level && (
                   <span className={`word-level-badge word-level-${currentSense.level}`}>{currentSense.level}</span>
@@ -231,11 +268,13 @@ const DictionaryWordPage: React.FC = () => {
               </div>
             </div>
             <div className="dict-adv-header__actions">
-              <button type="button" className="word-action-btn word-action-add-personal" onClick={onLearn}>
-                Учить
-              </button>
+              {!senseState?.isSaved && (
+                <button type="button" className="word-action-btn word-action-add-personal" onClick={onLearn}>
+                  Учить
+                </button>
+              )}
               {senseState?.isSaved && (
-                <button type="button" className="word-action-btn word-action-remove-personal" onClick={onRemove}>
+                <button type="button" className="word-action-btn word-action-remove-personal" onClick={() => setDeleteConfirmOpen(true)}>
                   Удалить
                 </button>
               )}
@@ -268,7 +307,8 @@ const DictionaryWordPage: React.FC = () => {
               </div>
 
               {!!mainExample?.en && (
-                <Section title="Пример">
+                <section className="dict-adv-section">
+                  <div className="dict-adv-section__body">
                   <div className="dict-adv-example">
                     <p className="dict-adv-example-en">
                       {splitTextToTokens(mainExample.en).map((t, idx) =>
@@ -289,11 +329,12 @@ const DictionaryWordPage: React.FC = () => {
                     </p>
                     {!!mainExample?.ru && <p className="dict-adv-example-ru">{mainExample.ru}</p>}
                   </div>
-                </Section>
+                  </div>
+                </section>
               )}
 
               {senses.length > 0 && (
-                <Section title="Значения">
+                <Section title="Варианты значений слова">
                   <ul className="dict-adv-sense-list">
                     {senses.map((s: any) => (
                       <li key={s.id} className={`dict-sense-card ${Number(s.id) === senseId ? "dict-sense-card--active" : ""}`}>
@@ -430,6 +471,42 @@ const DictionaryWordPage: React.FC = () => {
           )}
         </div>
       </main>
+      {deleteConfirmOpen && (
+        <div className="dict-modal dict-modal--confirm" role="dialog" aria-modal="true" aria-labelledby="dict-adv-delete-confirm-title">
+          <div className="dict-modal__backdrop" onClick={() => setDeleteConfirmOpen(false)} />
+          <div className="dict-modal__panel dict-modal__panel--confirm">
+            <div className="dict-modal__head dict-modal__head--confirm">
+              <div className="dict-modal__confirm-hero">
+                <span className="dict-modal__confirm-icon" aria-hidden>!</span>
+                <div className="dict-modal__confirm-heading">
+                  <h2 id="dict-adv-delete-confirm-title" className="dict-modal__title dict-modal__title--confirm">Удалить слово?</h2>
+                  <p className="dict-modal__confirm-subtitle">Действие нельзя отменить</p>
+                </div>
+              </div>
+            </div>
+            <div className="dict-modal__content dict-modal__content--confirm">
+              <p className="dict-modal__confirm-text">
+                Слово «{entry?.en || card?.lemma?.lemma || "Слово"}» будет удалено из списка «Мои слова». Продолжить?
+              </p>
+              <div className="dict-modal__confirm-actions">
+                <button type="button" className="word-action-btn dict-modal__confirm-cancel" onClick={() => setDeleteConfirmOpen(false)}>
+                  Отмена
+                </button>
+                <button
+                  type="button"
+                  className="word-action-btn word-action-remove-personal dict-modal__confirm-remove"
+                  onClick={async () => {
+                    const removed = await onRemove();
+                    if (removed) setDeleteConfirmOpen(false);
+                  }}
+                >
+                  Удалить
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       <footer className="footer">STroova</footer>
     </div>
   );

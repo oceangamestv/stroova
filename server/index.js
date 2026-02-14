@@ -59,12 +59,14 @@ import {
   lookupDictionaryTerm,
   ensureDefaultCollectionEnrolled,
   getCollectionProgress,
+  getMyWordsSummary,
   getUserSenseState,
   removeSavedByEntryId,
   removeSavedBySenseId,
   setSavedStatus,
   syncUserDictionaryFromMePatch,
 } from "./userDictionaryRepo.js";
+import { getIpaBoth } from "./lib/ipaGenerator.js";
 
 const PORT = Number(process.env.PORT) || 3000;
 const CORS_ORIGIN = process.env.CORS_ORIGIN || "http://localhost:5173";
@@ -404,6 +406,15 @@ const routes = {
     const pack = await getTodayPack(user.username, lang);
     const currentCollection = await getCollectionProgress(user.username, lang, collectionKey);
     send(res, 200, { ok: true, profile, collectionKey, currentCollection, ...pack });
+  },
+
+  "GET /api/user-dictionary/summary": async (req, res, body, url) => {
+    const auth = await requireAuthUser(req, res);
+    if (!auth) return;
+    const lang = url.searchParams.get("lang") || "en";
+    await ensureUserDictionaryBackfilled(auth.user.username, lang);
+    const out = await getMyWordsSummary(auth.user.username, lang);
+    send(res, 200, out);
   },
 
   "GET /api/user-dictionary/my-words": async (req, res, body, url) => {
@@ -927,6 +938,58 @@ const routes = {
   },
 
   /**
+   * Генерация IPA (UK/US) для слова/выражения.
+   * Используется отдельной кнопкой в админке.
+   */
+  "POST /api/admin/dictionary/fill-ipa": async (req, res, body) => {
+    const auth = await requireAdmin(req, res);
+    if (!auth) return;
+    const lang = String(body?.lang || "en").trim() || "en";
+    const entryId = body?.entryId != null ? Number(body.entryId) : null;
+    const wordRaw = String(body?.word || "").trim();
+    let en = wordRaw;
+
+    if (!en && entryId) {
+      const existing = await getDictionaryEntryById(lang, entryId);
+      if (!existing) {
+        send(res, 404, { error: "Запись словаря не найдена" });
+        return;
+      }
+      en = String(existing.en || "").trim();
+    }
+
+    if (!en) {
+      send(res, 400, { error: "Нужно передать word или entryId с непустым en" });
+      return;
+    }
+
+    const { ipaUk, ipaUs } = await getIpaBoth(en);
+    send(res, 200, { ipaUk, ipaUs, en });
+  },
+  "POST /admin/dictionary/fill-ipa": async (req, res, body) => {
+    const auth = await requireAdmin(req, res);
+    if (!auth) return;
+    const lang = String(body?.lang || "en").trim() || "en";
+    const entryId = body?.entryId != null ? Number(body.entryId) : null;
+    const wordRaw = String(body?.word || "").trim();
+    let en = wordRaw;
+    if (!en && entryId) {
+      const existing = await getDictionaryEntryById(lang, entryId);
+      if (!existing) {
+        send(res, 404, { error: "Запись словаря не найдена" });
+        return;
+      }
+      en = String(existing.en || "").trim();
+    }
+    if (!en) {
+      send(res, 400, { error: "Нужно передать word или entryId с непустым en" });
+      return;
+    }
+    const { ipaUk, ipaUs } = await getIpaBoth(en);
+    send(res, 200, { ipaUk, ipaUs, en });
+  },
+
+  /**
    * AI-подсказка по слову для админки. Требует OPENAI_API_KEY.
    * Возвращает suggestion в формате полей dictionary_entries.
    */
@@ -957,13 +1020,14 @@ const routes = {
       const prompt = [
         "Ты помощник администратора словаря английских слов.",
         "Сгенерируй JSON-объект ТОЛЬКО со следующими полями (можно пропускать неизвестные):",
-        "en, ru, level, accent, frequencyRank, rarity, register, example, exampleRu",
+        "en, ru, level, accent, frequencyRank, rarity, register, ipaUk, ipaUs, example, exampleRu",
         "Требования:",
         "- en: исходное слово/выражение (как в запросе)",
         "- ru: короткий, самый частотный перевод (1 вариант, без скобок и перечислений)",
         "- level: A0|A1|A2|B1|B2|C1|C2 (примерно, по сложности)",
         "- rarity: 'не редкое'|'редкое'|'очень редкое'",
         "- register: 'официальная'|'разговорная'",
+        "- ipaUk/ipaUs: транскрипция IPA для UK/US (если не уверен — оставь пустой строкой)",
         "- example/exampleRu: короткий пример на EN и естественный перевод на RU",
         "Если existing задан — старайся улучшить/уточнить его, но не делай слишком длинно.",
         "Верни СТРОГО JSON без пояснений и без markdown.",
@@ -1071,11 +1135,114 @@ const routes = {
         throw new Error("Не удалось распарсить JSON из ответа модели");
       }
     };
+    const normalizeDraftForUi = (draftRaw) => {
+      const draftObj = draftRaw && typeof draftRaw === "object" ? { ...draftRaw } : {};
+      const asObj = (v) => (v && typeof v === "object" && !Array.isArray(v) ? v : {});
+      const toNum = (v, fallback) => {
+        const raw = String(v ?? "").trim();
+        if (!/^-?\d+$/.test(raw)) return fallback;
+        const n = Number.parseInt(raw, 10);
+        return Number.isFinite(n) ? n : fallback;
+      };
+      const normalizeLevel = (v) => {
+        const s = String(v ?? "").trim().toUpperCase();
+        return ["A0", "A1", "A2", "B1", "B2", "C1", "C2"].includes(s) ? s : null;
+      };
+      const normalizeAccent = (v) => {
+        const s = String(v ?? "").trim().toLowerCase();
+        if (!s) return null;
+        if (s === "both" || s === "uk/us" || s === "us/uk") return "both";
+        if (s === "uk" || s === "british" || s === "br") return "UK";
+        if (s === "us" || s === "american" || s === "am") return "US";
+        return null;
+      };
+      const normalizeRarity = (v) => {
+        const s = String(v ?? "").trim().toLowerCase();
+        if (!s) return null;
+        if (s.includes("очень") && s.includes("ред")) return "очень редкое";
+        if (s === "редкое" || s === "rare" || s === "uncommon") return "редкое";
+        if (s === "не редкое" || s === "частое" || s === "обычное" || s === "common") return "не редкое";
+        return null;
+      };
+      const normalizeRegister = (v) => {
+        const s = String(v ?? "").trim().toLowerCase();
+        if (!s) return null;
+        if (s === "официальная" || s === "formal") return "официальная";
+        if (s === "разговорная" || s === "informal" || s === "colloquial") return "разговорная";
+        return null;
+      };
+      const ALIASES = {
+        en: "en",
+        lemma: "en",
+        ru: "ru",
+        gloss_ru: "ru",
+        level: "level",
+        accent: "accent",
+        frequencyRank: "frequencyRank",
+        frequency_rank: "frequencyRank",
+        rarity: "rarity",
+        register: "register",
+        ipaUk: "ipaUk",
+        ipa_uk: "ipaUk",
+        ipaUs: "ipaUs",
+        ipa_us: "ipaUs",
+        example: "example",
+        exampleRu: "exampleRu",
+        example_ru: "exampleRu",
+      };
+      const pickCard = (src) => {
+        const obj = asObj(src);
+        const out = {};
+        for (const [k, v] of Object.entries(obj)) {
+          const field = ALIASES[k];
+          if (!field || v === undefined) continue;
+          if (field === "frequencyRank") out.frequencyRank = Math.max(1, toNum(v, 15000));
+          else if (field === "level") {
+            const n = normalizeLevel(v);
+            if (n) out.level = n;
+          } else if (field === "accent") {
+            const n = normalizeAccent(v);
+            if (n) out.accent = n;
+          } else if (field === "rarity") {
+            const n = normalizeRarity(v);
+            if (n) out.rarity = n;
+          } else if (field === "register") {
+            const n = normalizeRegister(v);
+            if (n) out.register = n;
+          } else {
+            out[field] = typeof v === "string" ? v.trim() : String(v ?? "");
+          }
+        }
+        return out;
+      };
+
+      const mergedEntryPatch = {
+        ...pickCard(draftObj),
+        ...pickCard(draftObj.lemmaPatch),
+        ...pickCard(draftObj.entryPatch),
+      };
+
+      draftObj.entryPatch = mergedEntryPatch;
+      if (!Array.isArray(draftObj.senses)) draftObj.senses = [];
+      if (!Array.isArray(draftObj.forms)) draftObj.forms = [];
+      if (!Array.isArray(draftObj.warnings)) draftObj.warnings = [];
+
+      const required = ["en", "ru", "level", "accent", "frequencyRank", "rarity", "register", "ipaUk", "ipaUs", "example", "exampleRu"];
+      const missing = required.filter((k) => {
+        const v = mergedEntryPatch[k];
+        return v === undefined || v === null || (typeof v === "string" && v.trim() === "");
+      });
+      if (missing.length > 0) {
+        draftObj.warnings = [...draftObj.warnings, `entryPatch missing: ${missing.join(", ")}`];
+      }
+
+      return draftObj;
+    };
 
     try {
       const schema = [
         "{",
-        '  "entryPatch": { /* опционально: en, ru, level, accent, frequencyRank, rarity, register, ipaUk, ipaUs, example, exampleRu */ },',
+        '  "entryPatch": { "en": "...", "ru": "...", "level": "A0|A1|A2|B1|B2|C1|C2", "accent": "both|UK|US", "frequencyRank": 1200, "rarity": "не редкое|редкое|очень редкое", "register": "разговорная|официальная", "ipaUk": "/.../ или \"\"", "ipaUs": "/.../ или \"\"", "example": "...", "exampleRu": "..." },',
         '  "lemmaPatch": { /* опционально: frequencyRank, rarity, accent, ipaUk, ipaUs */ },',
         '  "senses": [',
         "    {",
@@ -1094,23 +1261,26 @@ const routes = {
       ].join("\n");
 
       const prompt = [
-        "Ты помощник администратора словаря английских слов.",
-        "Нужно сгенерировать ПОЛНЫЙ черновик данных по слову для дальнейшего ручного подтверждения человеком.",
+        "Ты помощник администратора словаря английских слов. Генерируешь черновик по слову для ручного подтверждения.",
+        "Вход: JSON с lang, entryId?, word?, existing? (текущие данные записи, если есть).",
         "",
-        "Вход — JSON с полями: lang, entryId?, word?, existing?.",
-        "existing (если есть) содержит текущие данные (entry + senses + examples + forms).",
+        "Критично — объект entryPatch (карточка слова). ОБЯЗАТЕЛЕН, все поля с осмысленными и правильными значениями:",
+        "- en — головная форма (как в запросе или из existing).",
+        "- ru — один короткий частотный перевод (не перечисление через запятую).",
+        "- level — CEFR (A0–C2) по реальной частотности и сложности.",
+        "- accent — both | UK | US по употреблению.",
+        "- frequencyRank — число (чем меньше, тем частотнее; типично 1–20000).",
+        "- rarity — «не редкое» | «редкое» | «очень редкое».",
+        "- register — «разговорная» | «официальная».",
+        "- ipaUk, ipaUs — IPA в слэшах; если не уверен — пустая строка \"\".",
+        "- example — одно короткое естественное предложение на EN, иллюстрирующее главное значение.",
+        "- exampleRu — перевод этого примера на RU, естественный и краткий.",
+        "Каждое поле — уникальный смысл; не дублировать, не заполнять «для галочки».",
+        "Нельзя складывать карточные поля только в lemmaPatch: они обязательно должны быть в entryPatch.",
+        "- Смыслы (senses): 1–4 реально разных значения, glossRu — один вариант на смысл. Примеры короткие и естественные.",
+        "- Формы (forms): по части речи (глагол: ing, past, past_participle; сущ.: plural; прил.: comparative/superlative). Если неочевидно — не добавляй.",
         "",
-        "Задача:",
-        "- Предложи максимально полезные и частотные данные, но НЕ выдумывай сомнительные вещи.",
-        "- Если не уверен в IPA — оставь ipaUk/ipaUs пустыми.",
-        "- Для перевода glossRu выбирай 1 самый частотный и короткий вариант (без перечислений).",
-        "- Смыслов делай 1–4, только реально разные значения.",
-        "- Примеры: короткие, естественные; RU перевод тоже естественный.",
-        "- Формы (forms): заполни основные формы по части речи, если это очевидно. Для глаголов: ing, past, past_participle, third_person_singular. Для существительных: plural. Для прилагательных: comparative/superlative. Если не очевидно — не добавляй.",
-        "",
-        "Выход:",
-        "- Верни СТРОГО JSON без пояснений и без markdown.",
-        "- Формат должен соответствовать этому шаблону (поля можно пропускать, если не уверен):",
+        "Выход: СТРОГО один JSON без markdown. Формат:",
         schema,
       ].join("\n");
 
@@ -1138,7 +1308,7 @@ const routes = {
 
       const data = await response.json();
       const content = data?.choices?.[0]?.message?.content;
-      outputJson = safeParseJson(content);
+      outputJson = normalizeDraftForUi(safeParseJson(content));
       send(res, 200, { draft: outputJson });
     } catch (e) {
       errText = e instanceof Error ? e.message : String(e);
@@ -1514,10 +1684,19 @@ const server = http.createServer(async (req, res) => {
   }
 
   const url = new URL(req.url || "/", `http://${req.headers.host}`);
-  const path = `${req.method} ${url.pathname}`;
-  const handler = routes[path];
-
+  let pathname = url.pathname;
+  // Если прокси отдаёт путь без /api (например /admin/dictionary/...), добавляем префикс для совпадения с routes
+  if (!pathname.startsWith("/api") && /^\/(admin|auth|rating|me|languages|dictionary|user-dictionary)/.test(pathname)) {
+    pathname = "/api" + pathname;
+  }
+  let path = `${req.method} ${pathname}`;
+  let handler = routes[path];
+  if (!handler && pathname.endsWith("/") && pathname.length > 1) {
+    path = `${req.method} ${pathname.slice(0, -1)}`;
+    handler = routes[path];
+  }
   if (!handler) {
+    console.warn("[routes] Not found:", path);
     send(res, 404, { error: "Not found" });
     return;
   }

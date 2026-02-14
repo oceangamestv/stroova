@@ -160,7 +160,7 @@ const WordCardTile: React.FC<{
           Подробнее
         </button>
         {onRemove && (
-          <button type="button" className="word-action-btn" onClick={onRemove}>
+          <button type="button" className="word-action-btn word-action-remove-personal" onClick={onRemove}>
             Удалить
           </button>
         )}
@@ -348,6 +348,10 @@ const DictionaryCasualPage: React.FC = () => {
   const [myStatus, setMyStatus] = useState<StatusFilter>("all");
   const [myItems, setMyItems] = useState<any[]>([]);
   const [myTotal, setMyTotal] = useState(0);
+  const [myWordsPanelOpen, setMyWordsPanelOpen] = useState(false);
+  const [myToolsFabCompact, setMyToolsFabCompact] = useState(false);
+  const myWordsSearchInputRef = useRef<HTMLInputElement>(null);
+  const myWordsPanelOpenButtonRef = useRef<HTMLButtonElement>(null);
 
   const [collectionsState, setCollectionsState] = useState<LoadState>("idle");
   const [collectionsError, setCollectionsError] = useState<string | null>(null);
@@ -358,6 +362,12 @@ const DictionaryCasualPage: React.FC = () => {
   const [collectionError, setCollectionError] = useState<string | null>(null);
   const [collection, setCollection] = useState<any | null>(null);
   const [collectionItems, setCollectionItems] = useState<any[]>([]);
+
+  const [deleteConfirm, setDeleteConfirm] = useState<{ open: boolean; senseId: number | null; wordLabel: string }>({
+    open: false,
+    senseId: null,
+    wordLabel: "",
+  });
 
   const isLoggedIn = !!user;
 
@@ -690,6 +700,35 @@ const DictionaryCasualPage: React.FC = () => {
     if (deckItems.length === 0) setDeckIndex(0);
     else if (deckIndex >= deckItems.length) setDeckIndex(Math.max(0, deckItems.length - 1));
   }, [deckItems.length, deckIndex]);
+
+  useEffect(() => {
+    if (!isMobile) return;
+    if (myWordsPanelOpen) {
+      const t = setTimeout(() => myWordsSearchInputRef.current?.focus(), 100);
+      const onKey = (e: KeyboardEvent) => {
+        if (e.key === "Escape") setMyWordsPanelOpen(false);
+      };
+      document.addEventListener("keydown", onKey);
+      return () => {
+        clearTimeout(t);
+        document.removeEventListener("keydown", onKey);
+      };
+    }
+    myWordsPanelOpenButtonRef.current?.focus({ preventScroll: true });
+  }, [isMobile, myWordsPanelOpen]);
+
+  useEffect(() => {
+    if (!isMobile || tab !== "my") {
+      setMyToolsFabCompact(false);
+      return;
+    }
+    const onScroll = () => {
+      setMyToolsFabCompact(window.scrollY > 24);
+    };
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, [isMobile, tab]);
 
   const todayHasContent = todayDue.length > 0 || todayNew.length > 0;
 
@@ -1160,7 +1199,8 @@ const DictionaryCasualPage: React.FC = () => {
             <section className="dict-casual-section">
               {myError && <div className="dictionary-error-banner" style={{ padding: "10px 12px" }}>{myError}</div>}
 
-              <div className="dict-my-toolbar">
+              {/* Desktop: full toolbar; mobile: hidden, use icon bar + sheet instead */}
+              <div className="dict-my-toolbar dict-my-toolbar--desktop">
                 <input
                   className="search-input"
                   placeholder="Поиск по моим словам…"
@@ -1182,9 +1222,78 @@ const DictionaryCasualPage: React.FC = () => {
                 </button>
               </div>
 
-              {mySummary && (
-                <div className="dict-my-summary">
-                  Всего: <b>{mySummary.total}</b> • Знаю: <b>{mySummary.known}</b> • Учу: <b>{mySummary.learning}</b>
+              {/* Mobile only: floating pill button for search + filters */}
+              {isMobile && (
+                <button
+                  type="button"
+                  ref={myWordsPanelOpenButtonRef}
+                  className={`dict-my-tools-fab${myToolsFabCompact ? " dict-my-tools-fab--compact" : ""}`}
+                  onClick={() => setMyWordsPanelOpen(true)}
+                  aria-label="Открыть поиск и фильтры словаря"
+                >
+                  <svg {...svgProps} width={20} height={20}>
+                    <circle cx="9" cy="9" r="5.5" />
+                    <path d="m14.5 14.5 4 4" />
+                    <path d="M14 3h6" />
+                    <path d="M17 3v5" />
+                  </svg>
+                  <span className="dict-my-tools-fab__label">Поиск и фильтр</span>
+                </button>
+              )}
+
+              {/* Mobile bottom sheet: search + filter + Apply */}
+              {isMobile && myWordsPanelOpen && (
+                <div
+                  className="dict-my-words-sheet-overlay"
+                  role="presentation"
+                  onClick={() => setMyWordsPanelOpen(false)}
+                />
+              )}
+              {isMobile && myWordsPanelOpen && (
+                <div className="dict-my-words-sheet" role="dialog" aria-label="Поиск и фильтры">
+                  <div className="dict-my-words-sheet__handle" aria-hidden />
+                  <div className="dict-my-words-sheet__content">
+                    <div className="dict-my-toolbar dict-my-toolbar--sheet">
+                      <input
+                        ref={myWordsSearchInputRef}
+                        className="search-input"
+                        placeholder="Поиск по моим словам…"
+                        value={myQ}
+                        onChange={(e) => setMyQ(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            loadMy();
+                            setMyWordsPanelOpen(false);
+                          }
+                        }}
+                      />
+                      <select value={myStatus} onChange={(e) => setMyStatus(e.target.value as StatusFilter)}>
+                        {(["all", "queue", "learning", "known", "hard"] as StatusFilter[]).map((s) => (
+                          <option key={s} value={s}>
+                            {statusLabel(s)}
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        type="button"
+                        className="word-action-btn"
+                        onClick={async () => {
+                          await loadMy();
+                          setMyWordsPanelOpen(false);
+                        }}
+                        disabled={myState === "loading"}
+                      >
+                        {myState === "loading" ? "…" : "Применить"}
+                      </button>
+                    </div>
+                    <button
+                      type="button"
+                      className="dict-my-words-sheet__close word-action-btn"
+                      onClick={() => setMyWordsPanelOpen(false)}
+                    >
+                      Закрыть
+                    </button>
+                  </div>
                 </div>
               )}
 
@@ -1194,8 +1303,8 @@ const DictionaryCasualPage: React.FC = () => {
                     <div className="dict-card__head">
                       <div className="dict-card__word">{it.en}</div>
                       <div className="dict-card__badges">
-                        {it.level && <MiniBadge className={`lvl lvl-${it.level}`}>{it.level}</MiniBadge>}
                         {it.status && <MiniBadge className={`st st-${it.status}`}>{statusLabel(it.status)}</MiniBadge>}
+                        {it.level && <MiniBadge className={`lvl lvl-${it.level}`}>{it.level}</MiniBadge>}
                       </div>
                     </div>
                     <div className="dict-card__ru">{it.ru || "—"}</div>
@@ -1209,7 +1318,7 @@ const DictionaryCasualPage: React.FC = () => {
                       <button type="button" className="word-action-btn" onClick={() => navigate(`/dictionary/word/${Number(it.senseId)}`)}>
                         Подробнее
                       </button>
-                      <button type="button" className="word-action-btn" onClick={() => removeFromMySense(Number(it.senseId))}>
+                      <button type="button" className="word-action-btn word-action-remove-personal" onClick={() => setDeleteConfirm({ open: true, senseId: Number(it.senseId), wordLabel: it.en || "Слово" })}>
                         Удалить
                       </button>
                     </div>
@@ -1691,6 +1800,49 @@ const DictionaryCasualPage: React.FC = () => {
           </div>
         )}
       </main>
+
+      {deleteConfirm.open && deleteConfirm.senseId !== null && (
+        <div className="dict-modal dict-modal--confirm" role="dialog" aria-modal="true" aria-labelledby="dict-delete-confirm-title">
+          <div className="dict-modal__backdrop" onClick={() => setDeleteConfirm({ open: false, senseId: null, wordLabel: "" })} />
+          <div className="dict-modal__panel dict-modal__panel--confirm">
+            <div className="dict-modal__head dict-modal__head--confirm">
+              <div className="dict-modal__confirm-hero">
+                <span className="dict-modal__confirm-icon" aria-hidden>!</span>
+                <div className="dict-modal__confirm-heading">
+                  <h2 id="dict-delete-confirm-title" className="dict-modal__title dict-modal__title--confirm">Удалить слово?</h2>
+                  <p className="dict-modal__confirm-subtitle">Действие нельзя отменить</p>
+                </div>
+              </div>
+            </div>
+            <div className="dict-modal__content dict-modal__content--confirm">
+              <p className="dict-modal__confirm-text">
+                Слово «{deleteConfirm.wordLabel}» будет удалено из списка «Мои слова». Продолжить?
+              </p>
+              <div className="dict-modal__confirm-actions">
+                <button
+                  type="button"
+                  className="word-action-btn dict-modal__confirm-cancel"
+                  onClick={() => setDeleteConfirm({ open: false, senseId: null, wordLabel: "" })}
+                >
+                  Отмена
+                </button>
+                <button
+                  type="button"
+                  className="word-action-btn word-action-remove-personal dict-modal__confirm-remove"
+                  onClick={async () => {
+                    if (deleteConfirm.senseId !== null) {
+                      await removeFromMySense(deleteConfirm.senseId);
+                      setDeleteConfirm({ open: false, senseId: null, wordLabel: "" });
+                    }
+                  }}
+                >
+                  Удалить
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <nav className="dict-casual-bottom-tabs" aria-label="Разделы словаря">
         <button type="button" className={`dictionary-tab dictionary-tab--side ${tab === "collections" ? "active" : ""}`} onClick={() => setTab("collections")}>

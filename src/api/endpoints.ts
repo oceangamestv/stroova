@@ -90,6 +90,15 @@ export const userDictionaryApi = {
       `/user-dictionary/today${q ? `?${q}` : ""}`
     );
   },
+  /** Сводка по словарю пользователя (всего слов, знаю, изучаю, повтор) для блока «Мой прогресс». */
+  summary: (params?: { lang?: string }) => {
+    const search = new URLSearchParams();
+    if (params?.lang) search.set("lang", params.lang);
+    const q = search.toString();
+    return api.get<{ total: number; queue: number; learning: number; known: number; hard: number }>(
+      `/user-dictionary/summary${q ? `?${q}` : ""}`
+    );
+  },
   myWords: (params?: { lang?: string; q?: string; status?: "all" | "queue" | "learning" | "known" | "hard"; offset?: number; limit?: number }) => {
     const search = new URLSearchParams();
     if (params?.lang) search.set("lang", params.lang);
@@ -216,6 +225,8 @@ export const adminDictionaryApi = {
     api.post<{ suggestion: Partial<Word> }>(`/admin/dictionary/ai-suggest`, body),
   aiDraft: (body: { lang?: string; entryId?: number; word?: string }) =>
     api.post<AdminDictionaryAiDraftResponse>(`/admin/dictionary/ai-draft`, body),
+  fillIpa: (body: { lang?: string; entryId?: number; word?: string }) =>
+    api.post<{ ipaUk: string; ipaUs: string; en: string }>(`/admin/dictionary/fill-ipa`, body),
   applyDraft: (body: AdminDictionaryApplyDraftBody) =>
     api.post<AdminDictionaryApplyDraftResponse>(`/admin/dictionary/apply-draft`, body),
 };

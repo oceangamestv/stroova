@@ -155,12 +155,9 @@ const Header: React.FC = () => {
   const [soundOn, setSoundOn] = useState(getSoundEnabled);
 
   useEffect(() => {
-    if (user) {
-      const uri = localStorage.getItem(VOICE_STORAGE_KEY_PREFIX + user.username);
-      setPreferredVoiceUri(uri || null);
-    } else {
-      setPreferredVoiceUri(null);
-    }
+    const username = user?.username ?? "guest";
+    const uri = localStorage.getItem(VOICE_STORAGE_KEY_PREFIX + username);
+    setPreferredVoiceUri(uri || null);
   }, [user?.username]);
 
   const streakDays = user?.activeDays?.streakDays ?? 0;

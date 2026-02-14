@@ -44,6 +44,14 @@ const routeConfig = [
     ),
   },
   {
+    path: "/admin/dictionary/word/:entryId",
+    element: (
+      <AdminRoute>
+        <AdminDictionaryPage />
+      </AdminRoute>
+    ),
+  },
+  {
     path: "/profile",
     element: (
       <ProtectedRoute>

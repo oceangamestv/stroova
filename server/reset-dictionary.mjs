@@ -15,6 +15,9 @@ async function resetDictionaryData() {
     await client.query(
       `
         TRUNCATE TABLE
+          user_daily_highlights,
+          dictionary_ai_suggestions,
+          dictionary_audit_log,
           dictionary_collection_items,
           dictionary_usage_patterns,
           dictionary_collocations,
@@ -29,10 +32,13 @@ async function resetDictionaryData() {
           dictionary_lemmas,
           dictionary_collections,
           dictionary_entries
-        RESTART IDENTITY
+        RESTART IDENTITY CASCADE
       `
     );
 
+    await client.query(
+      "UPDATE users SET word_progress = '{}'::jsonb, personal_dictionary = '[]'::jsonb"
+    );
     await client.query("UPDATE languages SET version = NULL WHERE code = 'en'");
     await client.query("COMMIT");
 

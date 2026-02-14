@@ -78,12 +78,12 @@ function wordToSlug(en: string): string {
     .replace(/[^a-z0-9_]/g, "");
 }
 
-const getAudioContext = (): AudioContext => {
+const getAudioContext = async (): Promise<AudioContext> => {
   if (!globalAudioContext) {
     globalAudioContext = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
   }
   if (globalAudioContext.state === "suspended") {
-    globalAudioContext.resume();
+    await globalAudioContext.resume();
   }
   return globalAudioContext;
 };
@@ -97,7 +97,7 @@ export const setPreferredVoiceUri = (uri: string | null) => {
 const playAudioBuffer = async (audioBuffer: AudioBuffer, rate?: number): Promise<void> => {
   try {
     try {
-      const audioContext = getAudioContext();
+      const audioContext = await getAudioContext();
       const source = audioContext.createBufferSource();
       const gainNode = audioContext.createGain();
       source.buffer = audioBuffer;
@@ -110,7 +110,7 @@ const playAudioBuffer = async (audioBuffer: AudioBuffer, rate?: number): Promise
     } catch {
       // fallback
     }
-    const audioContext = getAudioContext();
+    const audioContext = await getAudioContext();
     const wavBlob = await audioBufferToWav(audioBuffer);
     const audioUrl = URL.createObjectURL(wavBlob);
     const audio = new Audio(audioUrl);
@@ -192,72 +192,93 @@ const tryPlayPreGenerated = async (
 ): Promise<boolean> => {
   const path = getPreGeneratedAudioUrl(voice, wordEn);
   const base = getAudioBaseUrl();
-  const url = base ? `${base}${path}` : path;
+  const isCapacitor = typeof window !== "undefined" && !!(window as unknown as { Capacitor?: unknown }).Capacitor;
+  const url = base && isCapacitor ? `${base}${path}` : path;
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/039ed3c9-0fe6-43d1-a385-bc2c487e240a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'sounds.ts:tryPlayPreGenerated',message:'fetch url',data:{url,path,base,wordEn,voice},timestamp:Date.now(),hypothesisId:'B'})}).catch(()=>{});
+  // #endregion
   try {
     const res = await fetch(url);
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/039ed3c9-0fe6-43d1-a385-bc2c487e240a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'sounds.ts:afterFetch',message:'response',data:{ok:res.ok,status:res.status,url},timestamp:Date.now(),hypothesisId:'C'})}).catch(()=>{});
+    // #endregion
     if (!res.ok) return false;
     const buf = await res.arrayBuffer();
-    const audioContext = getAudioContext();
+    const audioContext = await getAudioContext();
     const audioBuffer = await audioContext.decodeAudioData(buf);
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/039ed3c9-0fe6-43d1-a385-bc2c487e240a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'sounds.ts:afterDecode',message:'decoded',data:{url},timestamp:Date.now(),hypothesisId:'D'})}).catch(()=>{});
+    // #endregion
     await playAudioBuffer(audioBuffer, rate);
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/039ed3c9-0fe6-43d1-a385-bc2c487e240a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'sounds.ts:afterPlay',message:'played',data:{url},timestamp:Date.now(),hypothesisId:'D'})}).catch(()=>{});
+    // #endregion
     return true;
-  } catch {
+  } catch (e) {
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/039ed3c9-0fe6-43d1-a385-bc2c487e240a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'sounds.ts:tryPlayCatch',message:'catch',data:{url,err:String(e&&(e as Error).message? (e as Error).message : e)},timestamp:Date.now(),hypothesisId:'C'})}).catch(()=>{});
+    // #endregion
     return false;
   }
 };
 
-/** Озвучивает слово: предгенерированные файлы (Bella/Michael) с сайта или с сервера. */
+/** Озвучивает слово только из предзаписанных WAV (public/audio/female или male) по голосу из профиля. */
 export const speakWord = async (
   word: string,
   _accent: "UK" | "US" | "both" = "both",
   rate?: number
 ): Promise<void> => {
-  if (!getSoundEnabled()) return;
+  const soundOn = getSoundEnabled();
+  const wordEn = String(word || "").trim();
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/039ed3c9-0fe6-43d1-a385-bc2c487e240a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'sounds.ts:speakWord',message:'entry',data:{soundOn,wordEn,preferredVoiceUri,wordRaw:word},timestamp:Date.now(),hypothesisId:'A'})}).catch(()=>{});
+  // #endregion
+  if (!soundOn) return;
+  if (!wordEn) return;
+  await getAudioContext();
   const voice = preferredVoiceUri || `kokoro:${VOICES.BELLA}`;
-  await tryPlayPreGenerated(word, voice, rate);
+  await tryPlayPreGenerated(wordEn, voice, rate);
 };
 
 /** Короткий чёткий звук ошибки (низкий тон) */
 export const playErrorSound = (): void => {
   if (!getSoundEnabled()) return;
-  try {
-    const audioContext = getAudioContext();
-    const oscillator = audioContext.createOscillator();
-    const gainNode = audioContext.createGain();
-    oscillator.connect(gainNode);
-    gainNode.connect(audioContext.destination);
-    oscillator.frequency.value = 200;
-    oscillator.type = "sine";
-    gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
-    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.2);
-    oscillator.start(audioContext.currentTime);
-    oscillator.stop(audioContext.currentTime + 0.2);
-  } catch {
-    // ignore
-  }
+  getAudioContext()
+    .then((audioContext) => {
+      const oscillator = audioContext.createOscillator();
+      const gainNode = audioContext.createGain();
+      oscillator.connect(gainNode);
+      gainNode.connect(audioContext.destination);
+      oscillator.frequency.value = 200;
+      oscillator.type = "sine";
+      gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.2);
+      oscillator.start(audioContext.currentTime);
+      oscillator.stop(audioContext.currentTime + 0.2);
+    })
+    .catch(() => {});
 };
 
 /** Короткий звонкий звук при правильном ответе (два быстрых тона) */
 export const playCorrectSound = (): void => {
   if (!getSoundEnabled()) return;
-  try {
-    const ctx = getAudioContext();
-    const t0 = ctx.currentTime;
-    const gainNode = ctx.createGain();
-    gainNode.connect(ctx.destination);
-    gainNode.gain.setValueAtTime(0, t0);
-    gainNode.gain.linearRampToValueAtTime(0.25, t0 + 0.02);
-    gainNode.gain.exponentialRampToValueAtTime(0.01, t0 + 0.12);
-    const osc1 = ctx.createOscillator();
-    osc1.type = "sine";
-    osc1.frequency.setValueAtTime(660, t0);
-    osc1.frequency.setValueAtTime(880, t0 + 0.06);
-    osc1.connect(gainNode);
-    osc1.start(t0);
-    osc1.stop(t0 + 0.12);
-  } catch {
-    // ignore
-  }
+  getAudioContext()
+    .then((ctx) => {
+      const t0 = ctx.currentTime;
+      const gainNode = ctx.createGain();
+      gainNode.connect(ctx.destination);
+      gainNode.gain.setValueAtTime(0, t0);
+      gainNode.gain.linearRampToValueAtTime(0.25, t0 + 0.02);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, t0 + 0.12);
+      const osc1 = ctx.createOscillator();
+      osc1.type = "sine";
+      osc1.frequency.setValueAtTime(660, t0);
+      osc1.frequency.setValueAtTime(880, t0 + 0.06);
+      osc1.connect(gainNode);
+      osc1.start(t0);
+      osc1.stop(t0 + 0.12);
+    })
+    .catch(() => {});
 };
 
 export const initializeVoices = async (): Promise<void> => {

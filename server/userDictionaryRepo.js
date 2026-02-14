@@ -1,4 +1,4 @@
-import { pool } from "./db.js";
+﻿import { pool } from "./db.js";
 
 function clampInt(v, min, max, fallback) {
   const n = typeof v === "number" ? v : parseInt(String(v ?? ""), 10);
@@ -41,14 +41,14 @@ async function getSenseIdsByEntryIds(langCode, entryIds, db = pool) {
 }
 
 /**
- * Лениво переносит legacy users.personal_dictionary/word_progress → нормализованные таблицы.
- * Безопасно вызывать многократно.
+ * Р›РµРЅРёРІРѕ РїРµСЂРµРЅРѕСЃРёС‚ legacy users.personal_dictionary/word_progress в†’ РЅРѕСЂРјР°Р»РёР·РѕРІР°РЅРЅС‹Рµ С‚Р°Р±Р»РёС†С‹.
+ * Р‘РµР·РѕРїР°СЃРЅРѕ РІС‹Р·С‹РІР°С‚СЊ РјРЅРѕРіРѕРєСЂР°С‚РЅРѕ.
  */
 export async function ensureUserDictionaryBackfilled(username, langCode = "en", db = pool) {
   const u = String(username || "").trim();
   if (!u) return { ok: false, reason: "no-username" };
 
-  // если уже есть сохранённые смыслы — считаем, что миграция уже была
+  // РµСЃР»Рё СѓР¶Рµ РµСЃС‚СЊ СЃРѕС…СЂР°РЅС‘РЅРЅС‹Рµ СЃРјС‹СЃР»С‹ вЂ” СЃС‡РёС‚Р°РµРј, С‡С‚Рѕ РјРёРіСЂР°С†РёСЏ СѓР¶Рµ Р±С‹Р»Р°
   const existing = await db.query(`SELECT 1 FROM user_saved_senses WHERE username = $1 LIMIT 1`, [u]);
   if (existing.rows.length > 0) return { ok: true, migrated: false };
 
@@ -76,7 +76,7 @@ export async function ensureUserDictionaryBackfilled(username, langCode = "en", 
     );
   }
 
-  // word_progress: ключи — entryId → { beginner/experienced/expert }
+  // word_progress: РєР»СЋС‡Рё вЂ” entryId в†’ { beginner/experienced/expert }
   const progressEntries = Object.entries(wordProgress || {});
   if (progressEntries.length > 0) {
     const entryIds = progressEntries.map(([id]) => Number(id)).filter((n) => Number.isFinite(n) && n > 0);
@@ -125,8 +125,8 @@ export async function ensureUserDictionaryBackfilled(username, langCode = "en", 
 }
 
 /**
- * Синхронизирует нормализованные таблицы с PATCH /me (legacy JSON-поля).
- * Чтобы не ломать текущие игры/клиент, которые продолжают слать personalDictionary/wordProgress как JSON.
+ * РЎРёРЅС…СЂРѕРЅРёР·РёСЂСѓРµС‚ РЅРѕСЂРјР°Р»РёР·РѕРІР°РЅРЅС‹Рµ С‚Р°Р±Р»РёС†С‹ СЃ PATCH /me (legacy JSON-РїРѕР»СЏ).
+ * Р§С‚РѕР±С‹ РЅРµ Р»РѕРјР°С‚СЊ С‚РµРєСѓС‰РёРµ РёРіСЂС‹/РєР»РёРµРЅС‚, РєРѕС‚РѕСЂС‹Рµ РїСЂРѕРґРѕР»Р¶Р°СЋС‚ СЃР»Р°С‚СЊ personalDictionary/wordProgress РєР°Рє JSON.
  */
 export async function syncUserDictionaryFromMePatch(username, langCode, patch, db = pool) {
   const u = String(username || "").trim();
@@ -140,7 +140,7 @@ export async function syncUserDictionaryFromMePatch(username, langCode, patch, d
     const entryMap = await getSenseIdsByEntryIds(langCode, list, db);
     const senseIds = Array.from(entryMap.values()).map((x) => x.senseId);
 
-    // вставим недостающие
+    // РІСЃС‚Р°РІРёРј РЅРµРґРѕСЃС‚Р°СЋС‰РёРµ
     if (senseIds.length > 0) {
       await db.query(
         `
@@ -153,8 +153,8 @@ export async function syncUserDictionaryFromMePatch(username, langCode, patch, d
         [u, senseIds]
       );
     }
-    // Важно: не удаляем из user_saved_senses записи, отсутствующие в legacy personalDictionary.
-    // Legacy-данные могут быть устаревшими и иначе "затирают" новые добавления из user-dictionary API.
+    // Р’Р°Р¶РЅРѕ: РЅРµ СѓРґР°Р»СЏРµРј РёР· user_saved_senses Р·Р°РїРёСЃРё, РѕС‚СЃСѓС‚СЃС‚РІСѓСЋС‰РёРµ РІ legacy personalDictionary.
+    // Legacy-РґР°РЅРЅС‹Рµ РјРѕРіСѓС‚ Р±С‹С‚СЊ СѓСЃС‚Р°СЂРµРІС€РёРјРё Рё РёРЅР°С‡Рµ "Р·Р°С‚РёСЂР°СЋС‚" РЅРѕРІС‹Рµ РґРѕР±Р°РІР»РµРЅРёСЏ РёР· user-dictionary API.
   }
 
   if (wordProgress && typeof wordProgress === "object") {
@@ -205,16 +205,16 @@ export async function syncUserDictionaryFromMePatch(username, langCode, patch, d
 
 export async function listMyWords(username, langCode, params = {}, db = pool) {
   const u = String(username || "").trim();
-  const languageId = await getLanguageId(langCode, db);
-  if (!u || !languageId) return { items: [], total: 0 };
+  if (!u) return { items: [], total: 0 };
 
   const q = String(params.q || "").trim().toLowerCase();
-  const status = params.status ? normalizeStatus(params.status) : "all";
+  const rawStatus = String(params.status || "all").trim().toLowerCase();
+  const status = rawStatus === "all" ? "all" : normalizeStatus(rawStatus);
   const offset = clampInt(params.offset, 0, 1_000_000, 0);
   const limit = clampInt(params.limit, 1, 200, 50);
 
-  const where = [];
-  const values = [u, languageId];
+  const where = ["us.username = $1"];
+  const values = [u];
   let n = values.length + 1;
 
   if (status !== "all") {
@@ -227,7 +227,7 @@ export async function listMyWords(username, langCode, params = {}, db = pool) {
     n++;
   }
 
-  const whereSql = where.length ? `AND ${where.join(" AND ")}` : "";
+  const whereSql = where.join(" AND ");
 
   const totalRes = await db.query(
     `
@@ -236,8 +236,7 @@ export async function listMyWords(username, langCode, params = {}, db = pool) {
       JOIN dictionary_senses s ON s.id = us.sense_id
       JOIN dictionary_lemmas m ON m.id = s.lemma_id
       LEFT JOIN dictionary_examples e ON e.sense_id = s.id AND e.is_main = TRUE
-      WHERE us.username = $1 AND m.language_id = $2
-      ${whereSql}
+      WHERE ${whereSql}
     `,
     values
   );
@@ -266,8 +265,7 @@ export async function listMyWords(username, langCode, params = {}, db = pool) {
       JOIN dictionary_lemmas m ON m.id = s.lemma_id
       LEFT JOIN dictionary_examples e ON e.sense_id = s.id AND e.is_main = TRUE
       LEFT JOIN user_sense_progress p ON p.username = us.username AND p.sense_id = us.sense_id
-      WHERE us.username = $1 AND m.language_id = $2
-      ${whereSql}
+      WHERE ${whereSql}
       ORDER BY us.updated_at DESC, us.added_at DESC
       OFFSET $${n} LIMIT $${n + 1}
     `,
@@ -275,6 +273,38 @@ export async function listMyWords(username, langCode, params = {}, db = pool) {
   );
 
   return { items: res.rows, total: totalRes.rows[0]?.total || 0 };
+}
+
+/**
+ * РЎРІРѕРґРєР° РїРѕ СЃР»РѕРІР°СЂСЋ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ: РІСЃРµРіРѕ СЃР»РѕРІ Рё СЂР°Р·Р±РёРІРєР° РїРѕ СЃС‚Р°С‚СѓСЃР°Рј (РґР»СЏ Р±Р»РѕРєР° В«РњРѕР№ РїСЂРѕРіСЂРµСЃСЃВ»).
+ * РЈС‡РёС‚С‹РІР°СЋС‚СЃСЏ РІСЃРµ СЃРѕС…СЂР°РЅС‘РЅРЅС‹Рµ СЃРјС‹СЃР»С‹ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ (Р±РµР· С„РёР»СЊС‚СЂР° РїРѕ СЏР·С‹РєСѓ), С‡С‚РѕР±С‹ СЃС‡С‘С‚С‡РёРєРё СЃРѕРІРїР°РґР°Р»Рё СЃ В«РњРѕРё СЃР»РѕРІР°В» Рё РєРѕР»Р»РµРєС†РёСЏРјРё.
+ */
+export async function getMyWordsSummary(username, langCode, db = pool) {
+  const u = String(username || "").trim();
+  if (!u) return { total: 0, queue: 0, learning: 0, known: 0, hard: 0 };
+
+  const res = await db.query(
+    `
+      SELECT us.status, COUNT(*)::int AS cnt
+      FROM user_saved_senses us
+      JOIN dictionary_senses s ON s.id = us.sense_id
+      JOIN dictionary_lemmas m ON m.id = s.lemma_id
+      WHERE us.username = $1
+      GROUP BY us.status
+    `,
+    [u]
+  );
+
+  const out = { total: 0, queue: 0, learning: 0, known: 0, hard: 0 };
+  for (const row of res.rows) {
+    const status = String(row.status || "").trim().toLowerCase();
+    const cnt = Number(row.cnt) || 0;
+    if (["queue", "learning", "known", "hard"].includes(status)) {
+      out[status] = cnt;
+      out.total += cnt;
+    }
+  }
+  return out;
 }
 
 export async function getWordCardByEntryId(langCode, entryId, db = pool) {
@@ -466,21 +496,21 @@ export async function getWordCardBySenseId(langCode, senseId, db = pool) {
   const info = senseRes.rows[0] || null;
   if (!info) return null;
 
-  // Попробуем найти legacy entry_id для этого sense (обычно есть только для sense #1)
+  // РџРѕРїСЂРѕР±СѓРµРј РЅР°Р№С‚Рё legacy entry_id РґР»СЏ СЌС‚РѕРіРѕ sense (РѕР±С‹С‡РЅРѕ РµСЃС‚СЊ С‚РѕР»СЊРєРѕ РґР»СЏ sense #1)
   const entryLink = await db.query(
     `SELECT entry_id AS "entryId" FROM dictionary_entry_links WHERE sense_id = $1 LIMIT 1`,
     [sid]
   );
   const entryId = entryLink.rows[0]?.entryId ? Number(entryLink.rows[0].entryId) : null;
 
-  // main example (если есть)
+  // main example (РµСЃР»Рё РµСЃС‚СЊ)
   const mainEx = await db.query(
     `SELECT en, ru FROM dictionary_examples WHERE sense_id = $1 AND is_main = TRUE ORDER BY id ASC LIMIT 1`,
     [sid]
   );
   const ex = mainEx.rows[0] || { en: "", ru: "" };
 
-  // Соберём entry-like объект для UI (казуальная карточка)
+  // РЎРѕР±РµСЂС‘Рј entry-like РѕР±СЉРµРєС‚ РґР»СЏ UI (РєР°Р·СѓР°Р»СЊРЅР°СЏ РєР°СЂС‚РѕС‡РєР°)
   const entry = {
     id: entryId || 0,
     en: info.lemma,
@@ -826,10 +856,10 @@ function stableStringHash(text) {
 function buildHardHint(row) {
   const hasPron = !!row?.hardPronunciation;
   const hasGrammar = !!row?.hardGrammar;
-  if (hasPron && hasGrammar) return "Сложное произношение и грамматика";
-  if (hasPron) return "Сложное произношение";
-  if (hasGrammar) return "Сложная грамматика";
-  return "Сложное слово";
+  if (hasPron && hasGrammar) return "РЎР»РѕР¶РЅРѕРµ РїСЂРѕРёР·РЅРѕС€РµРЅРёРµ Рё РіСЂР°РјРјР°С‚РёРєР°";
+  if (hasPron) return "РЎР»РѕР¶РЅРѕРµ РїСЂРѕРёР·РЅРѕС€РµРЅРёРµ";
+  if (hasGrammar) return "РЎР»РѕР¶РЅР°СЏ РіСЂР°РјРјР°С‚РёРєР°";
+  return "РЎР»РѕР¶РЅРѕРµ СЃР»РѕРІРѕ";
 }
 
 async function getServerDayKey(db = pool) {
@@ -844,7 +874,7 @@ async function getHardWordOfDay(username, langCode, db = pool) {
   const dayKey = await getServerDayKey(db);
   if (!dayKey) return null;
 
-  // 1) Если уже выбирали слово на сегодня — возвращаем его.
+  // 1) Р•СЃР»Рё СѓР¶Рµ РІС‹Р±РёСЂР°Р»Рё СЃР»РѕРІРѕ РЅР° СЃРµРіРѕРґРЅСЏ вЂ” РІРѕР·РІСЂР°С‰Р°РµРј РµРіРѕ.
   const saved = await db.query(
     `
       SELECT
@@ -887,12 +917,12 @@ async function getHardWordOfDay(username, langCode, db = pool) {
       ipaUs: row.ipaUs || "",
       example: row.example || "",
       exampleRu: row.exampleRu || "",
-      difficultyHint: String(meta.difficultyHint || "Сложное слово"),
+      difficultyHint: String(meta.difficultyHint || "РЎР»РѕР¶РЅРѕРµ СЃР»РѕРІРѕ"),
       difficultyType: String(meta.difficultyType || "mixed"),
     };
   }
 
-  // 2) Подбираем кандидатов: top-2000 + сложные по произношению/грамматике, исключая "known".
+  // 2) РџРѕРґР±РёСЂР°РµРј РєР°РЅРґРёРґР°С‚РѕРІ: top-2000 + СЃР»РѕР¶РЅС‹Рµ РїРѕ РїСЂРѕРёР·РЅРѕС€РµРЅРёСЋ/РіСЂР°РјРјР°С‚РёРєРµ, РёСЃРєР»СЋС‡Р°СЏ "known".
   const candidates = await db.query(
     `
       SELECT
@@ -908,12 +938,12 @@ async function getHardWordOfDay(username, langCode, db = pool) {
         COALESCE(ex.en, '') AS "example",
         COALESCE(ex.ru, '') AS "exampleRu",
         (
-          COALESCE(l.ipa_uk, '') ~ '(θ|ð|ʒ|tʃ|dʒ|ŋ|əː|ɜː)'
-          OR COALESCE(l.ipa_us, '') ~ '(θ|ð|ʒ|tʃ|dʒ|ŋ|ɝ|ɚ)'
+          COALESCE(l.ipa_uk, '') ~ '(Оё|Г°|К’|tКѓ|dК’|Е‹|Й™Лђ|ЙњЛђ)'
+          OR COALESCE(l.ipa_us, '') ~ '(Оё|Г°|К’|tКѓ|dК’|Е‹|Йќ|Йљ)'
         ) AS "hardPronunciation",
         (
           s.level IN ('A2', 'B1', 'B2', 'C1', 'C2')
-          OR s.register = 'официальная'
+          OR s.register = 'РѕС„РёС†РёР°Р»СЊРЅР°СЏ'
           OR EXISTS (
             SELECT 1
             FROM dictionary_forms f
@@ -930,11 +960,11 @@ async function getHardWordOfDay(username, langCode, db = pool) {
             WHEN 'C2' THEN 5
             ELSE 0
           END
-          + CASE WHEN s.register = 'официальная' THEN 1 ELSE 0 END
+          + CASE WHEN s.register = 'РѕС„РёС†РёР°Р»СЊРЅР°СЏ' THEN 1 ELSE 0 END
           + CASE
               WHEN (
-                COALESCE(l.ipa_uk, '') ~ '(θ|ð|ʒ|tʃ|dʒ|ŋ|əː|ɜː)'
-                OR COALESCE(l.ipa_us, '') ~ '(θ|ð|ʒ|tʃ|dʒ|ŋ|ɝ|ɚ)'
+                COALESCE(l.ipa_uk, '') ~ '(Оё|Г°|К’|tКѓ|dК’|Е‹|Й™Лђ|ЙњЛђ)'
+                OR COALESCE(l.ipa_us, '') ~ '(Оё|Г°|К’|tКѓ|dК’|Е‹|Йќ|Йљ)'
               ) THEN 3 ELSE 0
             END
           + CASE WHEN EXISTS (
@@ -949,11 +979,11 @@ async function getHardWordOfDay(username, langCode, db = pool) {
         AND l.frequency_rank <= 2000
         AND (
           (
-            COALESCE(l.ipa_uk, '') ~ '(θ|ð|ʒ|tʃ|dʒ|ŋ|əː|ɜː)'
-            OR COALESCE(l.ipa_us, '') ~ '(θ|ð|ʒ|tʃ|dʒ|ŋ|ɝ|ɚ)'
+            COALESCE(l.ipa_uk, '') ~ '(Оё|Г°|К’|tКѓ|dК’|Е‹|Й™Лђ|ЙњЛђ)'
+            OR COALESCE(l.ipa_us, '') ~ '(Оё|Г°|К’|tКѓ|dК’|Е‹|Йќ|Йљ)'
           )
           OR s.level IN ('A2', 'B1', 'B2', 'C1', 'C2')
-          OR s.register = 'официальная'
+          OR s.register = 'РѕС„РёС†РёР°Р»СЊРЅР°СЏ'
           OR EXISTS (
             SELECT 1
             FROM dictionary_forms f
@@ -984,7 +1014,7 @@ async function getHardWordOfDay(username, langCode, db = pool) {
   );
   if (!candidates.rows.length) return null;
 
-  // 3) Детерминированный выбор по пользователю и дню.
+  // 3) Р”РµС‚РµСЂРјРёРЅРёСЂРѕРІР°РЅРЅС‹Р№ РІС‹Р±РѕСЂ РїРѕ РїРѕР»СЊР·РѕРІР°С‚РµР»СЋ Рё РґРЅСЋ.
   const seed = stableStringHash(`${u}|${String(langCode || "en")}|${dayKey}|hard_word`);
   const idx = seed % candidates.rows.length;
   const picked = candidates.rows[idx];
@@ -996,7 +1026,7 @@ async function getHardWordOfDay(username, langCode, db = pool) {
       : "grammar";
   const difficultyHint = buildHardHint(picked);
 
-  // 4) Фиксируем выбор на день.
+  // 4) Р¤РёРєСЃРёСЂСѓРµРј РІС‹Р±РѕСЂ РЅР° РґРµРЅСЊ.
   await db.query(
     `
       INSERT INTO user_daily_highlights (username, lang_code, day_key, kind, sense_id, meta)
@@ -1037,7 +1067,7 @@ export async function getTodayPack(username, langCode, db = pool) {
   const languageId = await getLanguageId(langCode, db);
   if (!u || !languageId) return { due: [], new: [], hardOfDay: null };
 
-  // 1) due: сохранённые слова с низким прогрессом (простая эвристика)
+  // 1) due: СЃРѕС…СЂР°РЅС‘РЅРЅС‹Рµ СЃР»РѕРІР° СЃ РЅРёР·РєРёРј РїСЂРѕРіСЂРµСЃСЃРѕРј (РїСЂРѕСЃС‚Р°СЏ СЌРІСЂРёСЃС‚РёРєР°)
   const dueRes = await db.query(
     `
       SELECT
@@ -1067,7 +1097,7 @@ export async function getTodayPack(username, langCode, db = pool) {
     [u, languageId]
   );
 
-  // 2) new: частотные A0/A1 из общего словаря, которых ещё нет в сохранённых
+  // 2) new: С‡Р°СЃС‚РѕС‚РЅС‹Рµ A0/A1 РёР· РѕР±С‰РµРіРѕ СЃР»РѕРІР°СЂСЏ, РєРѕС‚РѕСЂС‹С… РµС‰С‘ РЅРµС‚ РІ СЃРѕС…СЂР°РЅС‘РЅРЅС‹С…
   const newRes = await db.query(
     `
       WITH saved AS (
@@ -1242,4 +1272,5 @@ export async function getCollectionProgress(username, langCode, collectionKey = 
     },
   };
 }
+
 

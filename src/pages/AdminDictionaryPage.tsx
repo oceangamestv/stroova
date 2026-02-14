@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import Header from "../components/common/Header";
 import { useIsMobile } from "../hooks/useIsMobile";
 import { useAuth } from "../features/auth/AuthContext";
+import { useNavigate, useParams } from "react-router-dom";
 import type { Word } from "../data/contracts/types";
 import { adminDictionaryApi } from "../api/endpoints";
 import type { AdminDictionaryAiDraft, AdminDictionaryEntryV2Response, AdminDictionaryListItem } from "../api/types";
@@ -15,10 +16,104 @@ const LEVELS: Word["level"][] = ["A0", "A1", "A2", "B1", "B2", "C1", "C2"];
 const ACCENTS: Word["accent"][] = ["both", "UK", "US"];
 const RARITIES: NonNullable<Word["rarity"]>[] = ["не редкое", "редкое", "очень редкое"];
 const REGISTERS: NonNullable<Word["register"]>[] = ["разговорная", "официальная"];
+const WORD_EDIT_FIELDS = [
+  "en",
+  "ru",
+  "level",
+  "accent",
+  "frequencyRank",
+  "rarity",
+  "register",
+  "ipaUk",
+  "ipaUs",
+  "example",
+  "exampleRu",
+] as const;
+type WordEditField = (typeof WORD_EDIT_FIELDS)[number];
+const IMPORTANT_EMPTY_FIELDS: WordEditField[] = ["ru", "frequencyRank", "rarity", "register", "ipaUk", "ipaUs", "example", "exampleRu"];
+
+const CARD_FIELD_ALIASES: Record<string, WordEditField> = {
+  en: "en",
+  lemma: "en",
+  ru: "ru",
+  gloss_ru: "ru",
+  level: "level",
+  accent: "accent",
+  frequencyRank: "frequencyRank",
+  frequency_rank: "frequencyRank",
+  rarity: "rarity",
+  register: "register",
+  ipaUk: "ipaUk",
+  ipa_uk: "ipaUk",
+  ipaUs: "ipaUs",
+  ipa_us: "ipaUs",
+  example: "example",
+  exampleRu: "exampleRu",
+  example_ru: "exampleRu",
+};
+
+function normalizeLevelValue(value: unknown): Word["level"] | null {
+  const v = String(value ?? "").trim().toUpperCase();
+  return (LEVELS as readonly string[]).includes(v) ? (v as Word["level"]) : null;
+}
+
+function normalizeAccentValue(value: unknown): Word["accent"] | null {
+  const raw = String(value ?? "").trim().toLowerCase();
+  if (!raw) return null;
+  if (raw === "both" || raw === "uk/us" || raw === "us/uk") return "both";
+  if (raw === "uk" || raw === "british" || raw === "br") return "UK";
+  if (raw === "us" || raw === "american" || raw === "am") return "US";
+  return null;
+}
+
+function normalizeRarityValue(value: unknown): NonNullable<Word["rarity"]> | null {
+  const raw = String(value ?? "").trim().toLowerCase();
+  if (!raw) return null;
+  if (raw.includes("очень") && raw.includes("ред")) return "очень редкое";
+  if (raw === "редкое" || raw === "rare" || raw === "uncommon") return "редкое";
+  if (raw === "не редкое" || raw === "частое" || raw === "обычное" || raw === "common") return "не редкое";
+  return null;
+}
+
+function normalizeRegisterValue(value: unknown): NonNullable<Word["register"]> | null {
+  const raw = String(value ?? "").trim().toLowerCase();
+  if (!raw) return null;
+  if (raw === "официальная" || raw === "formal") return "официальная";
+  if (raw === "разговорная" || raw === "informal" || raw === "colloquial") return "разговорная";
+  return null;
+}
 
 function toNumber(value: unknown, fallback: number) {
-  const n = parseInt(String(value ?? ""), 10);
+  const raw = String(value ?? "").trim();
+  if (!/^-?\d+$/.test(raw)) return fallback;
+  const n = parseInt(raw, 10);
   return Number.isFinite(n) ? n : fallback;
+}
+
+function pickCardFieldsFromObject(obj: Record<string, unknown>): Partial<Word> {
+  const out: Partial<Word> = {};
+  for (const [key, value] of Object.entries(obj)) {
+    const field = CARD_FIELD_ALIASES[key];
+    if (!field || value === undefined) continue;
+    if (field === "frequencyRank") {
+      out.frequencyRank = Math.max(1, toNumber(value, 15000));
+    } else if (field === "level") {
+      const normalized = normalizeLevelValue(value);
+      if (normalized) out.level = normalized;
+    } else if (field === "accent") {
+      const normalized = normalizeAccentValue(value);
+      if (normalized) out.accent = normalized;
+    } else if (field === "rarity") {
+      const normalized = normalizeRarityValue(value);
+      if (normalized) out.rarity = normalized;
+    } else if (field === "register") {
+      const normalized = normalizeRegisterValue(value);
+      if (normalized) out.register = normalized;
+    } else {
+      (out as Record<string, unknown>)[field] = typeof value === "string" ? value : String(value ?? "");
+    }
+  }
+  return out;
 }
 
 function formatApiError(e: unknown, fallback: string) {
@@ -84,6 +179,9 @@ function downloadText(filename: string, text: string, mime = "text/plain;charset
 const AdminDictionaryPage: React.FC = () => {
   const isMobile = useIsMobile();
   const { user } = useAuth();
+  const navigate = useNavigate();
+  const { entryId } = useParams<{ entryId?: string }>();
+  const editingEntryId = Number.isFinite(Number(entryId)) && Number(entryId) > 0 ? Number(entryId) : null;
 
   const [lang] = useState("en");
   const [query, setQuery] = useState("");
@@ -105,6 +203,7 @@ const AdminDictionaryPage: React.FC = () => {
   const selected = useMemo(() => items.find((w) => w.id === selectedId) ?? null, [items, selectedId]);
 
   const [draft, setDraft] = useState<Partial<Word> | null>(null);
+  const [editedDraft, setEditedDraft] = useState<Partial<Word> | null>(null);
   const [saveState, setSaveState] = useState<LoadState>("idle");
   const [saveError, setSaveError] = useState<string | null>(null);
 
@@ -132,7 +231,12 @@ const AdminDictionaryPage: React.FC = () => {
   });
 
   const [aiState, setAiState] = useState<LoadState>("idle");
+  const [ipaFillState, setIpaFillState] = useState<LoadState>("idle");
   const [aiError, setAiError] = useState<string | null>(null);
+  const [aiStatusText, setAiStatusText] = useState<string>("");
+  const [ipaStatusText, setIpaStatusText] = useState<string>("");
+  const [aiSuggestedFields, setAiSuggestedFields] = useState<WordEditField[] | null>(null);
+  const [aiAppliedSensesCount, setAiAppliedSensesCount] = useState<number | null>(null);
   const [aiJson, setAiJson] = useState<string>("");
 
   const [aiDraftState, setAiDraftState] = useState<LoadState>("idle");
@@ -162,6 +266,28 @@ const AdminDictionaryPage: React.FC = () => {
 
   const canAccess = !!user?.isAdmin && !isMobile;
 
+  const normalizeFieldValue = (field: WordEditField, value: unknown) => {
+    if (field === "frequencyRank") return toNumber(value, 15000);
+    return String(value ?? "").trim();
+  };
+
+  const isFieldChanged = (field: WordEditField) => {
+    if (!draft || !editedDraft) return false;
+    return normalizeFieldValue(field, draft[field]) !== normalizeFieldValue(field, editedDraft[field]);
+  };
+
+  const isFieldEmpty = (field: WordEditField) => {
+    if (!editedDraft) return false;
+    if (field === "frequencyRank") return !Number.isFinite(toNumber(editedDraft.frequencyRank, NaN));
+    return String(editedDraft[field] ?? "").trim() === "";
+  };
+
+  const changedFields = useMemo(() => WORD_EDIT_FIELDS.filter((field) => isFieldChanged(field)), [draft, editedDraft]);
+  const emptyImportantFields = useMemo(
+    () => IMPORTANT_EMPTY_FIELDS.filter((field) => isFieldEmpty(field)),
+    [editedDraft]
+  );
+
   const loadList = async (reset = true) => {
     setSearchState("loading");
     setSearchError(null);
@@ -170,6 +296,7 @@ const AdminDictionaryPage: React.FC = () => {
       setItems([]);
       setSelectedId(null);
       setDraft(null);
+      setEditedDraft(null);
       setV2(null);
       setV2Error(null);
     }
@@ -208,9 +335,17 @@ const AdminDictionaryPage: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [canAccess]);
 
-  const loadEntry = async (id: number) => {
+  useEffect(() => {
+    if (!canAccess) return;
+    if (!editingEntryId) return;
+    void loadEntryData(editingEntryId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canAccess, editingEntryId]);
+
+  const loadEntryData = async (id: number) => {
     setSelectedId(id);
     setDraft(null);
+    setEditedDraft(null);
     setSaveError(null);
     setV2(null);
     setV2Error(null);
@@ -225,9 +360,12 @@ const AdminDictionaryPage: React.FC = () => {
     setAiDraftJson("");
     setAiDraftError(null);
     setAiDraft(null);
+    setAiSuggestedFields(null);
+    setAiAppliedSensesCount(null);
     try {
       const { entry } = await adminDictionaryApi.getEntry({ lang, id });
       setDraft(entry);
+      setEditedDraft(entry);
       const v2Data = await adminDictionaryApi.getEntryV2({ lang, id });
       setV2(v2Data);
     } catch (e) {
@@ -235,28 +373,33 @@ const AdminDictionaryPage: React.FC = () => {
     }
   };
 
+  const loadEntry = async (id: number) => {
+    navigate(`/admin/dictionary/word/${id}`);
+  };
+
   const save = async () => {
-    if (!draft?.id) return;
+    if (!draft?.id || !editedDraft) return;
     setSaveState("loading");
     setSaveError(null);
     try {
-      const patch: Partial<Word> = {
-        en: String(draft.en ?? "").trim(),
-        ru: String(draft.ru ?? "").trim(),
-        level: (draft.level as Word["level"]) ?? "A0",
-        accent: (draft.accent as Word["accent"]) ?? "both",
-        frequencyRank: toNumber(draft.frequencyRank, 15000),
-        rarity: draft.rarity,
-        register: draft.register,
-        ipaUk: String(draft.ipaUk ?? ""),
-        ipaUs: String(draft.ipaUs ?? ""),
-        example: String(draft.example ?? ""),
-        exampleRu: String(draft.exampleRu ?? ""),
-      };
+      const patch: Partial<Word> = {};
+      for (const field of WORD_EDIT_FIELDS) {
+        if (!isFieldChanged(field)) continue;
+        if (field === "frequencyRank") {
+          patch.frequencyRank = toNumber(editedDraft.frequencyRank, 15000);
+          continue;
+        }
+        (patch as any)[field] = String(editedDraft[field] ?? "").trim();
+      }
+      if (Object.keys(patch).length === 0) {
+        setSaveState("idle");
+        return;
+      }
       const { entry } = await adminDictionaryApi.patchEntry({ lang, id: draft.id, patch });
       // Обновим в списке
       setItems((prev) => prev.map((w) => (w.id === entry.id ? { ...w, ...entry } : w)));
       setDraft(entry);
+      setEditedDraft(entry);
       try {
         const v2Data = await adminDictionaryApi.getEntryV2({ lang, id: entry.id });
         setV2(v2Data);
@@ -582,22 +725,112 @@ const AdminDictionaryPage: React.FC = () => {
   };
 
   const askAi = async () => {
-    const w = (draft?.en || selected?.en || query).trim();
+    const id = draft?.id ?? null;
+    const w = (editedDraft?.en || draft?.en || selected?.en || query).trim();
     if (!w) return;
+    if (!id) {
+      setAiError("Откройте слово для полной подсказки (карточка + смыслы).");
+      setAiStatusText("Ожидание: откройте слово, затем запустите AI‑подсказку.");
+      return;
+    }
     setAiState("loading");
     setAiError(null);
-    setAiJson("");
+    setAiStatusText("Выполняется AI‑подсказка...");
+    setAiSuggestedFields(null);
+    setAiAppliedSensesCount(null);
+    const prev = editedDraft ?? draft ?? {};
     try {
-      const { suggestion } = await adminDictionaryApi.aiSuggest({
+      const { draft: fullDraft } = await adminDictionaryApi.aiDraft({
         lang,
+        entryId: id,
         word: w,
-        existing: draft ?? null,
       });
-      setAiJson(JSON.stringify(suggestion, null, 2));
-      setAiState("idle");
+      if (!fullDraft || typeof fullDraft !== "object") {
+        setAiState("idle");
+        return;
+      }
+      const raw = fullDraft as Record<string, unknown>;
+      const fromRoot = pickCardFieldsFromObject(raw);
+      const fromLemmaPatch =
+        raw.lemmaPatch && typeof raw.lemmaPatch === "object"
+          ? pickCardFieldsFromObject(raw.lemmaPatch as Record<string, unknown>)
+          : {};
+      const fromEntryPatch =
+        raw.entryPatch && typeof raw.entryPatch === "object"
+          ? pickCardFieldsFromObject(raw.entryPatch as Record<string, unknown>)
+          : {};
+      const entryPatch: Partial<Word> = { ...fromRoot, ...fromLemmaPatch, ...fromEntryPatch };
+      const senses = Array.isArray(fullDraft.senses) ? fullDraft.senses : [];
+      const prevEntry = editedDraft ?? draft ?? {};
+      const changedByAi = (WORD_EDIT_FIELDS as readonly string[]).filter(
+        (field) => {
+          const key = field as WordEditField;
+          if (!(key in entryPatch)) return false;
+          return normalizeFieldValue(key, prevEntry[key]) !== normalizeFieldValue(key, (entryPatch as Partial<Word>)[key]);
+        }
+      ) as WordEditField[];
+      setAiSuggestedFields(changedByAi);
+      setEditedDraft((prevState) => ({ ...(prevState || {}), ...(entryPatch as Partial<Word>) }));
+
+      if (senses.length > 0) {
+        const senseNos = senses.map((s) => Number(s?.senseNo)).filter((n) => Number.isFinite(n) && n > 0);
+        const formIndexes = Array.isArray(fullDraft.forms) ? fullDraft.forms.map((_, i) => i) : [];
+        await adminDictionaryApi.applyDraft({
+          lang,
+          entryId: id,
+          draft: fullDraft,
+          apply: {
+            entryPatch: false,
+            lemmaPatch: true,
+            selectedSenseNos: senseNos.length > 0 ? senseNos : undefined,
+            selectedFormIndexes: formIndexes.length > 0 ? formIndexes : undefined,
+            replaceExamples: true,
+            applySense1Core: true,
+          },
+        });
+        setAiAppliedSensesCount(senses.length);
+        const v2Data = await adminDictionaryApi.getEntryV2({ lang, id });
+        setV2(v2Data);
+      }
+      setAiStatusText(`Готово: AI обновил ${changedByAi.length} полей карточки, смыслов применено: ${senses.length}.`);
     } catch (e) {
-      setAiState("error");
-      setAiError(formatApiError(e, "Ошибка AI-подсказки"));
+      const msg = formatApiError(e, "Ошибка AI-подсказки");
+      setAiError(msg);
+      setAiStatusText(`Ошибка AI: ${msg}`);
+    } finally {
+      setAiState("idle");
+    }
+  };
+
+  const fillIpa = async () => {
+    const id = draft?.id || selected?.id || selectedId;
+    const word = String(editedDraft?.en ?? draft?.en ?? selected?.en ?? "").trim();
+    if (!id && !word) {
+      setAiError("Укажите слово (EN), чтобы сгенерировать IPA.");
+      setIpaStatusText("Ожидание: укажите слово (EN) для генерации IPA.");
+      return;
+    }
+    setIpaFillState("loading");
+    setAiError(null);
+    setIpaStatusText("Выполняется генерация IPA (UK/US)...");
+    try {
+      const res = await adminDictionaryApi.fillIpa({
+        lang,
+        entryId: id ?? undefined,
+        word: word || undefined,
+      });
+      setEditedDraft((prev) => ({
+        ...(prev || {}),
+        ipaUk: String(res.ipaUk || ""),
+        ipaUs: String(res.ipaUs || ""),
+      }));
+      setIpaStatusText(`Готово: IPA заполнены. UK: ${String(res.ipaUk || "")} | US: ${String(res.ipaUs || "")}`);
+    } catch (e) {
+      const msg = formatApiError(e, "Ошибка генерации IPA");
+      setAiError(msg);
+      setIpaStatusText(`Ошибка IPA: ${msg}`);
+    } finally {
+      setIpaFillState("idle");
     }
   };
 
@@ -666,10 +899,33 @@ const AdminDictionaryPage: React.FC = () => {
     try {
       const parsed = JSON.parse(aiJson);
       if (!parsed || typeof parsed !== "object") return;
-      setDraft((prev) => ({ ...(prev || {}), ...(parsed as Partial<Word>) }));
+      setEditedDraft((prev) => ({ ...(prev || {}), ...(parsed as Partial<Word>) }));
     } catch {
       setAiError("JSON не парсится");
     }
+  };
+
+  const fieldLabel: Record<WordEditField, string> = {
+    en: "Слово/выражение (EN)",
+    ru: "Короткий перевод (RU)",
+    level: "Уровень (CEFR)",
+    accent: "Акцент",
+    frequencyRank: "Частотность (rank)",
+    rarity: "Редкость",
+    register: "Регистр",
+    ipaUk: "Транскрипция (IPA UK)",
+    ipaUs: "Транскрипция (IPA US)",
+    example: "Пример (EN)",
+    exampleRu: "Перевод примера (RU)",
+  };
+
+  const updateEditedField = (field: WordEditField, value: unknown) => {
+    setEditedDraft((prev) => ({ ...(prev || {}), [field]: value }));
+  };
+
+  const restoreEditedField = (field: WordEditField) => {
+    if (!draft) return;
+    setEditedDraft((prev) => ({ ...(prev || {}), [field]: draft[field] }));
   };
 
   if (!canAccess) {
@@ -712,11 +968,12 @@ const AdminDictionaryPage: React.FC = () => {
               />
               <button
                 type="button"
-                className="word-action-btn word-action-add-personal"
+                className="admin-dict-btn admin-dict-btn--primary"
                 onClick={() => loadList(true)}
                 disabled={searchState === "loading"}
+                title="Применить поиск и фильтры"
               >
-                {searchState === "loading" ? "Загрузка…" : "Применить"}
+                {searchState === "loading" ? "Загрузка…" : "Найти"}
               </button>
             </div>
             <div className="admin-dict-filters-row">
@@ -768,7 +1025,7 @@ const AdminDictionaryPage: React.FC = () => {
               </label>
               <button
                 type="button"
-                className="word-action-btn"
+                className="admin-dict-btn admin-dict-btn--secondary"
                 onClick={() => {
                   setQuery("");
                   setFilterLevel("all");
@@ -781,8 +1038,9 @@ const AdminDictionaryPage: React.FC = () => {
                   setQcMissingRu(false);
                   void loadList(true);
                 }}
+                title="Сбросить все фильтры"
               >
-                Сброс
+                Сброс фильтров
               </button>
             </div>
           </div>
@@ -792,10 +1050,18 @@ const AdminDictionaryPage: React.FC = () => {
             </div>
           )}
 
-          <div className="admin-dict-section" style={{ marginTop: 12 }}>
+          {editingEntryId && (
+            <div className="admin-dict-nav-row">
+              <button type="button" className="admin-dict-btn admin-dict-btn--secondary" onClick={() => navigate("/admin/dictionary")}>
+                ← К списку слов
+              </button>
+            </div>
+          )}
+
+          {false && <div className="admin-dict-section" style={{ marginTop: 12 }}>
             <div className="admin-dict-section-title">Инструменты</div>
             <div className="admin-dict-actions" style={{ marginTop: 0 }}>
-              <button type="button" className="word-action-btn" onClick={exportCsv}>
+              <button type="button" className="admin-dict-btn admin-dict-btn--secondary" onClick={exportCsv}>
                 Экспорт CSV (по текущим фильтрам)
               </button>
             </div>
@@ -813,7 +1079,7 @@ const AdminDictionaryPage: React.FC = () => {
                   placeholder="Колонки минимум: id. Опционально: en,ru,level,register,rarity,reviewed(yes/no)"
                 />
               </label>
-              <button type="button" className="word-action-btn" onClick={importCsv} disabled={importState === "loading"}>
+              <button type="button" className="admin-dict-btn admin-dict-btn--secondary" onClick={importCsv} disabled={importState === "loading"}>
                 {importState === "loading" ? "Импорт…" : "Импортировать"}
               </button>
               {importLog && (
@@ -822,10 +1088,10 @@ const AdminDictionaryPage: React.FC = () => {
                 </pre>
               )}
             </div>
-          </div>
+          </div>}
 
-          <div className="admin-dict-layout">
-            <div className="admin-dict-results">
+          <div className="admin-dict-layout admin-dict-layout--single">
+            <div className="admin-dict-results" style={editingEntryId ? { display: "none" } : undefined}>
               <div className="admin-dict-results-title">
                 Слова ({items.length}/{total})
               </div>
@@ -844,6 +1110,8 @@ const AdminDictionaryPage: React.FC = () => {
                       <div className="admin-dict-result-bottom">
                         <span className="admin-dict-result-ru">{w.ru}</span>
                         <span className="admin-dict-qc-badges" aria-hidden>
+                          {!String(w.ru || "").trim() ? <span className="admin-dict-chip">no ru</span> : null}
+                          {!Number.isFinite(Number(w.frequencyRank)) ? <span className="admin-dict-chip">no freq</span> : null}
                           {!w.hasExample ? <span className="admin-dict-chip">no ex</span> : null}
                           {!w.hasIpa ? <span className="admin-dict-chip">no ipa</span> : null}
                         </span>
@@ -858,7 +1126,7 @@ const AdminDictionaryPage: React.FC = () => {
               {items.length < total && (
                 <button
                   type="button"
-                  className="word-action-btn"
+                  className="admin-dict-btn admin-dict-btn--secondary"
                   onClick={() => {
                     setOffset(items.length);
                     void loadList(false);
@@ -871,10 +1139,10 @@ const AdminDictionaryPage: React.FC = () => {
               )}
             </div>
 
-            <div className="admin-dict-editor">
+            <div className="admin-dict-editor" style={!editingEntryId ? { display: "none" } : undefined}>
               <div className="admin-dict-results-title">Редактор</div>
               {!draft ? (
-                <div className="dictionary-subtitle">Выбери слово слева.</div>
+                <div className="dictionary-subtitle">Загрузка слова…</div>
               ) : (
                 <>
                   {saveError && (
@@ -885,180 +1153,120 @@ const AdminDictionaryPage: React.FC = () => {
 
                   <div className="admin-dict-section">
                     <div className="admin-dict-section-title">Карточка слова (то, что видит пользователь)</div>
-                    <div className="admin-dict-form">
-                    <label className="admin-dict-field">
-                      <span className="admin-dict-label">Слово/выражение (EN)</span>
-                      <HelpText>Написание как в словаре. Можно фразу: <i>thank you</i>, <i>good morning</i>.</HelpText>
-                      <input value={draft.en ?? ""} onChange={(e) => setDraft({ ...draft, en: e.target.value })} placeholder="например: run / thank you" />
-                    </label>
-                    <label className="admin-dict-field">
-                      <span className="admin-dict-label">Короткий перевод (RU)</span>
-                      <HelpText>
-                        1 самый частотный вариант (без длинных перечислений). Это «глосс» для карточки.
-                      </HelpText>
-                      <input value={draft.ru ?? ""} onChange={(e) => setDraft({ ...draft, ru: e.target.value })} placeholder="например: бежать" />
-                    </label>
-
-                    <div className="admin-dict-row">
-                      <label className="admin-dict-field">
-                        <span className="admin-dict-label">Уровень (CEFR)</span>
-                        <HelpText>Уровень для основного значения (sense #1), которое используется в играх.</HelpText>
-                        <select
-                          value={(draft.level as string) ?? "A0"}
-                          onChange={(e) => setDraft({ ...draft, level: e.target.value as Word["level"] })}
-                        >
-                          {LEVELS.map((l) => (
-                            <option key={l} value={l}>
-                              {l}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                      <label className="admin-dict-field">
-                        <span className="admin-dict-label">Акцент</span>
-                        <HelpText>Какой вариант произношения использовать в озвучке: UK / US / оба.</HelpText>
-                        <select
-                          value={(draft.accent as string) ?? "both"}
-                          onChange={(e) => setDraft({ ...draft, accent: e.target.value as Word["accent"] })}
-                        >
-                          {ACCENTS.map((a) => (
-                            <option key={a} value={a}>
-                              {a}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
+                    {draft && editedDraft && (
+                    <div className="admin-dict-card-grid">
+                      <div className="admin-dict-modal-pane">
+                        <div className="admin-dict-results-title">Сейчас в БД (read-only)</div>
+                        {WORD_EDIT_FIELDS.map((field) => (
+                          <label key={`left-${field}`} className="admin-dict-field admin-dict-field--mirror">
+                            <div className="admin-dict-field-head admin-dict-field-head--readonly">
+                              <span className="admin-dict-label">{fieldLabel[field]}</span>
+                              <span className="admin-dict-field-head-spacer" aria-hidden />
+                            </div>
+                            {field === "example" || field === "exampleRu" ? (
+                              <textarea value={String(draft[field] ?? "")} rows={2} readOnly />
+                            ) : (
+                              <input value={field === "frequencyRank" ? String(draft.frequencyRank ?? "") : String(draft[field] ?? "")} readOnly />
+                            )}
+                          </label>
+                        ))}
+                      </div>
+                      <div className="admin-dict-modal-pane">
+                        <div className="admin-dict-results-title">Редактируемые поля</div>
+                        {WORD_EDIT_FIELDS.map((field) => {
+                          const changed = isFieldChanged(field);
+                          const empty = IMPORTANT_EMPTY_FIELDS.includes(field) && isFieldEmpty(field);
+                          return (
+                            <label key={`right-${field}`} className={`admin-dict-field admin-dict-field--mirror ${changed ? "admin-dict-field--changed" : ""} ${empty ? "admin-dict-field--empty" : ""}`}>
+                              <div className="admin-dict-field-head">
+                                <span className="admin-dict-label">{fieldLabel[field]}</span>
+                                <button type="button" className="admin-dict-btn admin-dict-btn--ghost" onClick={() => restoreEditedField(field)} disabled={!changed} title="Вернуть значение из БД">
+                                  Отменить
+                                </button>
+                              </div>
+                              {field === "level" ? (
+                                <select value={String(editedDraft.level ?? "A0")} onChange={(e) => updateEditedField("level", e.target.value as Word["level"])}>
+                                  {LEVELS.map((l) => (
+                                    <option key={l} value={l}>{l}</option>
+                                  ))}
+                                </select>
+                              ) : field === "accent" ? (
+                                <select value={String(editedDraft.accent ?? "both")} onChange={(e) => updateEditedField("accent", e.target.value as Word["accent"])}>
+                                  {ACCENTS.map((a) => (
+                                    <option key={a} value={a}>{a}</option>
+                                  ))}
+                                </select>
+                              ) : field === "rarity" ? (
+                                <select value={String(editedDraft.rarity ?? "не редкое")} onChange={(e) => updateEditedField("rarity", e.target.value as Word["rarity"])}>
+                                  {RARITIES.map((r) => (
+                                    <option key={r} value={r}>{r}</option>
+                                  ))}
+                                </select>
+                              ) : field === "register" ? (
+                                <select value={String(editedDraft.register ?? "разговорная")} onChange={(e) => updateEditedField("register", e.target.value as Word["register"])}>
+                                  {REGISTERS.map((r) => (
+                                    <option key={r} value={r}>{r}</option>
+                                  ))}
+                                </select>
+                              ) : field === "example" || field === "exampleRu" ? (
+                                <textarea value={String(editedDraft[field] ?? "")} rows={2} onChange={(e) => updateEditedField(field, e.target.value)} />
+                              ) : field === "frequencyRank" ? (
+                                <input
+                                  value={String(editedDraft.frequencyRank ?? "")}
+                                  onChange={(e) => updateEditedField("frequencyRank", toNumber(e.target.value, 15000))}
+                                />
+                              ) : (
+                                <input value={String(editedDraft[field] ?? "")} onChange={(e) => updateEditedField(field, e.target.value)} />
+                              )}
+                            </label>
+                          );
+                        })}
+                        <div className="admin-dict-help">
+                          Изменено: <b>{changedFields.length}</b>
+                          {emptyImportantFields.length > 0 && (
+                            <> • Пустые: <b>{emptyImportantFields.map((f) => fieldLabel[f]).join(", ")}</b></>
+                          )}
+                        </div>
+                        <div className="admin-dict-card-helpers">
+                          <button
+                            type="button"
+                            className="admin-dict-btn admin-dict-btn--secondary"
+                            onClick={() => void askAi()}
+                            disabled={aiState === "loading"}
+                            title="Заполнит поля карточки и смыслы по подсказке AI (нужен OPENAI_API_KEY на сервере)."
+                          >
+                            {aiState === "loading" ? "AI…" : "AI‑подсказка"}
+                          </button>
+                          <button
+                            type="button"
+                            className="admin-dict-btn admin-dict-btn--secondary"
+                            onClick={() => void fillIpa()}
+                            disabled={ipaFillState === "loading"}
+                            title="Сгенерировать IPA UK/US по полю EN."
+                          >
+                            {ipaFillState === "loading" ? "IPA…" : "Заполнить IPA"}
+                          </button>
+                        </div>
+                        {(aiStatusText || ipaStatusText) && (
+                          <div className="admin-dict-help">
+                            {aiStatusText && <div><strong>Статус AI:</strong> {aiStatusText}</div>}
+                            {ipaStatusText && <div><strong>Статус IPA:</strong> {ipaStatusText}</div>}
+                          </div>
+                        )}
+                        {(aiSuggestedFields?.length > 0 || aiAppliedSensesCount != null) && (
+                          <div className="admin-dict-help admin-dict-ai-changed">
+                            {aiSuggestedFields && aiSuggestedFields.length > 0 && (
+                              <div><strong>Карточка (поля изменены):</strong> {aiSuggestedFields.map((f) => fieldLabel[f]).join(", ")}</div>
+                            )}
+                            {aiAppliedSensesCount != null && aiAppliedSensesCount > 0 && (
+                              <div><strong>Смыслы и примеры:</strong> применено в БД — {aiAppliedSensesCount} смысл(ов) с примерами</div>
+                            )}
+                          </div>
+                        )}
+                      </div>
                     </div>
-
-                    <div className="admin-dict-row">
-                      <label className="admin-dict-field">
-                        <span className="admin-dict-label">Частотность (rank)</span>
-                        <HelpText>Чем меньше число — тем чаще слово встречается в языке.</HelpText>
-                        <input
-                          value={draft.frequencyRank ?? 15000}
-                          onChange={(e) => setDraft({ ...draft, frequencyRank: toNumber(e.target.value, 15000) })}
-                        />
-                      </label>
-                      <label className="admin-dict-field">
-                        <span className="admin-dict-label">Редкость</span>
-                        <HelpText>Качественная оценка частоты (помогает фильтровать экзотику).</HelpText>
-                        <select
-                          value={(draft.rarity as string) ?? "не редкое"}
-                          onChange={(e) => setDraft({ ...draft, rarity: e.target.value as Word["rarity"] })}
-                        >
-                          {RARITIES.map((r) => (
-                            <option key={r} value={r}>
-                              {r}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                      <label className="admin-dict-field">
-                        <span className="admin-dict-label">Регистр</span>
-                        <HelpText>Где уместно: разговорная речь или официальная.</HelpText>
-                        <select
-                          value={(draft.register as string) ?? "разговорная"}
-                          onChange={(e) => setDraft({ ...draft, register: e.target.value as Word["register"] })}
-                        >
-                          {REGISTERS.map((r) => (
-                            <option key={r} value={r}>
-                              {r}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                    </div>
-
-                    <div className="admin-dict-row">
-                      <label className="admin-dict-field">
-                        <span className="admin-dict-label">Транскрипция (IPA UK)</span>
-                        <HelpText>Можно оставить пустым — но лучше заполнить для обучения произношению.</HelpText>
-                        <input value={draft.ipaUk ?? ""} onChange={(e) => setDraft({ ...draft, ipaUk: e.target.value })} placeholder="например: /rʌn/" />
-                      </label>
-                      <label className="admin-dict-field">
-                        <span className="admin-dict-label">Транскрипция (IPA US)</span>
-                        <HelpText>Если UK/US одинаковые — можно продублировать.</HelpText>
-                        <input value={draft.ipaUs ?? ""} onChange={(e) => setDraft({ ...draft, ipaUs: e.target.value })} placeholder="например: /rʌn/" />
-                      </label>
-                    </div>
-
-                    <label className="admin-dict-field">
-                      <span className="admin-dict-label">Пример (EN)</span>
-                      <HelpText>Короткое естественное предложение (контекст важнее «словарности»).</HelpText>
-                      <textarea
-                        value={draft.example ?? ""}
-                        onChange={(e) => setDraft({ ...draft, example: e.target.value })}
-                        rows={3}
-                        placeholder="например: I run every morning."
-                      />
-                    </label>
-                    <label className="admin-dict-field">
-                      <span className="admin-dict-label">Перевод примера (RU)</span>
-                      <HelpText>Не дословно — главное естественность и тот же смысл.</HelpText>
-                      <textarea
-                        value={draft.exampleRu ?? ""}
-                        onChange={(e) => setDraft({ ...draft, exampleRu: e.target.value })}
-                        rows={3}
-                        placeholder="например: Я бегаю каждое утро."
-                      />
-                    </label>
-                    </div>
+                    )}
                   </div>
-
-                  <div className="admin-dict-actions">
-                    <button
-                      type="button"
-                      className="word-action-btn word-action-add-personal"
-                      onClick={save}
-                      disabled={saveState === "loading"}
-                    >
-                      {saveState === "loading" ? "Сохранение…" : "Сохранить"}
-                    </button>
-                    <button type="button" className="word-action-btn" onClick={() => toggleReviewed(true)}>
-                      ✅ Проверено
-                    </button>
-                    <button type="button" className="word-action-btn" onClick={() => toggleReviewed(false)}>
-                      ↩ Снять проверку
-                    </button>
-                    <button
-                      type="button"
-                      className="word-action-btn"
-                      onClick={askAi}
-                      disabled={aiState === "loading"}
-                      title="Требует OPENAI_API_KEY на сервере"
-                    >
-                      {aiState === "loading" ? "AI…" : "AI‑подсказка"}
-                    </button>
-                    <button
-                      type="button"
-                      className="word-action-btn"
-                      onClick={askAiDraft}
-                      disabled={aiDraftState === "loading"}
-                      title="Полный черновик: смыслы/примеры/формы. Требует OPENAI_API_KEY на сервере"
-                    >
-                      {aiDraftState === "loading" ? "Draft…" : "AI‑черновик"}
-                    </button>
-                    <button
-                      type="button"
-                      className="word-action-btn"
-                      onClick={checkOpenAiKey}
-                      title="Проверить, как сервер видит OPENAI_API_KEY (длина, префикс, суффикс)"
-                    >
-                      Проверить ключ
-                    </button>
-                  </div>
-                  {(openaiCheckError || openaiCheckResult) && (
-                    <div className="admin-dict-help" style={{ marginTop: 8 }}>
-                      {openaiCheckError && (
-                        <div className="dictionary-error-banner" style={{ padding: "8px 12px" }}>{openaiCheckError}</div>
-                      )}
-                      {openaiCheckResult && (
-                        <pre style={{ margin: 0, fontSize: 12, whiteSpace: "pre-wrap", wordBreak: "break-all" }}>
-                          {JSON.stringify(openaiCheckResult, null, 2)}
-                        </pre>
-                      )}
-                    </div>
-                  )}
 
                   {(v2Error || v2) && (
                     <div className="admin-dict-section" style={{ marginTop: 14 }}>
@@ -1150,10 +1358,10 @@ const AdminDictionaryPage: React.FC = () => {
                                     />
                                   </label>
                                   <div className="admin-dict-actions">
-                                    <button type="button" className="word-action-btn" onClick={() => saveSense(s.id)}>
+                                    <button type="button" className="admin-dict-btn admin-dict-btn--secondary" onClick={() => saveSense(s.id)}>
                                       Сохранить значение
                                     </button>
-                                    <button type="button" className="word-action-btn" onClick={() => { setEditingSenseId(null); setSenseEdit(null); }}>
+                                    <button type="button" className="admin-dict-btn admin-dict-btn--secondary" onClick={() => { setEditingSenseId(null); setSenseEdit(null); }}>
                                       Отмена
                                     </button>
                                   </div>
@@ -1163,11 +1371,11 @@ const AdminDictionaryPage: React.FC = () => {
                                   {s.definitionRu ? <div className="admin-dict-sense-text">{s.definitionRu}</div> : null}
                                   {s.usageNote ? <div className="admin-dict-sense-note">{s.usageNote}</div> : null}
                                   <div className="admin-dict-actions" style={{ marginTop: 10 }}>
-                                    <button type="button" className="word-action-btn" onClick={() => startEditSense(s)}>
+                                    <button type="button" className="admin-dict-btn admin-dict-btn--secondary" onClick={() => startEditSense(s)}>
                                       Редактировать
                                     </button>
                                     {s.senseNo > 1 && (
-                                      <button type="button" className="word-action-btn" onClick={() => deleteSense(s.id)}>
+                                      <button type="button" className="admin-dict-btn admin-dict-btn--secondary" onClick={() => deleteSense(s.id)}>
                                         Удалить
                                       </button>
                                     )}
@@ -1192,10 +1400,10 @@ const AdminDictionaryPage: React.FC = () => {
                                             <input value={exampleEdit.ru} onChange={(e) => setExampleEdit({ ...exampleEdit, ru: e.target.value })} />
                                           </label>
                                           <div className="admin-dict-actions" style={{ marginTop: 6 }}>
-                                            <button type="button" className="word-action-btn" onClick={() => saveExample(ex.id)}>
+                                            <button type="button" className="admin-dict-btn admin-dict-btn--secondary" onClick={() => saveExample(ex.id)}>
                                               Сохранить
                                             </button>
-                                            <button type="button" className="word-action-btn" onClick={() => { setEditingExampleId(null); setExampleEdit(null); }}>
+                                            <button type="button" className="admin-dict-btn admin-dict-btn--secondary" onClick={() => { setEditingExampleId(null); setExampleEdit(null); }}>
                                               Отмена
                                             </button>
                                           </div>
@@ -1210,14 +1418,14 @@ const AdminDictionaryPage: React.FC = () => {
                                             {ex.isMain ? (
                                               <span className="admin-dict-review-pill ok">Main</span>
                                             ) : (
-                                              <button type="button" className="word-action-btn" onClick={() => setMainExample(ex.id)}>
+                                              <button type="button" className="admin-dict-btn admin-dict-btn--secondary" onClick={() => setMainExample(ex.id)}>
                                                 Сделать главным
                                               </button>
                                             )}
-                                            <button type="button" className="word-action-btn" onClick={() => startEditExample(ex)}>
+                                            <button type="button" className="admin-dict-btn admin-dict-btn--secondary" onClick={() => startEditExample(ex)}>
                                               Редактировать
                                             </button>
-                                            <button type="button" className="word-action-btn" onClick={() => deleteExample(ex.id)}>
+                                            <button type="button" className="admin-dict-btn admin-dict-btn--secondary" onClick={() => deleteExample(ex.id)}>
                                               Удалить
                                             </button>
                                           </div>
@@ -1265,7 +1473,7 @@ const AdminDictionaryPage: React.FC = () => {
                                     />
                                     <span className="admin-dict-label" style={{ margin: 0 }}>Сделать главным примером</span>
                                   </label>
-                                  <button type="button" className="word-action-btn" onClick={() => addExample(s.id)}>
+                                  <button type="button" className="admin-dict-btn admin-dict-btn--secondary" onClick={() => addExample(s.id)}>
                                     Добавить пример
                                   </button>
                                 </div>
@@ -1307,10 +1515,10 @@ const AdminDictionaryPage: React.FC = () => {
                                       <textarea value={formEdit.notes} onChange={(e) => setFormEdit({ ...formEdit, notes: e.target.value })} rows={2} />
                                     </label>
                                     <div className="admin-dict-actions" style={{ marginTop: 6 }}>
-                                      <button type="button" className="word-action-btn" onClick={() => saveForm(f.id)}>
+                                      <button type="button" className="admin-dict-btn admin-dict-btn--secondary" onClick={() => saveForm(f.id)}>
                                         Сохранить
                                       </button>
-                                      <button type="button" className="word-action-btn" onClick={() => { setEditingFormId(null); setFormEdit(null); }}>
+                                      <button type="button" className="admin-dict-btn admin-dict-btn--secondary" onClick={() => { setEditingFormId(null); setFormEdit(null); }}>
                                         Отмена
                                       </button>
                                     </div>
@@ -1323,10 +1531,10 @@ const AdminDictionaryPage: React.FC = () => {
                                       {f.notes ? <div className="admin-dict-sense-note">{f.notes}</div> : null}
                                     </div>
                                     <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", justifyContent: "flex-end" }}>
-                                      <button type="button" className="word-action-btn" onClick={() => startEditForm(f)}>
+                                      <button type="button" className="admin-dict-btn admin-dict-btn--secondary" onClick={() => startEditForm(f)}>
                                         Редактировать
                                       </button>
-                                      <button type="button" className="word-action-btn" onClick={() => deleteForm(f.id)}>
+                                      <button type="button" className="admin-dict-btn admin-dict-btn--secondary" onClick={() => deleteForm(f.id)}>
                                         Удалить
                                       </button>
                                     </div>
@@ -1357,7 +1565,7 @@ const AdminDictionaryPage: React.FC = () => {
                               <HelpText>Например: «устар.», «редко», «только в выражении …».</HelpText>
                               <textarea value={newForm.notes} onChange={(e) => setNewForm({ ...newForm, notes: e.target.value })} rows={2} />
                             </label>
-                            <button type="button" className="word-action-btn" onClick={addForm}>
+                            <button type="button" className="admin-dict-btn admin-dict-btn--secondary" onClick={addForm}>
                               Добавить форму
                             </button>
                           </div>
@@ -1406,7 +1614,7 @@ const AdminDictionaryPage: React.FC = () => {
                             <span className="admin-dict-label">Usage note</span>
                             <textarea value={senseDraft.usageNote} onChange={(e) => setSenseDraft({ ...senseDraft, usageNote: e.target.value })} rows={2} />
                           </label>
-                          <button type="button" className="word-action-btn" onClick={addSense}>
+                          <button type="button" className="admin-dict-btn admin-dict-btn--secondary" onClick={addSense}>
                             Добавить значение
                           </button>
                         </div>
@@ -1414,137 +1622,45 @@ const AdminDictionaryPage: React.FC = () => {
                     </div>
                   )}
 
+                  <div className="admin-dict-footer-actions">
+                    <button
+                      type="button"
+                      className="admin-dict-btn admin-dict-btn--primary"
+                      onClick={save}
+                      disabled={saveState === "loading" || changedFields.length === 0}
+                      title="Сохранить изменения карточки в БД"
+                    >
+                      {saveState === "loading" ? "Сохранение…" : "Сохранить карточку"}
+                    </button>
+                    <button
+                      type="button"
+                      className="admin-dict-btn admin-dict-btn--secondary"
+                      onClick={() => { setEditedDraft(draft); setAiSuggestedFields(null); setAiAppliedSensesCount(null); }}
+                      title="Отменить правки карточки"
+                    >
+                      Сбросить карточку
+                    </button>
+                    <button type="button" className="admin-dict-btn admin-dict-btn--secondary" onClick={() => toggleReviewed(true)} title="Отметить запись как проверенную лингвистом">
+                      ✅ Проверено
+                    </button>
+                    <button type="button" className="admin-dict-btn admin-dict-btn--secondary" onClick={() => toggleReviewed(false)} title="Снять отметку проверки">
+                      Снять проверку
+                    </button>
+                    <button type="button" className="admin-dict-btn admin-dict-btn--secondary" onClick={() => navigate("/admin/dictionary")}>
+                      ← К списку слов
+                    </button>
+                  </div>
+
                   {aiError && (
                     <div className="dictionary-error-banner" style={{ padding: "8px 12px", marginTop: 8 }}>
                       {aiError}
-                    </div>
-                  )}
-                  {aiDraftError && (
-                    <div className="dictionary-error-banner" style={{ padding: "8px 12px", marginTop: 8 }}>
-                      {aiDraftError}
-                    </div>
-                  )}
-                  {aiDraftJson && (
-                    <div className="admin-dict-ai">
-                      <div className="admin-dict-results-title">AI draft (JSON)</div>
-                      <HelpText>
-                        Это <b>черновик</b>: смыслы/примеры/формы. Выбери, что применить в БД. По умолчанию <b>sense #1</b> не
-                        трогаем по core‑полям (уровень/регистр/глосс), чтобы не ломать legacy‑карточку.
-                      </HelpText>
-                      <textarea
-                        value={aiDraftJson}
-                        onChange={(e) => {
-                          const v = e.target.value;
-                          setAiDraftJson(v);
-                          try {
-                            const parsed = JSON.parse(v);
-                            if (parsed && typeof parsed === "object") setAiDraft(parsed as AdminDictionaryAiDraft);
-                          } catch {
-                            // ignore parse errors while typing
-                          }
-                        }}
-                        rows={12}
-                      />
-
-                      <div className="admin-dict-form admin-dict-form--compact" style={{ marginTop: 10 }}>
-                        <div className="admin-dict-row" style={{ alignItems: "center" }}>
-                          <label className="admin-dict-qc-toggle">
-                            <input type="checkbox" checked={applyDraftEntryPatch} onChange={(e) => setApplyDraftEntryPatch(e.target.checked)} />
-                            <span>Применить entryPatch (legacy карточку)</span>
-                          </label>
-                          <label className="admin-dict-qc-toggle">
-                            <input type="checkbox" checked={applyDraftLemmaPatch} onChange={(e) => setApplyDraftLemmaPatch(e.target.checked)} />
-                            <span>Применить lemmaPatch (частотность/IPA…)</span>
-                          </label>
-                        </div>
-                        <div className="admin-dict-row" style={{ alignItems: "center" }}>
-                          <label className="admin-dict-qc-toggle">
-                            <input type="checkbox" checked={applyDraftReplaceExamples} onChange={(e) => setApplyDraftReplaceExamples(e.target.checked)} />
-                            <span>Заменять примеры (иначе только добавлять/обновлять)</span>
-                          </label>
-                          <label className="admin-dict-qc-toggle">
-                            <input type="checkbox" checked={applyDraftSense1Core} onChange={(e) => setApplyDraftSense1Core(e.target.checked)} />
-                            <span>Разрешить core‑правки для sense #1</span>
-                          </label>
-                        </div>
-
-                        {aiDraft?.senses && aiDraft.senses.length > 0 && (
-                          <div className="admin-dict-field">
-                            <span className="admin-dict-label">Смыслы (какие применить)</span>
-                            <div className="admin-dict-row" style={{ flexWrap: "wrap", gap: 10 }}>
-                              {aiDraft.senses.map((s) => {
-                                const no = Number(s.senseNo);
-                                const checked = applyDraftSenseNos.includes(no);
-                                return (
-                                  <label key={no} className="admin-dict-qc-toggle">
-                                    <input
-                                      type="checkbox"
-                                      checked={checked}
-                                      onChange={(e) => {
-                                        const on = e.target.checked;
-                                        setApplyDraftSenseNos((prev) => (on ? Array.from(new Set([...prev, no])) : prev.filter((x) => x !== no)));
-                                      }}
-                                    />
-                                    <span>
-                                      #{no} {s.glossRu ? `— ${s.glossRu}` : ""}
-                                    </span>
-                                  </label>
-                                );
-                              })}
-                            </div>
-                          </div>
-                        )}
-
-                        {aiDraft?.forms && aiDraft.forms.length > 0 && (
-                          <div className="admin-dict-field">
-                            <span className="admin-dict-label">Формы (какие применить)</span>
-                            <div className="admin-dict-row" style={{ flexWrap: "wrap", gap: 10 }}>
-                              {aiDraft.forms.map((f, idx) => {
-                                const checked = applyDraftFormIndexes.includes(idx);
-                                return (
-                                  <label key={`${f.form}-${f.formType}-${idx}`} className="admin-dict-qc-toggle">
-                                    <input
-                                      type="checkbox"
-                                      checked={checked}
-                                      onChange={(e) => {
-                                        const on = e.target.checked;
-                                        setApplyDraftFormIndexes((prev) => (on ? Array.from(new Set([...prev, idx])) : prev.filter((x) => x !== idx)));
-                                      }}
-                                    />
-                                    <span>
-                                      {f.form} <span className="admin-dict-muted">({f.formType})</span>
-                                    </span>
-                                  </label>
-                                );
-                              })}
-                            </div>
-                          </div>
-                        )}
-
-                        <button
-                          type="button"
-                          className="word-action-btn word-action-add-personal"
-                          onClick={applyAiDraft}
-                          disabled={aiDraftState === "loading" || !draft?.id || !aiDraft}
-                        >
-                          {aiDraftState === "loading" ? "Применяем…" : "Применить выбранное в БД"}
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                  {aiJson && (
-                    <div className="admin-dict-ai">
-                      <div className="admin-dict-results-title">AI suggestion (JSON)</div>
-                      <textarea value={aiJson} onChange={(e) => setAiJson(e.target.value)} rows={10} />
-                      <button type="button" className="word-action-btn" onClick={applyAiJson}>
-                        Применить в форму
-                      </button>
                     </div>
                   )}
                 </>
               )}
             </div>
           </div>
+
         </div>
       </main>
       <footer className="footer">STroova</footer>
