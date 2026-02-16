@@ -48,9 +48,15 @@ export async function ensureUserDictionaryBackfilled(username, langCode = "en", 
   const u = String(username || "").trim();
   if (!u) return { ok: false, reason: "no-username" };
 
-  // РµСЃР»Рё СѓР¶Рµ РµСЃС‚СЊ СЃРѕС…СЂР°РЅС‘РЅРЅС‹Рµ СЃРјС‹СЃР»С‹ вЂ” СЃС‡РёС‚Р°РµРј, С‡С‚Рѕ РјРёРіСЂР°С†РёСЏ СѓР¶Рµ Р±С‹Р»Р°
+  // если уже есть сохранённые смыслы — считаем, что миграция уже была
   const existing = await db.query(`SELECT 1 FROM user_saved_senses WHERE username = $1 LIMIT 1`, [u]);
   if (existing.rows.length > 0) return { ok: true, migrated: false };
+
+  // колонка personal_dictionary могла быть удалена runPersonalDictionaryMigration — тогда не читаем legacy
+  const colCheck = await db.query(
+    `SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'users' AND column_name = 'personal_dictionary'`
+  );
+  if (colCheck.rows.length === 0) return { ok: true, migrated: false };
 
   const userRes = await db.query(
     `SELECT personal_dictionary AS "personalDictionary", word_progress AS "wordProgress" FROM users WHERE username = $1`,
