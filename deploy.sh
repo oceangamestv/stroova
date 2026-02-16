@@ -8,6 +8,12 @@ cd "$(dirname "$0")"
 echo "→ git pull"
 git pull
 
+if [ -f scripts/run-migrations.sh ]; then
+  echo "→ миграции БД"
+  chmod +x scripts/run-migrations.sh 2>/dev/null || true
+  ./scripts/run-migrations.sh
+fi
+
 echo "→ npm ci --ignore-scripts"
 npm ci --ignore-scripts
 

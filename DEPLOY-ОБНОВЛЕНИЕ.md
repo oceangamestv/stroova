@@ -184,7 +184,7 @@ pm2 restart stroova-api
 | Где | Команды |
 |-----|--------|
 | Компьютер | `cd d:\Cursor` → `git add .` → `git commit -m "описание"` → `git push` |
-| Сервер | `cd ~/stroova` → `git pull` (при ошибке: `git checkout -- node_modules/.package-lock.json` и снова `git pull`) → `npm ci --ignore-scripts` → `npm run build` → `pm2 restart stroova-api` |
+| Сервер | `cd ~/stroova` → `git pull` (при конфликте: `git checkout -- node_modules/.package-lock.json` и снова `git pull`) → `./deploy.sh` (миграции, сборка, перезапуск PM2) |
 
 ---
 
@@ -207,25 +207,37 @@ cd ~/stroova
 ./deploy.sh
 ```
 
-Скрипт [deploy.sh](deploy.sh) делает по порядку: `git pull` → `npm ci --ignore-scripts` → `npm run build` → `pm2 restart stroova-api`.
+Скрипт [deploy.sh](deploy.sh) делает по порядку: `git pull` → **миграции БД** ([scripts/run-migrations.sh](scripts/run-migrations.sh)) → `npm ci --ignore-scripts` → `npm run build` → `pm2 startOrReload` → `pm2 save`.
 
 **Если `./deploy.sh` не срабатывает из‑за конфликта при pull** (см. раздел «Инструкция для будущих обновлений» выше): сначала на сервере выполни `git checkout -- node_modules/.package-lock.json` и `git pull`, затем снова `./deploy.sh`.
 
 (Если проект клонирован не в домашнюю папку, перейди в каталог проекта — например для пользователя root это `/root/stroova`.)
 
-### 3. Миграции БД (если в репо появились новые)
+### 3. Миграции БД
 
-После `git pull` в папке `server/migrations/` могут оказаться **новые** файлы `.sql` (например `004_...sql`). Их нужно применить **один раз вручную** (на сервере должен быть установлен `psql`, обычно он есть после установки PostgreSQL по DEPLOY-УБУНТУ-ПОШАГОВО):
+При каждом запуске `./deploy.sh` автоматически выполняется [scripts/run-migrations.sh](scripts/run-migrations.sh): подгружается `.env`, и все миграции из `server/migrations/` применяются в фиксированном порядке. Нужны установленный `psql` и переменная `DATABASE_URL` в `.env` (на сервере это уже есть после настройки по DEPLOY-УБУНТУ-ПОШАГОВО).
+
+**Порядок миграций:** 001 → 002 → 003_active_days_and_rewards → 003_add_dictionary_version → 004 → 005 → 006 → 007. Миграции идемпотентны (`IF NOT EXISTS` и т.д.), повторный прогон безопасен.
+
+- **004** — флаг админа (`users.is_admin`) и таблица AI-подсказок для словаря.
+- **005** — нормализованный словарь (леммы/значения/примеры и `dictionary_entry_links`); без неё «Мои слова» и лента «Сегодня» отдают 500.
+
+Если по какой-то причине миграции нужно выполнить вручную:
 
 ```bash
 cd ~/stroova
-set -a && source .env && set +a
-psql "$DATABASE_URL" -f server/migrations/001_dictionary_frequency_rarity_register.sql
-psql "$DATABASE_URL" -f server/migrations/002_recreate_dictionary_entries.sql
-psql "$DATABASE_URL" -f server/migrations/003_active_days_and_rewards.sql
+./scripts/run-migrations.sh
 ```
 
-Применяй только те миграции, которые ещё не выполнялись. Если все уже применены или схема полностью создаётся при первом запуске API через `initDb()` в [server/db.js](server/db.js) — этот шаг можно пропустить.
+#### Если после обновления 500 на «Мои слова» / «Сегодня» (user-dictionary)
+
+Если при добавлении слова или открытии «Сегодня» приходят 500 на `GET /api/user-dictionary/today` или `GET /api/user-dictionary/my-words`, на боевой БД не применены миграции 005–007. Один раз выполни на сервере:
+
+```bash
+cd ~/stroova
+./scripts/run-migrations.sh
+pm2 restart stroova-api
+```
 
 ### 4. Обновление транскрипций IPA на боевой БД
 
@@ -248,4 +260,4 @@ set -a && source .env && set +a && npm run update-ipa
 
 Если настроен автодеплой: при push в ветку `main` GitHub Actions подключается к серверу и выполняет `./deploy.sh` (см. [.github/workflows/deploy.yml](.github/workflows/deploy.yml)). Секреты: `SSH_HOST` = **stroova.ru**, `SSH_USER`, `SSH_PRIVATE_KEY`; при необходимости — `APP_DIR` (путь к проекту на сервере).
 
-**Новые миграции** при автодеплое не применяются — их нужно один раз выполнить вручную по SSH (шаг 3 выше).
+При автодеплое миграции применяются автоматически (шаг внутри `./deploy.sh`).
