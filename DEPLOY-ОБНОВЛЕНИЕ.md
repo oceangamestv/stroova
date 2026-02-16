@@ -130,14 +130,15 @@ git pull
 **Если появилась ошибка** вроде:
 `error: Your local changes to the following files would be overwritten by merge: ... Please commit your changes or stash them before you merge.`
 
-Значит на сервере изменён файл (часто `node_modules/.package-lock.json`). Отмени это изменение и снова выполни pull:
+Значит на сервере изменён файл (часто `node_modules/.package-lock.json` или `deploy.sh`). Отмени это изменение и снова выполни pull:
 
 ```bash
 git checkout -- node_modules/.package-lock.json
+git checkout -- deploy.sh
 git pull
 ```
 
-(Если в сообщении об ошибке указан другой файл — подставь его путь вместо `node_modules/.package-lock.json`.)
+(Если в сообщении указан другой файл — добавь его в `git checkout -- …` или один раз `git stash` и затем `git pull`.)
 
 Установи зависимости и пересобери фронт, перезапусти API:
 
@@ -226,8 +227,11 @@ cd ~/stroova
 
 ```bash
 cd ~/stroova
+chmod +x scripts/run-migrations.sh
 ./scripts/run-migrations.sh
 ```
+
+(Если появляется «Permission denied», можно вместо `./scripts/run-migrations.sh` выполнить: `bash scripts/run-migrations.sh`.)
 
 #### Если после обновления 500 на «Мои слова» / «Сегодня» (user-dictionary)
 
@@ -238,6 +242,10 @@ cd ~/stroova
 ./scripts/run-migrations.sh
 pm2 restart stroova-api
 ```
+
+**Если `psql` пишет `FATAL: role "root" does not exist`:** значит в текущей оболочке не подхватывается `DATABASE_URL` из `.env`, и psql подключается под пользователем ОС (root). Проверь: `cd ~/stroova && set -a && source .env && set +a && echo "DATABASE_URL length: ${#DATABASE_URL}"` — должно быть число больше 20. В `.env` должна быть строка вида `DATABASE_URL=postgresql://stroova:ПАРОЛЬ@localhost:5432/stroova` (без пробелов вокруг `=`, без кавычек). После этого снова запусти `./scripts/run-migrations.sh`.
+
+**Если скрипт пишет «DATABASE_URL не задан»:** файл `.env` есть, но переменная не подхватывается. Проверь на сервере: `grep DATABASE_URL .env` — должна быть одна строка вида `DATABASE_URL=postgresql://stroova:ПАРОЛЬ@localhost:5432/stroova`. Без пробелов вокруг `=`. Если в пароле есть спецсимволы (`#`, `&`, `?`), возьми значение в одинарные кавычки: `DATABASE_URL='postgresql://stroova:пароль@localhost:5432/stroova'`. После правки сохрани файл и снова запусти `./scripts/run-migrations.sh`.
 
 ### 4. Обновление транскрипций IPA на боевой БД
 
