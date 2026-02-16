@@ -131,7 +131,6 @@ export const serverAuthAdapter = {
       const updated = await meApi.patch({
         stats: user.stats,
         wordProgress: user.wordProgress as Record<number, { beginner?: number; experienced?: number; expert?: number }>,
-        personalDictionary: user.personalDictionary,
         gameSettings: user.gameSettings,
       });
       // Если бэкенд не возвращает personalDictionary/gameSettings — сохраняем локальные значения

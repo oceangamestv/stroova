@@ -23,7 +23,7 @@ function rowToUser(row) {
     createdAt: row.created_at instanceof Date ? row.created_at.toISOString() : row.created_at,
     stats: row.stats && typeof row.stats === "object" ? row.stats : defaultStats(),
     wordProgress: row.word_progress && typeof row.word_progress === "object" ? row.word_progress : {},
-    personalDictionary: Array.isArray(row.personal_dictionary) ? row.personal_dictionary : [],
+    personalDictionary: [],
     gameSettings: row.game_settings && typeof row.game_settings === "object" ? row.game_settings : {},
   };
 }
@@ -46,35 +46,76 @@ export async function getUser(username) {
   return rowToUser(res.rows[0] || null);
 }
 
+let hasPersonalDictionaryColumn = null;
+
+async function checkPersonalDictionaryColumn() {
+  if (hasPersonalDictionaryColumn !== null) return hasPersonalDictionaryColumn;
+  const res = await pool.query(
+    `SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'users' AND column_name = 'personal_dictionary'`
+  );
+  hasPersonalDictionaryColumn = res.rows.length > 0;
+  return hasPersonalDictionaryColumn;
+}
+
+/** Вызвать после удаления колонки personal_dictionary, чтобы saveUser переключился на запрос без неё. */
+export function invalidatePersonalDictionaryColumnCache() {
+  hasPersonalDictionaryColumn = null;
+}
+
 export async function saveUser(user) {
   const stats = JSON.stringify(user.stats || defaultStats());
   const wordProgress = JSON.stringify(user.wordProgress || {});
-  const personalDictionary = JSON.stringify(user.personalDictionary || []);
   const gameSettings = JSON.stringify(user.gameSettings || {});
+  const personalDictionary = JSON.stringify(user.personalDictionary || []);
+  const hasCol = await checkPersonalDictionaryColumn();
 
-  await pool.query(
-    `INSERT INTO users (username, display_name, password_hash, is_admin, created_at, stats, word_progress, personal_dictionary, game_settings)
-     VALUES ($1, $2, $3, $4, $5::timestamptz, $6::jsonb, $7::jsonb, $8::jsonb, $9::jsonb)
-     ON CONFLICT (username) DO UPDATE SET
-       display_name = EXCLUDED.display_name,
-       password_hash = EXCLUDED.password_hash,
-       is_admin = EXCLUDED.is_admin,
-       stats = EXCLUDED.stats,
-       word_progress = EXCLUDED.word_progress,
-       personal_dictionary = EXCLUDED.personal_dictionary,
-       game_settings = EXCLUDED.game_settings`,
-    [
-      user.username,
-      user.displayName ?? user.username,
-      user.passwordHash,
-      !!user.isAdmin,
-      user.createdAt || new Date().toISOString(),
-      stats,
-      wordProgress,
-      personalDictionary,
-      gameSettings,
-    ]
-  );
+  if (hasCol) {
+    await pool.query(
+      `INSERT INTO users (username, display_name, password_hash, is_admin, created_at, stats, word_progress, personal_dictionary, game_settings)
+       VALUES ($1, $2, $3, $4, $5::timestamptz, $6::jsonb, $7::jsonb, $8::jsonb, $9::jsonb)
+       ON CONFLICT (username) DO UPDATE SET
+         display_name = EXCLUDED.display_name,
+         password_hash = EXCLUDED.password_hash,
+         is_admin = EXCLUDED.is_admin,
+         stats = EXCLUDED.stats,
+         word_progress = EXCLUDED.word_progress,
+         personal_dictionary = EXCLUDED.personal_dictionary,
+         game_settings = EXCLUDED.game_settings`,
+      [
+        user.username,
+        user.displayName ?? user.username,
+        user.passwordHash,
+        !!user.isAdmin,
+        user.createdAt || new Date().toISOString(),
+        stats,
+        wordProgress,
+        personalDictionary,
+        gameSettings,
+      ]
+    );
+  } else {
+    await pool.query(
+      `INSERT INTO users (username, display_name, password_hash, is_admin, created_at, stats, word_progress, game_settings)
+       VALUES ($1, $2, $3, $4, $5::timestamptz, $6::jsonb, $7::jsonb, $8::jsonb)
+       ON CONFLICT (username) DO UPDATE SET
+         display_name = EXCLUDED.display_name,
+         password_hash = EXCLUDED.password_hash,
+         is_admin = EXCLUDED.is_admin,
+         stats = EXCLUDED.stats,
+         word_progress = EXCLUDED.word_progress,
+         game_settings = EXCLUDED.game_settings`,
+      [
+        user.username,
+        user.displayName ?? user.username,
+        user.passwordHash,
+        !!user.isAdmin,
+        user.createdAt || new Date().toISOString(),
+        stats,
+        wordProgress,
+        gameSettings,
+      ]
+    );
+  }
 }
 
 export async function removeUser(username) {
@@ -154,7 +195,6 @@ export function createDefaultUser(username, passwordHash) {
     createdAt: new Date().toISOString(),
     stats: defaultStats(),
     wordProgress: {},
-    personalDictionary: [],
     gameSettings: {},
   };
 }

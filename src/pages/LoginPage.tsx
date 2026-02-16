@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../features/auth/AuthContext";
 
 type Mode = "login" | "register";
@@ -9,6 +9,9 @@ const LoginPage: React.FC = () => {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
+  const [agreedToPrivacy, setAgreedToPrivacy] = useState(false);
+  const [agreementHighlight, setAgreementHighlight] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [lockoutUntil, setLockoutUntil] = useState<number | null>(null);
@@ -19,6 +22,17 @@ const LoginPage: React.FC = () => {
   useEffect(() => {
     if (user) navigate("/", { replace: true });
   }, [user, navigate]);
+
+  useEffect(() => {
+    setError("");
+    setLockoutUntil(null);
+    setLockoutSecondsLeft(null);
+    if (mode === "login") {
+      setConfirmPassword("");
+      setAgreedToTerms(false);
+      setAgreedToPrivacy(false);
+    }
+  }, [mode]);
 
   useEffect(() => {
     if (lockoutUntil == null) return;
@@ -46,6 +60,12 @@ const LoginPage: React.FC = () => {
 
     try {
       if (mode === "register") {
+        if (!agreedToTerms || !agreedToPrivacy) {
+          setError("Необходимо согласиться с Пользовательским соглашением и Политикой конфиденциальности");
+          setAgreementHighlight(true);
+          return;
+        }
+        setAgreementHighlight(false);
         if (password !== confirmPassword) {
           setError("Пароли не совпадают");
           return;
@@ -153,6 +173,68 @@ const LoginPage: React.FC = () => {
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
               />
+            </div>
+          )}
+
+          {mode === "register" && (
+            <div
+              className={`auth-legal${agreementHighlight ? " auth-legal--highlight" : ""}`}
+              role="group"
+              aria-label="Согласия"
+            >
+              <div className="auth-legal-title">Перед регистрацией подтвердите:</div>
+
+              <div className={`auth-legal-item${agreementHighlight && !agreedToTerms ? " auth-legal-item--highlight" : ""}`}>
+                <input
+                  type="checkbox"
+                  id="terms"
+                  checked={agreedToTerms}
+                  onChange={(e) => {
+                    setAgreedToTerms(e.target.checked);
+                    if (e.target.checked) setAgreementHighlight(false);
+                  }}
+                />
+                <label htmlFor="terms">
+                  <span className="auth-legal-prefix">Я согласен с</span>
+                  <Link
+                    to="/terms"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="auth-legal-link"
+                    title="Пользовательским соглашением"
+                  >
+                    Пользовательским соглашением
+                  </Link>
+                </label>
+              </div>
+
+              <div className={`auth-legal-item${agreementHighlight && !agreedToPrivacy ? " auth-legal-item--highlight" : ""}`}>
+                <input
+                  type="checkbox"
+                  id="privacy"
+                  checked={agreedToPrivacy}
+                  onChange={(e) => {
+                    setAgreedToPrivacy(e.target.checked);
+                    if (e.target.checked) setAgreementHighlight(false);
+                  }}
+                />
+                <label htmlFor="privacy">
+                  <span className="auth-legal-prefix">Я согласен с</span>
+                  <Link
+                    to="/privacy"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="auth-legal-link"
+                    title="Политикой конфиденциальности"
+                  >
+                    Политикой конфиденциальности
+                  </Link>
+                </label>
+              </div>
+
+              <div className="auth-legal-hint">
+                Важно: не используйте ФИО и другие персональные данные в логине — аккаунт может быть заблокирован.
+              </div>
             </div>
           )}
 

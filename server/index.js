@@ -18,6 +18,7 @@ import {
   getLoginLockout,
   recordFailedLogin,
   clearLoginLockout,
+  invalidatePersonalDictionaryColumnCache,
 } from "./store.js";
 import {
   getWordsByLanguage,
@@ -27,6 +28,7 @@ import {
   searchDictionaryEntries,
   getDictionaryEntryById,
   patchDictionaryEntry,
+  syncDictionaryV2FromEntries,
   updateDictionaryVersion,
   listDictionaryEntriesAdmin,
   getEntryV2Admin,
@@ -47,24 +49,43 @@ import { optIn, getLeaderboard } from "./rating.js";
 import { pool } from "./db.js";
 import {
   addSavedByEntryId,
+  addSavedByEntryIds,
   addManySavedSenses,
   addSavedBySenseId,
+  addPhraseProgress,
   ensureUserDictionaryBackfilled,
+  getFormCardById,
   getCollection,
   getTodayPack,
+  getUserPhraseState,
+  getFormCardBySenseAndForm,
   getWordCardByEntryId,
   getWordCardBySenseId,
+  listAllWords,
   listCollections,
   listMyWords,
+  listMyPhrases,
   lookupDictionaryTerm,
+  removePhraseProgress,
   ensureDefaultCollectionEnrolled,
   getCollectionProgress,
+  listCollectionsAdmin,
+  createCollectionAdmin,
+  patchCollectionAdmin,
+  deleteCollectionAdmin,
+  listCollectionItemsAdmin,
+  searchCollectionCandidatesAdmin,
+  addCollectionItemAdmin,
+  removeCollectionItemAdmin,
+  reorderCollectionItemsAdmin,
   getMyWordsSummary,
+  setPhraseStatus,
   getUserSenseState,
   removeSavedByEntryId,
   removeSavedBySenseId,
   setSavedStatus,
   syncUserDictionaryFromMePatch,
+  getPersonalEntryIdsFromSavedSenses,
 } from "./userDictionaryRepo.js";
 import { getIpaBoth } from "./lib/ipaGenerator.js";
 
@@ -99,6 +120,48 @@ function sanitizeOpenAiKey(key) {
   // Ключи OpenAI: sk-proj-... или sk-..., допустимы буквы, цифры, дефис, подчёркивание
   s = s.replace(/[^\w-]+$/g, ""); // убрать хвост вроде > или пробелы
   return s;
+}
+
+const DICT_LEVELS = ["A0", "A1", "A2", "B1", "B2", "C1", "C2"];
+function normalizeImportLevel(v) {
+  const s = String(v ?? "").trim().toUpperCase();
+  return DICT_LEVELS.includes(s) ? s : null;
+}
+function normalizeImportRegister(v) {
+  const s = String(v ?? "").trim().toLowerCase();
+  if (!s) return null;
+  if (s === "официальная" || s === "formal") return "официальная";
+  if (s === "разговорная" || s === "informal" || s === "colloquial") return "разговорная";
+  return null;
+}
+function normalizeImportWord(raw) {
+  const word = String(raw ?? "").trim();
+  if (!word) return null;
+  // Only single EN word token (no spaces). Allow internal hyphen/apostrophe.
+  if (/\s/.test(word)) return null;
+  if (!/^[A-Za-z][A-Za-z'-]*$/.test(word)) return null;
+  const lemmaKey = word.toLowerCase();
+  return { word, lemmaKey };
+}
+function safeParseJsonArray(text) {
+  const t = String(text || "").trim();
+  if (!t) throw new Error("Пустой ответ от модели");
+  try {
+    const parsed = JSON.parse(t);
+    if (!Array.isArray(parsed)) throw new Error("Ожидается JSON-массив");
+    return parsed;
+  } catch {
+    // Попытка вытащить JSON-массив из текста
+    const start = t.indexOf("[");
+    const end = t.lastIndexOf("]");
+    if (start >= 0 && end > start) {
+      const slice = t.slice(start, end + 1);
+      const parsed = JSON.parse(slice);
+      if (!Array.isArray(parsed)) throw new Error("Ожидается JSON-массив");
+      return parsed;
+    }
+    throw new Error("Не удалось распарсить JSON-массив из ответа модели");
+  }
 }
 
 function send(res, status, body) {
@@ -222,12 +285,21 @@ const routes = {
       return;
     }
     const user = createDefaultUser(username, hashPassword(password));
-    const a0Ids = await getWordIdsByLevel("en", "A0");
-    if (a0Ids.length > 0) user.personalDictionary = a0Ids;
     await saveUser(user);
+    const a0Ids = await getWordIdsByLevel("en", "A0");
+    if (a0Ids.length > 0) {
+      try {
+        await addSavedByEntryIds(username, "en", a0Ids, "registration");
+      } catch (e) {
+        console.warn("registration starter words failed:", e);
+      }
+    }
     const token = randomToken();
     await createSession(token, username);
-    send(res, 200, { token, user: normalizeUserForResponse(user) });
+    let userForResponse = await getUser(username);
+    const personalEntryIds = await getPersonalEntryIdsFromSavedSenses(username, "en");
+    userForResponse = { ...userForResponse, personalDictionary: personalEntryIds };
+    send(res, 200, { token, user: normalizeUserForResponse(userForResponse) });
   },
 
   "POST /api/auth/login": async (req, res, body) => {
@@ -263,7 +335,9 @@ const routes = {
     await clearLoginLockout(username);
     const token = randomToken();
     await createSession(token, username);
-    send(res, 200, { token, user: normalizeUserForResponse(user) });
+    const personalEntryIds = await getPersonalEntryIdsFromSavedSenses(username, "en");
+    const userForResponse = { ...user, personalDictionary: personalEntryIds };
+    send(res, 200, { token, user: normalizeUserForResponse(userForResponse) });
   },
 
   "GET /api/auth/check-username": async (req, res, _, url) => {
@@ -289,6 +363,9 @@ const routes = {
       send(res, 401, { error: "Пользователь не найден" });
       return;
     }
+    // «Мой словарь» в играх берём из user_saved_senses (слова, добавленные через раздел Словарь)
+    const personalEntryIds = await getPersonalEntryIdsFromSavedSenses(session.username, "en");
+    user = { ...user, personalDictionary: personalEntryIds };
     const activeDays = await getActiveDays(session.username);
     user = normalizeUserForResponse(user, activeDays);
     send(res, 200, user);
@@ -333,21 +410,14 @@ const routes = {
     if (body.wordProgress && typeof body.wordProgress === "object") {
       user.wordProgress = { ...user.wordProgress, ...body.wordProgress };
     }
-    if (body.personalDictionary !== undefined) {
-      user.personalDictionary = Array.isArray(body.personalDictionary)
-        ? body.personalDictionary
-        : [];
-    }
     if (body.gameSettings !== undefined && typeof body.gameSettings === "object") {
       user.gameSettings = { ...user.gameSettings, ...body.gameSettings };
     }
     await saveUser(user);
-    // Синхронизируем legacy JSON-поля → нормализованный персональный словарь
     try {
       const lang = String(body?.lang || "en").trim() || "en";
       await ensureUserDictionaryBackfilled(session.username, lang);
       await syncUserDictionaryFromMePatch(session.username, lang, {
-        personalDictionary: body.personalDictionary,
         wordProgress: body.wordProgress,
       });
     } catch (e) {
@@ -356,6 +426,8 @@ const routes = {
     if (activeDays.streakDays === 0 && activeDays.lastActiveDate === null) {
       activeDays = await getActiveDays(session.username);
     }
+    const personalEntryIds = await getPersonalEntryIdsFromSavedSenses(session.username, "en");
+    user = { ...user, personalDictionary: personalEntryIds };
     send(res, 200, normalizeUserForResponse(user, activeDays));
   },
 
@@ -430,6 +502,23 @@ const routes = {
     send(res, 200, out);
   },
 
+  "GET /api/user-dictionary/my-phrases": async (req, res, body, url) => {
+    const auth = await requireAuthUser(req, res);
+    if (!auth) return;
+    const lang = url.searchParams.get("lang") || "en";
+    const q = url.searchParams.get("q") || "";
+    const status = url.searchParams.get("status") || "all";
+    const offset = url.searchParams.get("offset") || "0";
+    const limit = url.searchParams.get("limit") || "50";
+    const out = await listMyPhrases(auth.user.username, lang, {
+      q,
+      status,
+      offset: Number(offset),
+      limit: Number(limit),
+    });
+    send(res, 200, out);
+  },
+
   "GET /api/user-dictionary/collections": async (req, res, body, url) => {
     const lang = url.searchParams.get("lang") || "en";
     const auth = await getOptionalAuthUser(req);
@@ -453,6 +542,28 @@ const routes = {
       return;
     }
     send(res, 200, out);
+  },
+
+  "GET /api/user-dictionary/all-words": async (req, res, body, url) => {
+    // #region agent log
+    try {
+      const auth = await requireAuthUser(req, res);
+      if (!auth) return;
+      fetch("http://127.0.0.1:7242/ingest/039ed3c9-0fe6-43d1-a385-bc2c487e240a", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ location: "server/index.js:all-words-handler", message: "all-words handler entry", data: { hasAuth: true, username: auth?.user?.username }, timestamp: Date.now(), hypothesisId: "H1" }) }).catch(() => {});
+      const lang = url.searchParams.get("lang") || "en";
+      const offset = parseInt(url.searchParams.get("offset") || "0", 10) || 0;
+      const limit = Math.min(100, Math.max(1, parseInt(url.searchParams.get("limit") || "50", 10) || 50));
+      const q = (url.searchParams.get("q") || "").trim();
+      const opts = { offset, limit, q: q || undefined };
+      fetch("http://127.0.0.1:7242/ingest/039ed3c9-0fe6-43d1-a385-bc2c487e240a", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ location: "server/index.js:before-listAllWords", message: "calling listAllWords", data: { username: auth.user.username, lang, opts }, timestamp: Date.now(), hypothesisId: "H1" }) }).catch(() => {});
+      const out = await listAllWords(auth.user.username, lang, opts);
+      fetch("http://127.0.0.1:7242/ingest/039ed3c9-0fe6-43d1-a385-bc2c487e240a", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ location: "server/index.js:after-listAllWords", message: "listAllWords returned", data: { itemsLength: out?.items?.length, total: out?.total }, timestamp: Date.now(), hypothesisId: "H5" }) }).catch(() => {});
+      send(res, 200, out);
+    } catch (err) {
+      fetch("http://127.0.0.1:7242/ingest/039ed3c9-0fe6-43d1-a385-bc2c487e240a", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ location: "server/index.js:all-words-catch", message: "all-words error", data: { errorMessage: String(err?.message), errorName: err?.name, stack: String(err?.stack).slice(0, 500) }, timestamp: Date.now(), hypothesisId: "H1" }) }).catch(() => {});
+      throw err;
+    }
+    // #endregion
   },
 
   "POST /api/user-dictionary/add": async (req, res, body) => {
@@ -548,6 +659,67 @@ const routes = {
     send(res, 200, { ok: true, status: out.status });
   },
 
+  "POST /api/user-dictionary/phrase/add": async (req, res, body) => {
+    const auth = await requireAuthUser(req, res);
+    if (!auth) return;
+    const itemType = String(body?.itemType || "").trim();
+    const itemId = body?.itemId;
+    if (!itemType || !itemId) {
+      send(res, 400, { error: "Поля itemType и itemId обязательны" });
+      return;
+    }
+    const out = await addPhraseProgress(auth.user.username, itemType, Number(itemId), "manual");
+    if (!out?.ok) {
+      send(res, 400, { error: "Некорректные параметры фразы" });
+      return;
+    }
+    send(res, 200, { ok: true });
+  },
+
+  "POST /api/user-dictionary/phrase/remove": async (req, res, body) => {
+    const auth = await requireAuthUser(req, res);
+    if (!auth) return;
+    const itemType = String(body?.itemType || "").trim();
+    const itemId = body?.itemId;
+    if (!itemType || !itemId) {
+      send(res, 400, { error: "Поля itemType и itemId обязательны" });
+      return;
+    }
+    const out = await removePhraseProgress(auth.user.username, itemType, Number(itemId));
+    send(res, 200, out || { ok: false });
+  },
+
+  "POST /api/user-dictionary/phrase/status": async (req, res, body) => {
+    const auth = await requireAuthUser(req, res);
+    if (!auth) return;
+    const itemType = String(body?.itemType || "").trim();
+    const itemId = body?.itemId;
+    const status = body?.status;
+    if (!itemType || !itemId || !status) {
+      send(res, 400, { error: "Поля itemType, itemId и status обязательны" });
+      return;
+    }
+    const out = await setPhraseStatus(auth.user.username, itemType, Number(itemId), String(status));
+    if (!out) {
+      send(res, 404, { error: "Фраза не найдена в прогрессе" });
+      return;
+    }
+    send(res, 200, { ok: true, status: out.status });
+  },
+
+  "GET /api/user-dictionary/phrase-state": async (req, res, body, url) => {
+    const auth = await requireAuthUser(req, res);
+    if (!auth) return;
+    const itemType = url.searchParams.get("itemType");
+    const itemId = url.searchParams.get("itemId");
+    if (!itemType || !itemId) {
+      send(res, 400, { error: "Параметры itemType и itemId обязательны" });
+      return;
+    }
+    const out = await getUserPhraseState(auth.user.username, itemType, Number(itemId));
+    send(res, 200, out || { isSaved: false, status: null });
+  },
+
   "GET /api/user-dictionary/sense-state": async (req, res, body, url) => {
     const auth = await requireAuthUser(req, res);
     if (!auth) return;
@@ -588,6 +760,33 @@ const routes = {
       return;
     }
     send(res, 200, card);
+  },
+
+  "GET /api/dictionary/form-card": async (req, res, body, url) => {
+    const lang = url.searchParams.get("lang") || "en";
+    const senseId = url.searchParams.get("senseId");
+    const form = url.searchParams.get("form") || "";
+    if (!senseId) {
+      send(res, 400, { error: "Параметр senseId обязателен" });
+      return;
+    }
+    if (!String(form).trim()) {
+      send(res, 400, { error: "Параметр form обязателен" });
+      return;
+    }
+    const card = await getFormCardBySenseAndForm(lang, Number(senseId), form);
+    send(res, 200, { card });
+  },
+
+  "GET /api/dictionary/form-card-by-id": async (req, res, body, url) => {
+    const lang = url.searchParams.get("lang") || "en";
+    const cardId = url.searchParams.get("cardId");
+    if (!cardId) {
+      send(res, 400, { error: "Параметр cardId обязателен" });
+      return;
+    }
+    const card = await getFormCardById(lang, Number(cardId));
+    send(res, 200, { card });
   },
 
   "GET /api/dictionary/lookup": async (req, res, body, url) => {
@@ -637,6 +836,164 @@ const routes = {
       model: (process.env.OPENAI_MODEL || "gpt-4o-mini").trim(),
     };
     send(res, 200, info);
+  },
+
+  // ===== Admin: collections =====
+  "GET /api/admin/collections/list": async (req, res, body, url) => {
+    const auth = await requireAdmin(req, res);
+    if (!auth) return;
+    const lang = String(url.searchParams.get("lang") || "en").trim() || "en";
+    const q = String(url.searchParams.get("q") || "");
+    const offset = Number(url.searchParams.get("offset") || 0);
+    const limit = Number(url.searchParams.get("limit") || 50);
+    const out = await listCollectionsAdmin(lang, { q, offset, limit });
+    send(res, 200, out);
+  },
+
+  "GET /api/admin/collections/items": async (req, res, body, url) => {
+    const auth = await requireAdmin(req, res);
+    if (!auth) return;
+    const lang = String(url.searchParams.get("lang") || "en").trim() || "en";
+    const collectionId = Number(url.searchParams.get("collectionId") || 0);
+    if (!collectionId) {
+      send(res, 400, { error: "Параметр collectionId обязателен" });
+      return;
+    }
+    const q = String(url.searchParams.get("q") || "");
+    const offset = Number(url.searchParams.get("offset") || 0);
+    const limit = Number(url.searchParams.get("limit") || 100);
+    const out = await listCollectionItemsAdmin(lang, collectionId, { q, offset, limit });
+    send(res, 200, out);
+  },
+
+  "GET /api/admin/collections/candidates": async (req, res, body, url) => {
+    const auth = await requireAdmin(req, res);
+    if (!auth) return;
+    const lang = String(url.searchParams.get("lang") || "en").trim() || "en";
+    const q = String(url.searchParams.get("q") || "");
+    const offset = Number(url.searchParams.get("offset") || 0);
+    const limit = Number(url.searchParams.get("limit") || 60);
+    const out = await searchCollectionCandidatesAdmin(lang, { q, offset, limit });
+    send(res, 200, out);
+  },
+
+  "POST /api/admin/collections/create": async (req, res, body) => {
+    const auth = await requireAdmin(req, res);
+    if (!auth) return;
+    const lang = String(body?.lang || "en").trim() || "en";
+    const created = await createCollectionAdmin(lang, {
+      collectionKey: body?.collectionKey,
+      title: body?.title,
+      description: body?.description,
+      levelFrom: body?.levelFrom,
+      levelTo: body?.levelTo,
+      isPublic: body?.isPublic,
+      sortOrder: body?.sortOrder,
+    });
+    if (!created) {
+      send(res, 400, { error: "Не удалось создать коллекцию. Проверьте title и collectionKey." });
+      return;
+    }
+    send(res, 200, { ok: true, collection: created });
+  },
+
+  "PATCH /api/admin/collections/update": async (req, res, body) => {
+    const auth = await requireAdmin(req, res);
+    if (!auth) return;
+    const lang = String(body?.lang || "en").trim() || "en";
+    const collectionId = Number(body?.collectionId || 0);
+    if (!collectionId) {
+      send(res, 400, { error: "Поле collectionId обязательно" });
+      return;
+    }
+    const updated = await patchCollectionAdmin(lang, collectionId, {
+      collectionKey: body?.collectionKey,
+      title: body?.title,
+      description: body?.description,
+      levelFrom: body?.levelFrom,
+      levelTo: body?.levelTo,
+      isPublic: body?.isPublic,
+      sortOrder: body?.sortOrder,
+    });
+    if (!updated) {
+      send(res, 404, { error: "Коллекция не найдена или не обновлена" });
+      return;
+    }
+    send(res, 200, { ok: true, collection: updated });
+  },
+
+  "POST /api/admin/collections/delete": async (req, res, body) => {
+    const auth = await requireAdmin(req, res);
+    if (!auth) return;
+    const lang = String(body?.lang || "en").trim() || "en";
+    const collectionId = Number(body?.collectionId || 0);
+    if (!collectionId) {
+      send(res, 400, { error: "Поле collectionId обязательно" });
+      return;
+    }
+    const out = await deleteCollectionAdmin(lang, collectionId);
+    if (!out?.ok) {
+      send(res, 400, { error: "Не удалось удалить коллекцию" });
+      return;
+    }
+    send(res, 200, out);
+  },
+
+  "POST /api/admin/collections/item/add": async (req, res, body) => {
+    const auth = await requireAdmin(req, res);
+    if (!auth) return;
+    const lang = String(body?.lang || "en").trim() || "en";
+    const collectionId = Number(body?.collectionId || 0);
+    if (!collectionId) {
+      send(res, 400, { error: "Поле collectionId обязательно" });
+      return;
+    }
+    const out = await addCollectionItemAdmin(lang, collectionId, {
+      senseId: body?.senseId,
+      itemType: body?.itemType,
+      itemId: body?.itemId,
+      sortOrder: body?.sortOrder,
+    });
+    if (!out?.ok) {
+      send(res, 400, { error: "Не удалось добавить элемент в коллекцию", details: out?.reason || null });
+      return;
+    }
+    send(res, 200, out);
+  },
+
+  "POST /api/admin/collections/item/remove": async (req, res, body) => {
+    const auth = await requireAdmin(req, res);
+    if (!auth) return;
+    const lang = String(body?.lang || "en").trim() || "en";
+    const collectionId = Number(body?.collectionId || 0);
+    if (!collectionId) {
+      send(res, 400, { error: "Поле collectionId обязательно" });
+      return;
+    }
+    const out = await removeCollectionItemAdmin(lang, collectionId, {
+      senseId: body?.senseId,
+      itemType: body?.itemType,
+      itemId: body?.itemId,
+    });
+    if (!out?.ok) {
+      send(res, 400, { error: "Не удалось удалить элемент из коллекции", details: out?.reason || null });
+      return;
+    }
+    send(res, 200, out);
+  },
+
+  "POST /api/admin/collections/items/reorder": async (req, res, body) => {
+    const auth = await requireAdmin(req, res);
+    if (!auth) return;
+    const lang = String(body?.lang || "en").trim() || "en";
+    const collectionId = Number(body?.collectionId || 0);
+    const senseIds = Array.isArray(body?.senseIds) ? body.senseIds : [];
+    if (!collectionId) {
+      send(res, 400, { error: "Поле collectionId обязательно" });
+      return;
+    }
+    const out = await reorderCollectionItemsAdmin(lang, collectionId, senseIds);
+    send(res, 200, out);
   },
 
   // ===== Admin: словарь (только для is_admin = true) =====
@@ -737,6 +1094,526 @@ const routes = {
       return;
     }
     send(res, 200, data);
+  },
+
+  "GET /api/admin/dictionary/wizard/checklist": async (req, res, body, url) => {
+    const auth = await requireAdmin(req, res);
+    if (!auth) return;
+    const lang = url.searchParams.get("lang") || "en";
+    const id = Number(url.searchParams.get("id") || 0);
+    if (!id) {
+      send(res, 400, { error: "Параметр id обязателен" });
+      return;
+    }
+    const data = await getEntryV2Admin(lang, id);
+    if (!data) {
+      send(res, 404, { error: "Запись не найдена" });
+      return;
+    }
+    const cardsRes = await pool.query(
+      `
+        SELECT id
+        FROM dictionary_form_cards
+        WHERE entry_id = $1
+      `,
+      [id]
+    );
+    const hasBlock1 =
+      Boolean(String(data.entry?.ru || "").trim()) &&
+      Boolean(String(data.entry?.example || "").trim()) &&
+      Boolean(String(data.entry?.exampleRu || "").trim()) &&
+      Boolean(String(data.entry?.ipaUk || "").trim() || String(data.entry?.ipaUs || "").trim()) &&
+      Number.isFinite(Number(data.entry?.frequencyRank));
+    const senses = Array.isArray(data.senses) ? data.senses : [];
+    const hasBlock2 =
+      senses.length > 0 &&
+      senses.every((s) => String(s.glossRu || "").trim() && Array.isArray(s.examples) && s.examples.length > 0);
+    const hasBlock3 = cardsRes.rows.length > 0 || (Array.isArray(data.forms) && data.forms.length > 0);
+    send(res, 200, {
+      block1: { ready: hasBlock1, label: "Карточка слова" },
+      block2: { ready: hasBlock2, label: "Смыслы и примеры" },
+      block3: { ready: hasBlock3, label: "Формы слова" },
+      warnings: [
+        ...(hasBlock1 ? [] : ["Блок 1: заполните ru/frequency/IPA/пример"]),
+        ...(hasBlock2 ? [] : ["Блок 2: добавьте смыслы с примерами"]),
+        ...(hasBlock3 ? [] : ["Блок 3: добавьте формы или карточки форм"]),
+      ],
+    });
+  },
+
+  "GET /api/admin/dictionary/block1": async (req, res, body, url) => {
+    const auth = await requireAdmin(req, res);
+    if (!auth) return;
+    const lang = url.searchParams.get("lang") || "en";
+    const id = Number(url.searchParams.get("id") || 0);
+    if (!id) {
+      send(res, 400, { error: "Параметр id обязателен" });
+      return;
+    }
+    const entry = await getDictionaryEntryById(lang, id);
+    const v2 = await getEntryV2Admin(lang, id);
+    if (!entry || !v2) {
+      send(res, 404, { error: "Запись не найдена" });
+      return;
+    }
+    send(res, 200, { entry, lemma: v2.lemma });
+  },
+
+  "PATCH /api/admin/dictionary/block1": async (req, res, body) => {
+    const auth = await requireAdmin(req, res);
+    if (!auth) return;
+    const lang = String(body?.lang || "en").trim() || "en";
+    const id = Number(body?.entryId || 0);
+    if (!id) {
+      send(res, 400, { error: "Поле entryId обязательно" });
+      return;
+    }
+    const updated = await patchDictionaryEntry(lang, id, body?.patch || {});
+    if (!updated) {
+      send(res, 404, { error: "Запись не найдена" });
+      return;
+    }
+    await updateDictionaryVersion(lang);
+    send(res, 200, { ok: true, entry: updated });
+  },
+
+  "GET /api/admin/dictionary/block2": async (req, res, body, url) => {
+    const auth = await requireAdmin(req, res);
+    if (!auth) return;
+    const lang = url.searchParams.get("lang") || "en";
+    const id = Number(url.searchParams.get("id") || 0);
+    if (!id) {
+      send(res, 400, { error: "Параметр id обязателен" });
+      return;
+    }
+    const v2 = await getEntryV2Admin(lang, id);
+    if (!v2) {
+      send(res, 404, { error: "Запись не найдена" });
+      return;
+    }
+    send(res, 200, { senses: v2.senses || [] });
+  },
+
+  "PATCH /api/admin/dictionary/block2": async (req, res, body) => {
+    const auth = await requireAdmin(req, res);
+    if (!auth) return;
+    const lang = String(body?.lang || "en").trim() || "en";
+    const updates = Array.isArray(body?.updates) ? body.updates : [];
+    let updated = 0;
+    for (const item of updates) {
+      if (!item?.senseId || !item?.patch) continue;
+      const out = await patchSenseAdmin(lang, Number(item.senseId), item.patch, auth.user.username);
+      if (out) updated++;
+    }
+    send(res, 200, { ok: true, updated });
+  },
+
+  "GET /api/admin/dictionary/block3": async (req, res, body, url) => {
+    const auth = await requireAdmin(req, res);
+    if (!auth) return;
+    const id = Number(url.searchParams.get("id") || 0);
+    if (!id) {
+      send(res, 400, { error: "Параметр id обязателен" });
+      return;
+    }
+    const cardsRes = await pool.query(
+      `
+        SELECT id, entry_id AS "entryId", lemma_id AS "lemmaId", source_form_id AS "sourceFormId",
+               en, ru, level, accent, frequency_rank AS "frequencyRank", rarity, register,
+               ipa_uk AS "ipaUk", ipa_us AS "ipaUs", example, example_ru AS "exampleRu",
+               pos, sort_order AS "sortOrder", created_at AS "createdAt", updated_at AS "updatedAt"
+        FROM dictionary_form_cards
+        WHERE entry_id = $1
+        ORDER BY sort_order ASC, id ASC
+      `,
+      [id]
+    );
+    send(res, 200, { cards: cardsRes.rows || [] });
+  },
+
+  "POST /api/admin/dictionary/block3/save": async (req, res, body) => {
+    const auth = await requireAdmin(req, res);
+    if (!auth) return;
+    const entryId = Number(body?.entryId || 0);
+    const cards = Array.isArray(body?.cards) ? body.cards : [];
+    if (!entryId) {
+      send(res, 400, { error: "Поле entryId обязательно" });
+      return;
+    }
+    const keepIds = cards
+      .map((c) => Number(c?.id || 0))
+      .filter((id) => Number.isFinite(id) && id > 0);
+    await pool.query("BEGIN");
+    try {
+      if (keepIds.length > 0) {
+        await pool.query(
+          `DELETE FROM dictionary_form_cards WHERE entry_id = $1 AND id <> ALL($2::int[])`,
+          [entryId, keepIds]
+        );
+      } else {
+        await pool.query(`DELETE FROM dictionary_form_cards WHERE entry_id = $1`, [entryId]);
+      }
+      for (let i = 0; i < cards.length; i++) {
+        const c = cards[i] || {};
+        const payload = [
+          entryId,
+          Number(c.lemmaId || 0) || null,
+          Number(c.sourceFormId || 0) || null,
+          String(c.en || "").trim(),
+          String(c.ru || ""),
+          String(c.level || "A0"),
+          String(c.accent || "both"),
+          Math.max(1, Number(c.frequencyRank || 15000) || 15000),
+          String(c.rarity || "редкое"),
+          String(c.register || "разговорная"),
+          String(c.ipaUk || ""),
+          String(c.ipaUs || ""),
+          String(c.example || ""),
+          String(c.exampleRu || ""),
+          String(c.pos || ""),
+          i,
+        ];
+        if (Number(c.id || 0) > 0) {
+          await pool.query(
+            `
+              UPDATE dictionary_form_cards
+              SET lemma_id = $2, source_form_id = $3, en = $4, ru = $5, level = $6, accent = $7,
+                  frequency_rank = $8, rarity = $9, register = $10, ipa_uk = $11, ipa_us = $12,
+                  example = $13, example_ru = $14, pos = $15, sort_order = $16, updated_at = NOW()
+              WHERE id = $17 AND entry_id = $1
+            `,
+            [...payload, Number(c.id)]
+          );
+        } else if (String(c.en || "").trim()) {
+          await pool.query(
+            `
+              INSERT INTO dictionary_form_cards (
+                entry_id, lemma_id, source_form_id, en, ru, level, accent, frequency_rank, rarity, register,
+                ipa_uk, ipa_us, example, example_ru, pos, sort_order, updated_at
+              ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,NOW())
+              ON CONFLICT (entry_id, en) DO UPDATE
+              SET ru = EXCLUDED.ru, level = EXCLUDED.level, accent = EXCLUDED.accent, frequency_rank = EXCLUDED.frequency_rank,
+                  rarity = EXCLUDED.rarity, register = EXCLUDED.register, ipa_uk = EXCLUDED.ipa_uk, ipa_us = EXCLUDED.ipa_us,
+                  example = EXCLUDED.example, example_ru = EXCLUDED.example_ru, pos = EXCLUDED.pos, sort_order = EXCLUDED.sort_order, updated_at = NOW()
+            `,
+            payload
+          );
+        }
+      }
+      await pool.query("COMMIT");
+      send(res, 200, { ok: true });
+    } catch (e) {
+      await pool.query("ROLLBACK");
+      throw e;
+    }
+  },
+
+  /**
+   * Удалить одну карточку формы (form_card) сразу из БД (Block 3).
+   * Нужно, чтобы удалённые формы не оставались в списке «Все слова».
+   */
+  "POST /api/admin/dictionary/form-card/delete": async (req, res, body) => {
+    const auth = await requireAdmin(req, res);
+    if (!auth) return;
+    const entryId = Number(body?.entryId || 0);
+    const formCardId = Number(body?.formCardId || 0);
+    if (!entryId || !formCardId) {
+      send(res, 400, { error: "Поля entryId и formCardId обязательны" });
+      return;
+    }
+
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      const fcRes = await client.query(
+        `
+          SELECT id, entry_id AS "entryId", lemma_id AS "lemmaId", en
+          FROM dictionary_form_cards
+          WHERE id = $1 AND entry_id = $2
+          LIMIT 1
+        `,
+        [formCardId, entryId]
+      );
+      const row = fcRes.rows[0] || null;
+      if (!row) {
+        await client.query("ROLLBACK");
+        send(res, 404, { error: "Карточка формы не найдена" });
+        return;
+      }
+
+      // user_phrase_progress has no FK, must cleanup manually
+      await client.query(`DELETE FROM user_phrase_progress WHERE item_type = 'form_card' AND item_id = $1`, [formCardId]);
+
+      const delRes = await client.query(`DELETE FROM dictionary_form_cards WHERE id = $1 AND entry_id = $2`, [formCardId, entryId]);
+
+      // Optional cleanup: if this form also exists in dictionary_forms, remove it
+      const lemmaId = row.lemmaId != null ? Number(row.lemmaId) : null;
+      const en = String(row.en || "").trim();
+      if (lemmaId && en) {
+        await client.query(`DELETE FROM dictionary_forms WHERE lemma_id = $1 AND form = $2`, [lemmaId, en]);
+      }
+
+      await client.query("COMMIT");
+      send(res, 200, { ok: true, deleted: delRes.rowCount || 0 });
+    } catch (e) {
+      try {
+        await client.query("ROLLBACK");
+      } catch {}
+      const msg = e instanceof Error ? e.message : String(e);
+      send(res, 500, { error: "Не удалось удалить карточку формы", details: msg });
+    } finally {
+      client.release();
+    }
+  },
+
+  /**
+   * Полное удаление слова (entry) из словаря (админка).
+   * Важно: удаляет entry + (если lemma больше нигде не используется) удаляет и v2 (lemma/senses/...),
+   * чтобы слово исчезло из «Все слова» (там показываются и v2-смыслы без entry).
+   */
+  "POST /api/admin/dictionary/entry/delete": async (req, res, body) => {
+    const auth = await requireAdmin(req, res);
+    if (!auth) return;
+    const lang = String(body?.lang || "en").trim() || "en";
+    const entryId = Number(body?.entryId || 0);
+    if (!entryId) {
+      send(res, 400, { error: "Поле entryId обязательно" });
+      return;
+    }
+
+    const langRes = await pool.query("SELECT id FROM languages WHERE code = $1", [lang]);
+    if (langRes.rows.length === 0) {
+      send(res, 400, { error: "Неизвестный язык", details: `lang=${lang}` });
+      return;
+    }
+    const languageId = langRes.rows[0].id;
+
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+
+      const linkRes = await client.query(`SELECT lemma_id AS "lemmaId" FROM dictionary_entry_links WHERE entry_id = $1 LIMIT 1`, [entryId]);
+      const lemmaId = linkRes.rows[0]?.lemmaId != null ? Number(linkRes.rows[0].lemmaId) : null;
+
+      // Cleanup user progress for form cards under this entry (no FK)
+      const fcIdsRes = await client.query(`SELECT id FROM dictionary_form_cards WHERE entry_id = $1`, [entryId]);
+      const formCardIds = (fcIdsRes.rows || []).map((r) => Number(r.id)).filter((n) => Number.isFinite(n) && n > 0);
+      if (formCardIds.length > 0) {
+        await client.query(`DELETE FROM user_phrase_progress WHERE item_type = 'form_card' AND item_id = ANY($1::int[])`, [formCardIds]);
+      }
+
+      const delEntryRes = await client.query(`DELETE FROM dictionary_entries WHERE language_id = $1 AND id = $2`, [languageId, entryId]);
+      if ((delEntryRes.rowCount || 0) === 0) {
+        await client.query("ROLLBACK");
+        send(res, 404, { error: "Запись словаря не найдена" });
+        return;
+      }
+
+      if (lemmaId) {
+        const stillUsed = await client.query(`SELECT 1 FROM dictionary_entry_links WHERE lemma_id = $1 LIMIT 1`, [lemmaId]);
+        if ((stillUsed.rows || []).length === 0) {
+          // Collect ids for manual cleanup in user_phrase_progress (no FK) before cascade delete
+          const collRes = await client.query(`SELECT id FROM dictionary_collocations WHERE lemma_id = $1`, [lemmaId]);
+          const collocationIds = (collRes.rows || []).map((r) => Number(r.id)).filter((n) => Number.isFinite(n) && n > 0);
+
+          const patternRes = await client.query(
+            `
+              SELECT p.id
+              FROM dictionary_usage_patterns p
+              JOIN dictionary_senses s ON s.id = p.sense_id
+              WHERE s.lemma_id = $1
+            `,
+            [lemmaId]
+          );
+          const patternIds = (patternRes.rows || []).map((r) => Number(r.id)).filter((n) => Number.isFinite(n) && n > 0);
+
+          if (collocationIds.length > 0) {
+            await client.query(`DELETE FROM user_phrase_progress WHERE item_type = 'collocation' AND item_id = ANY($1::int[])`, [collocationIds]);
+          }
+          if (patternIds.length > 0) {
+            await client.query(`DELETE FROM user_phrase_progress WHERE item_type = 'pattern' AND item_id = ANY($1::int[])`, [patternIds]);
+          }
+
+          // This cascades senses/examples/forms/collocations/patterns
+          await client.query(`DELETE FROM dictionary_lemmas WHERE id = $1`, [lemmaId]);
+        }
+      }
+
+      await client.query("COMMIT");
+    } catch (e) {
+      try {
+        await client.query("ROLLBACK");
+      } catch {}
+      const msg = e instanceof Error ? e.message : String(e);
+      send(res, 500, { error: "Не удалось удалить слово", details: msg });
+      return;
+    } finally {
+      client.release();
+    }
+
+    try {
+      await updateDictionaryVersion(lang);
+    } catch (e) {
+      console.warn("entry/delete: updateDictionaryVersion failed:", e);
+    }
+    send(res, 200, { ok: true });
+  },
+
+  "POST /api/admin/dictionary/ai-draft-block1": async (req, res, body) => {
+    const auth = await requireAdmin(req, res);
+    if (!auth) return;
+    const endpoint = `http://127.0.0.1:${PORT}/api/admin/dictionary/ai-draft`;
+    const rsp = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: req.headers.authorization || "",
+      },
+      body: JSON.stringify({ ...body, mode: "full" }),
+    });
+    const data = await rsp.json();
+    if (!rsp.ok) {
+      send(res, rsp.status, data);
+      return;
+    }
+    send(res, 200, { draft: { entryPatch: data?.draft?.entryPatch || {}, lemmaPatch: data?.draft?.lemmaPatch || {}, warnings: data?.draft?.warnings || [] } });
+  },
+
+  "POST /api/admin/dictionary/ai-draft-block2": async (req, res, body) => {
+    const auth = await requireAdmin(req, res);
+    if (!auth) return;
+    const endpoint = `http://127.0.0.1:${PORT}/api/admin/dictionary/ai-draft`;
+    const rsp = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: req.headers.authorization || "",
+      },
+      body: JSON.stringify({ ...body, mode: "full" }),
+    });
+    const data = await rsp.json();
+    if (!rsp.ok) {
+      send(res, rsp.status, data);
+      return;
+    }
+    send(res, 200, { draft: { senses: data?.draft?.senses || [], warnings: data?.draft?.warnings || [] } });
+  },
+
+  "POST /api/admin/dictionary/ai-draft-block3": async (req, res, body) => {
+    const auth = await requireAdmin(req, res);
+    if (!auth) return;
+    const lang = String(body?.lang || "en").trim() || "en";
+    const entryId = Number(body?.entryId || 0);
+    const endpoint = `http://127.0.0.1:${PORT}/api/admin/dictionary/ai-draft`;
+    const rsp = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: req.headers.authorization || "",
+      },
+      body: JSON.stringify({ ...body, mode: "forms_only" }),
+    });
+    const data = await rsp.json();
+    if (!rsp.ok) {
+      send(res, rsp.status, data);
+      return;
+    }
+    const formsRaw = Array.isArray(data?.draft?.forms) ? data.draft.forms : [];
+    const warnings = Array.isArray(data?.draft?.warnings) ? data.draft.warnings : [];
+    // Dedupe AI forms by form (case-insensitive) so we don't create duplicates in UI/draft.
+    const seenForms = new Set();
+    const forms = [];
+    for (const f of formsRaw) {
+      const en = String(f?.form || "").trim();
+      const key = en.toLowerCase();
+      if (!key) continue;
+      if (seenForms.has(key)) {
+        warnings.push(`AI forms: duplicate removed "${en}"`);
+        continue;
+      }
+      seenForms.add(key);
+      forms.push(f);
+    }
+    let baseEntry = null;
+    let basePos = "";
+    let lemmaId = null;
+    const existingCardsByEn = new Map();
+    if (entryId > 0) {
+      const v2 = await getEntryV2Admin(lang, entryId);
+      baseEntry = v2?.entry || null;
+      basePos = String(v2?.lemma?.pos || "");
+      lemmaId = v2?.lemma?.id ?? null;
+      const cardsRes = await pool.query(
+        `
+          SELECT id, en, ru, level, accent, frequency_rank AS "frequencyRank", rarity, register,
+                 ipa_uk AS "ipaUk", ipa_us AS "ipaUs", example, example_ru AS "exampleRu", pos
+          FROM dictionary_form_cards
+          WHERE entry_id = $1
+        `,
+        [entryId]
+      );
+      for (const row of cardsRes.rows || []) {
+        const key = String(row.en || "").trim().toLowerCase();
+        if (key) existingCardsByEn.set(key, row);
+      }
+    }
+    // Для каждой формы делаем отдельный AI-драфт (word=form), чтобы поля были релевантны именно форме.
+    const limitedForms = forms.slice(0, 16);
+    const formCardsDraft = await Promise.all(
+      limitedForms.map(async (f, idx) => {
+        const en = String(f?.form || "").trim();
+        const prev = existingCardsByEn.get(en.toLowerCase()) || null;
+        if (prev?.id && en) {
+          warnings.push(`Form card already exists: "${en}" (id=${prev.id}) — reused.`);
+        }
+        let aiEntryPatch = {};
+        if (en) {
+          try {
+            const enrichRsp = await fetch(endpoint, {
+              method: "POST",
+              headers: {
+                "content-type": "application/json",
+                authorization: req.headers.authorization || "",
+              },
+              body: JSON.stringify({ lang, word: en, mode: "full" }),
+            });
+            const enrichData = await enrichRsp.json();
+            if (enrichRsp.ok) {
+              aiEntryPatch = enrichData?.draft?.entryPatch && typeof enrichData.draft.entryPatch === "object"
+                ? enrichData.draft.entryPatch
+                : {};
+            } else {
+              warnings.push(`AI detail draft failed for "${en}": ${String(enrichData?.error || enrichRsp.status)}`);
+            }
+          } catch (e) {
+            warnings.push(`AI detail draft exception for "${en}": ${e instanceof Error ? e.message : "unknown error"}`);
+          }
+        }
+        return {
+          id: prev?.id,
+          entryId: entryId || undefined,
+          lemmaId: lemmaId,
+          sourceFormId: null,
+          en,
+          ru: String(prev?.ru ?? aiEntryPatch?.ru ?? baseEntry?.ru ?? ""),
+          level: String(prev?.level ?? aiEntryPatch?.level ?? baseEntry?.level ?? "A0"),
+          accent: String(prev?.accent ?? aiEntryPatch?.accent ?? baseEntry?.accent ?? "both"),
+          frequencyRank: Math.max(1, Number(prev?.frequencyRank ?? aiEntryPatch?.frequencyRank ?? baseEntry?.frequencyRank ?? 15000) || 15000),
+          rarity: String(prev?.rarity ?? aiEntryPatch?.rarity ?? baseEntry?.rarity ?? "редкое"),
+          register: String(prev?.register ?? aiEntryPatch?.register ?? baseEntry?.register ?? "разговорная"),
+          ipaUk: String(prev?.ipaUk ?? aiEntryPatch?.ipaUk ?? baseEntry?.ipaUk ?? ""),
+          ipaUs: String(prev?.ipaUs ?? aiEntryPatch?.ipaUs ?? baseEntry?.ipaUs ?? ""),
+          example: String(prev?.example ?? aiEntryPatch?.example ?? baseEntry?.example ?? ""),
+          exampleRu: String(prev?.exampleRu ?? aiEntryPatch?.exampleRu ?? baseEntry?.exampleRu ?? ""),
+          pos: String(prev?.pos ?? aiEntryPatch?.pos ?? basePos ?? ""),
+          sortOrder: idx,
+        };
+      })
+    );
+    if (forms.length > limitedForms.length) {
+      warnings.push(`Forms truncated for AI-detail enrichment: ${forms.length} -> ${limitedForms.length}`);
+    }
+    send(res, 200, { draft: { formCardsDraft, warnings } });
   },
 
   "POST /api/admin/dictionary/review": async (req, res, body) => {
@@ -1085,6 +1962,274 @@ const routes = {
   },
 
   /**
+   * AI-импорт: предпросмотр списка слов/лемм для добавления в словарь.
+   * Генерирует только EN-леммы/фразы. Дубликаты помечаются (exists=true).
+   */
+  "POST /api/admin/dictionary/ai-import/preview": async (req, res, body) => {
+    const auth = await requireAdmin(req, res);
+    if (!auth) return;
+
+    const apiKey = sanitizeOpenAiKey(process.env.OPENAI_API_KEY);
+    const baseUrl = (process.env.OPENAI_BASE_URL || "https://api.openai.com/v1").trim();
+    const model = (process.env.OPENAI_MODEL || "gpt-4o-mini").trim();
+
+    const lang = String(body?.lang || "en").trim() || "en";
+    const level = normalizeImportLevel(body?.level);
+    const topic = String(body?.topic || "").trim();
+    const register = normalizeImportRegister(body?.register) || "разговорная";
+    const countRaw = body?.count;
+    const count = Math.max(1, Math.min(200, Number(countRaw) || 0));
+
+    if (!apiKey) {
+      send(res, 400, { error: "OPENAI_API_KEY не задан на сервере" });
+      return;
+    }
+    if (!level) {
+      send(res, 400, { error: "Поле level обязательно (A0..C2)" });
+      return;
+    }
+    if (!Number.isFinite(count) || count <= 0) {
+      send(res, 400, { error: "Поле count обязательно (1..200)" });
+      return;
+    }
+
+    const langRes = await pool.query("SELECT id FROM languages WHERE code = $1", [lang]);
+    if (langRes.rows.length === 0) {
+      send(res, 400, { error: "Неизвестный язык", details: `lang=${lang}` });
+      return;
+    }
+    const languageId = langRes.rows[0].id;
+
+    // Build avoid-list from existing words in the requested level group
+    const avoidLimit = 600;
+    const avoidRes = await pool.query(
+      `
+        SELECT LOWER(TRIM(e.en)) AS lemma_key
+        FROM dictionary_entries e
+        LEFT JOIN dictionary_entry_links el ON el.entry_id = e.id
+        LEFT JOIN dictionary_senses s ON s.id = el.sense_id
+        WHERE e.language_id = $1
+          AND COALESCE(s.level, e.level) = $2
+          AND TRIM(COALESCE(e.en, '')) <> ''
+        ORDER BY e.frequency_rank ASC, e.id ASC
+        LIMIT $3
+      `,
+      [languageId, level, avoidLimit]
+    );
+    const avoidLemmaKeys = avoidRes.rows.map((r) => String(r.lemma_key || "")).filter(Boolean);
+
+    const inputJson = { lang, level, topic, count, register, avoidLemmaKeys };
+    let words = [];
+    try {
+      const prompt = [
+        "Ты помощник администратора словаря английских слов.",
+        "Твоя задача: сгенерировать список EN-слов (только ОДНО слово в каждой строке) для добавления в словарь.",
+        `Верни СТРОГО JSON-массив строк длины ${count}. Без markdown, без пояснений, без нумерации.`,
+        "Правила:",
+        "- Только английский (ASCII), без переводов, без транскрипций.",
+        "- Каждая строка: ровно ОДНО слово, без пробелов.",
+        "- Допустимые символы: A-Z, a-z, а также дефис/апостроф внутри слова (например: re-enter, don't).",
+        "- Не используй собственные имена, бренды, аббревиатуры-одноразки, сленг и токсичные слова.",
+        "- Слова должны соответствовать уровню CEFR и тематике, если она задана.",
+        "- Избегай дублей и слишком похожих вариантов (plural/singular и т.п.).",
+        "- Если в input_json есть avoidLemmaKeys — НЕ возвращай ни одного слова из этого списка (сравнивай без учета регистра).",
+      ].join("\n");
+
+      const endpoint = `${baseUrl.replace(/\/$/, "")}/chat/completions`;
+      const response = await fetch(endpoint, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model,
+          messages: [
+            { role: "system", content: prompt },
+            { role: "user", content: JSON.stringify(inputJson) },
+          ],
+          temperature: 0.35,
+        }),
+      });
+      if (!response.ok) {
+        const t = await response.text();
+        throw new Error(`LLM error ${response.status}: ${t}`);
+      }
+      const data = await response.json();
+      const content = data?.choices?.[0]?.message?.content;
+      const arr = safeParseJsonArray(content);
+      words = arr;
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      send(res, 500, { error: "Не удалось сгенерировать список слов", details: msg });
+      return;
+    }
+
+    // Normalize + dedupe
+    const normalized = [];
+    const seen = new Set();
+    for (const w of words) {
+      const n = normalizeImportWord(w);
+      if (!n) continue;
+      if (seen.has(n.lemmaKey)) continue;
+      seen.add(n.lemmaKey);
+      normalized.push(n);
+      if (normalized.length >= count) break;
+    }
+
+    const lemmaKeys = normalized.map((x) => x.lemmaKey);
+    const existing = new Set();
+    if (lemmaKeys.length > 0) {
+      const exRes = await pool.query(
+        `SELECT lemma_key FROM dictionary_lemmas WHERE language_id = $1 AND lemma_key = ANY($2::text[])`,
+        [languageId, lemmaKeys]
+      );
+      for (const row of exRes.rows) existing.add(String(row.lemma_key || ""));
+    }
+
+    const items = normalized.map((x) => ({
+      word: x.word,
+      lemmaKey: x.lemmaKey,
+      exists: existing.has(x.lemmaKey),
+    }));
+
+    const missing = Math.max(0, count - items.length);
+    const status =
+      missing === 0
+        ? { ok: true, missing: 0, message: "OK" }
+        : {
+            ok: false,
+            missing,
+            message: `Не удалось сгенерировать достаточно уникальных слов: ${items.length} из ${count}. Попробуйте уменьшить количество или изменить тему.`,
+          };
+
+    send(res, 200, {
+      items,
+      status,
+      stats: {
+        requested: count,
+        unique: items.length,
+        duplicates: items.filter((i) => i.exists).length,
+      },
+    });
+  },
+
+  /**
+   * AI-импорт: сохранить список слов/лемм в БД.
+   * Вставляет только новые слова (дубли auto-skip).
+   */
+  "POST /api/admin/dictionary/ai-import/commit": async (req, res, body) => {
+    const auth = await requireAdmin(req, res);
+    if (!auth) return;
+
+    const lang = String(body?.lang || "en").trim() || "en";
+    const level = normalizeImportLevel(body?.level);
+    const register = normalizeImportRegister(body?.register) || "разговорная";
+    const wordsRaw = Array.isArray(body?.words) ? body.words : [];
+
+    if (!level) {
+      send(res, 400, { error: "Поле level обязательно (A0..C2)" });
+      return;
+    }
+    if (!Array.isArray(wordsRaw) || wordsRaw.length === 0) {
+      send(res, 400, { error: "Поле words обязательно (непустой массив строк)" });
+      return;
+    }
+
+    const langRes = await pool.query("SELECT id FROM languages WHERE code = $1", [lang]);
+    if (langRes.rows.length === 0) {
+      send(res, 400, { error: "Неизвестный язык", details: `lang=${lang}` });
+      return;
+    }
+    const languageId = langRes.rows[0].id;
+
+    // Normalize + dedupe
+    const normalized = [];
+    const seen = new Set();
+    for (const w of wordsRaw) {
+      const n = normalizeImportWord(w);
+      if (!n) continue;
+      if (seen.has(n.lemmaKey)) continue;
+      seen.add(n.lemmaKey);
+      normalized.push(n);
+      if (normalized.length >= 500) break; // hard safety cap
+    }
+    if (normalized.length === 0) {
+      send(res, 400, { error: "Список words пуст после нормализации" });
+      return;
+    }
+
+    // Skip duplicates by lemma_key (fast indexed lookup)
+    const lemmaKeys = normalized.map((x) => x.lemmaKey);
+    const existing = new Set();
+    const exRes = await pool.query(
+      `SELECT lemma_key FROM dictionary_lemmas WHERE language_id = $1 AND lemma_key = ANY($2::text[])`,
+      [languageId, lemmaKeys]
+    );
+    for (const row of exRes.rows) existing.add(String(row.lemma_key || ""));
+
+    const toInsert = normalized.filter((x) => !existing.has(x.lemmaKey)).map((x) => x.word);
+    const skippedExisting = existing.size;
+
+    let inserted = 0;
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      if (toInsert.length > 0) {
+        const ins = await client.query(
+          `
+            WITH input AS (
+              SELECT UNNEST($2::text[]) AS en
+            )
+            INSERT INTO dictionary_entries
+              (language_id, en, ru, accent, level, frequency_rank, rarity, register, ipa_uk, ipa_us, example, example_ru)
+            SELECT
+              $1,
+              en,
+              '',
+              'both',
+              $3,
+              15000,
+              'не редкое',
+              $4,
+              '',
+              '',
+              '',
+              ''
+            FROM input
+            ON CONFLICT (language_id, en) DO NOTHING
+            RETURNING id
+          `,
+          [languageId, toInsert, level, register]
+        );
+        inserted = ins.rows.length;
+      }
+      await client.query("COMMIT");
+    } catch (e) {
+      try {
+        await client.query("ROLLBACK");
+      } catch {}
+      const msg = e instanceof Error ? e.message : String(e);
+      send(res, 500, { error: "Не удалось сохранить слова", details: msg });
+      return;
+    } finally {
+      client.release();
+    }
+
+    // Sync v2 + bump version (outside transaction, but deterministic/idempotent)
+    try {
+      await syncDictionaryV2FromEntries(lang);
+      await updateDictionaryVersion(lang);
+    } catch (e) {
+      console.warn("ai-import commit: post-sync failed:", e);
+    }
+
+    const attempted = toInsert.length;
+    const skippedConflicts = Math.max(0, attempted - inserted);
+    send(res, 200, { ok: true, inserted, skippedDuplicates: skippedExisting + skippedConflicts });
+  },
+
+  /**
    * AI-черновик по слову/записи для админки. Требует OPENAI_API_KEY.
    * Возвращает draft (расширенный JSON: смыслы, примеры, формы).
    */
@@ -1098,6 +2243,7 @@ const routes = {
     const lang = String(body?.lang || "en").trim() || "en";
     const entryId = body?.entryId != null ? Number(body.entryId) : null;
     const word = String(body?.word || "").trim();
+    const mode = String(body?.mode || "full").trim().toLowerCase() === "forms_only" ? "forms_only" : "full";
 
     if (!apiKey) {
       send(res, 400, { error: "OPENAI_API_KEY не задан на сервере" });
@@ -1227,13 +2373,214 @@ const routes = {
       if (!Array.isArray(draftObj.forms)) draftObj.forms = [];
       if (!Array.isArray(draftObj.warnings)) draftObj.warnings = [];
 
-      const required = ["en", "ru", "level", "accent", "frequencyRank", "rarity", "register", "ipaUk", "ipaUs", "example", "exampleRu"];
-      const missing = required.filter((k) => {
-        const v = mergedEntryPatch[k];
-        return v === undefined || v === null || (typeof v === "string" && v.trim() === "");
-      });
-      if (missing.length > 0) {
-        draftObj.warnings = [...draftObj.warnings, `entryPatch missing: ${missing.join(", ")}`];
+      const normalizeRuForCompare = (v) =>
+        String(v ?? "")
+          .toLowerCase()
+          .replace(/[ё]/g, "е")
+          .replace(/[^a-zа-я0-9\s-]/gi, " ")
+          .replace(/\s+/g, " ")
+          .trim();
+      const normalizeFormType = (v) => {
+        const s = String(v ?? "").trim().toLowerCase();
+        if (!s) return null;
+        const m = {
+          ing: "ing",
+          gerund: "ing",
+          present_participle: "ing",
+          past: "past",
+          past_simple: "past",
+          past_participle: "past_participle",
+          participle: "past_participle",
+          third_person_singular: "third_person_singular",
+          third_person: "third_person_singular",
+          third_person_sg: "third_person_singular",
+          plural: "plural",
+          comparative: "comparative",
+          superlative: "superlative",
+          other: "other",
+        };
+        return m[s] || null;
+      };
+      const pluralizeNoun = (w) => {
+        const s = String(w || "").trim().toLowerCase();
+        if (!s) return "";
+        if (/(s|x|z|ch|sh)$/.test(s)) return `${s}es`;
+        if (/[^aeiou]y$/.test(s)) return `${s.slice(0, -1)}ies`;
+        return `${s}s`;
+      };
+      const verb3rd = (w) => {
+        const s = String(w || "").trim().toLowerCase();
+        if (!s) return "";
+        if (/(s|x|z|ch|sh|o)$/.test(s)) return `${s}es`;
+        if (/[^aeiou]y$/.test(s)) return `${s.slice(0, -1)}ies`;
+        return `${s}s`;
+      };
+      const verbIng = (w) => {
+        const s = String(w || "").trim().toLowerCase();
+        if (!s) return "";
+        if (/ie$/.test(s)) return `${s.slice(0, -2)}ying`;
+        if (/[^e]e$/.test(s)) return `${s.slice(0, -1)}ing`;
+        return `${s}ing`;
+      };
+      const verbPast = (w) => {
+        const s = String(w || "").trim().toLowerCase();
+        if (!s) return "";
+        if (/[^aeiou]y$/.test(s)) return `${s.slice(0, -1)}ied`;
+        if (/e$/.test(s)) return `${s}d`;
+        return `${s}ed`;
+      };
+      const adjComparative = (w) => {
+        const s = String(w || "").trim().toLowerCase();
+        if (!s) return "";
+        if (/[^aeiou]y$/.test(s)) return `${s.slice(0, -1)}ier`;
+        if (/e$/.test(s)) return `${s}r`;
+        return `${s}er`;
+      };
+      const adjSuperlative = (w) => {
+        const s = String(w || "").trim().toLowerCase();
+        if (!s) return "";
+        if (/[^aeiou]y$/.test(s)) return `${s.slice(0, -1)}iest`;
+        if (/e$/.test(s)) return `${s}st`;
+        return `${s}est`;
+      };
+      const IRREGULAR_VERB_FORMS = {
+        be: { third_person_singular: "is", ing: "being", past: "was", past_participle: "been" },
+        do: { third_person_singular: "does", ing: "doing", past: "did", past_participle: "done" },
+        go: { third_person_singular: "goes", ing: "going", past: "went", past_participle: "gone" },
+        have: { third_person_singular: "has", ing: "having", past: "had", past_participle: "had" },
+        make: { third_person_singular: "makes", ing: "making", past: "made", past_participle: "made" },
+        take: { third_person_singular: "takes", ing: "taking", past: "took", past_participle: "taken" },
+        come: { third_person_singular: "comes", ing: "coming", past: "came", past_participle: "come" },
+        run: { third_person_singular: "runs", ing: "running", past: "ran", past_participle: "run" },
+        write: { third_person_singular: "writes", ing: "writing", past: "wrote", past_participle: "written" },
+        read: { third_person_singular: "reads", ing: "reading", past: "read", past_participle: "read" },
+        eat: { third_person_singular: "eats", ing: "eating", past: "ate", past_participle: "eaten" },
+        drink: { third_person_singular: "drinks", ing: "drinking", past: "drank", past_participle: "drunk" },
+        speak: { third_person_singular: "speaks", ing: "speaking", past: "spoke", past_participle: "spoken" },
+        see: { third_person_singular: "sees", ing: "seeing", past: "saw", past_participle: "seen" },
+        get: { third_person_singular: "gets", ing: "getting", past: "got", past_participle: "gotten" },
+        know: { third_person_singular: "knows", ing: "knowing", past: "knew", past_participle: "known" },
+      };
+
+      if (mode !== "forms_only") {
+        const required = ["en", "ru", "level", "accent", "frequencyRank", "rarity", "register", "ipaUk", "ipaUs", "example", "exampleRu"];
+        const missing = required.filter((k) => {
+          const v = mergedEntryPatch[k];
+          return v === undefined || v === null || (typeof v === "string" && v.trim() === "");
+        });
+        if (missing.length > 0) {
+          draftObj.warnings = [...draftObj.warnings, `entryPatch missing: ${missing.join(", ")}`];
+        }
+      }
+
+      if (mode !== "forms_only") {
+        const senseOne =
+          draftObj.senses.find((s) => Number(s?.senseNo) === 1) ||
+          draftObj.senses[0] ||
+          null;
+        const entryRuNorm = normalizeRuForCompare(mergedEntryPatch.ru);
+        const senseOneGlossNorm = normalizeRuForCompare(senseOne?.glossRu);
+        if (entryRuNorm && senseOneGlossNorm && entryRuNorm === senseOneGlossNorm) {
+          draftObj.warnings = [...draftObj.warnings, "sense#1 duplicates entryPatch.ru"];
+        }
+      }
+
+      // Normalize/dedupe forms + validate by POS + lightweight fallback for obvious regular forms.
+      const normalizedForms = [];
+      const seenForms = new Set();
+      for (const raw of draftObj.forms) {
+        const f = raw && typeof raw === "object" ? raw : {};
+        const form = String(f.form || "").trim().toLowerCase();
+        const formType = normalizeFormType(f.formType);
+        if (!form || !formType) continue;
+        const key = `${formType}|${form}`;
+        if (seenForms.has(key)) {
+          draftObj.warnings = [...draftObj.warnings, `duplicate form removed: ${form} (${formType})`];
+          continue;
+        }
+        seenForms.add(key);
+        normalizedForms.push({
+          form,
+          formType,
+          isIrregular: Boolean(f.isIrregular),
+          notes: String(f.notes || ""),
+        });
+      }
+
+      const lemmaEn = String(mergedEntryPatch.en || word || existing?.entry?.en || existing?.lemma?.lemma || "").trim().toLowerCase();
+      const posRaw = String(existing?.lemma?.pos || "").trim().toLowerCase();
+      const looksVerb = /(verb|глагол)/.test(posRaw);
+      const looksNoun = /(noun|существ)/.test(posRaw);
+      const looksAdjective = /(adjective|adj|прилаг)/.test(posRaw);
+      const formTypesSet = new Set(normalizedForms.map((f) => String(f.formType)));
+
+      const ensureForm = (formType, generator, opts = {}) => {
+        if (!lemmaEn || formTypesSet.has(formType)) return false;
+        const generated = String(generator(lemmaEn) || "").trim().toLowerCase();
+        if (!generated || generated === lemmaEn) return false;
+        const key = `${formType}|${generated}`;
+        if (seenForms.has(key)) return false;
+        seenForms.add(key);
+        formTypesSet.add(formType);
+        normalizedForms.push({
+          form: generated,
+          formType,
+          isIrregular: Boolean(opts.isIrregular),
+          notes: opts.notes ? String(opts.notes) : "auto-filled (regular fallback)",
+        });
+        const source = opts.isIrregular ? "irregular fallback" : "regular fallback";
+        draftObj.warnings = [...draftObj.warnings, `forms auto-filled: ${generated} (${formType}, ${source})`];
+        return true;
+      };
+
+      if (looksVerb) {
+        const expectedVerb = ["third_person_singular", "ing", "past", "past_participle"];
+        const missingVerb = expectedVerb.filter((t) => !formTypesSet.has(t));
+        if (missingVerb.length > 0) {
+          draftObj.warnings = [...draftObj.warnings, `forms missing for verb: ${missingVerb.join(", ")}`];
+        }
+        const irregular = IRREGULAR_VERB_FORMS[lemmaEn] || null;
+        const fromIrregular = (formType) => (irregular ? irregular[formType] || "" : "");
+        ensureForm("third_person_singular", (w) => fromIrregular("third_person_singular") || verb3rd(w), {
+          isIrregular: Boolean(irregular),
+          notes: irregular ? "auto-filled (irregular fallback)" : "auto-filled (regular fallback)",
+        });
+        ensureForm("ing", (w) => fromIrregular("ing") || verbIng(w), {
+          isIrregular: Boolean(irregular),
+          notes: irregular ? "auto-filled (irregular fallback)" : "auto-filled (regular fallback)",
+        });
+        ensureForm("past", (w) => fromIrregular("past") || verbPast(w), {
+          isIrregular: Boolean(irregular),
+          notes: irregular ? "auto-filled (irregular fallback)" : "auto-filled (regular fallback)",
+        });
+        ensureForm("past_participle", (w) => fromIrregular("past_participle") || verbPast(w), {
+          isIrregular: Boolean(irregular),
+          notes: irregular ? "auto-filled (irregular fallback)" : "auto-filled (regular fallback)",
+        });
+      } else if (looksNoun) {
+        if (!formTypesSet.has("plural")) {
+          draftObj.warnings = [...draftObj.warnings, "forms missing for noun: plural"];
+        }
+        ensureForm("plural", pluralizeNoun);
+      } else if (looksAdjective) {
+        const missingAdj = ["comparative", "superlative"].filter((t) => !formTypesSet.has(t));
+        if (missingAdj.length > 0) {
+          draftObj.warnings = [...draftObj.warnings, `forms missing for adjective: ${missingAdj.join(", ")}`];
+        }
+        // avoid noisy fallback for long adjectives where periphrastic forms are common
+        if (lemmaEn && lemmaEn.length <= 8 && !lemmaEn.includes(" ")) {
+          ensureForm("comparative", adjComparative);
+          ensureForm("superlative", adjSuperlative);
+        }
+      }
+
+      draftObj.forms = normalizedForms;
+      draftObj.warnings = Array.from(new Set((draftObj.warnings || []).map((x) => String(x))));
+
+      if (mode === "forms_only") {
+        draftObj.senses = [];
+        // Keep entryPatch untouched in UI editor.
+        draftObj.warnings = Array.from(new Set([...(draftObj.warnings || []), "mode: forms_only (senses omitted)"]));
       }
 
       return draftObj;
@@ -1263,6 +2610,9 @@ const routes = {
       const prompt = [
         "Ты помощник администратора словаря английских слов. Генерируешь черновик по слову для ручного подтверждения.",
         "Вход: JSON с lang, entryId?, word?, existing? (текущие данные записи, если есть).",
+        mode === "forms_only"
+          ? "РЕЖИМ: forms_only. Сгенерируй только forms + warnings. Не генерируй senses."
+          : "РЕЖИМ: full. Генерируй карточку, смыслы, формы и warnings.",
         "",
         "Критично — объект entryPatch (карточка слова). ОБЯЗАТЕЛЕН, все поля с осмысленными и правильными значениями:",
         "- en — головная форма (как в запросе или из existing).",
@@ -1277,10 +2627,16 @@ const routes = {
         "- exampleRu — перевод этого примера на RU, естественный и краткий.",
         "Каждое поле — уникальный смысл; не дублировать, не заполнять «для галочки».",
         "Нельзя складывать карточные поля только в lemmaPatch: они обязательно должны быть в entryPatch.",
-        "- Смыслы (senses): 1–4 реально разных значения, glossRu — один вариант на смысл. Примеры короткие и естественные.",
-        "- Формы (forms): по части речи (глагол: ing, past, past_participle; сущ.: plural; прил.: comparative/superlative). Если неочевидно — не добавляй.",
+        "- Смыслы (senses): 1–4 реально разных значения, glossRu — один вариант на смысл. Для senseNo=1 не дублируй дословно entryPatch.ru; если рядом по смыслу, уточни через definitionRu/usageNote и другой пример. Примеры короткие и естественные.",
+        "- Формы (forms): НЕ пропускай, если их можно определить. Без дублей.",
+        "- Для глагола дай минимум: third_person_singular, ing, past, past_participle.",
+        "- Для существительного дай plural (если исчисляемое).",
+        "- Для прилагательного добавляй comparative/superlative только если форма естественная (short adjective), иначе можно не добавлять.",
+        "- formType только из списка: ing|past|past_participle|third_person_singular|plural|comparative|superlative|other.",
         "",
-        "Выход: СТРОГО один JSON без markdown. Формат:",
+        mode === "forms_only"
+          ? "Выход (forms_only): СТРОГО JSON вида { \"forms\": [...], \"warnings\": [...] } без markdown."
+          : "Выход: СТРОГО один JSON без markdown. Формат:",
         schema,
       ].join("\n");
 
@@ -1714,8 +3070,28 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
+/** Одноразовая миграция: перенос users.personal_dictionary в user_saved_senses и удаление колонки. Запускается при каждом старте (идемпотентно). */
+async function runPersonalDictionaryMigration() {
+  const col = await pool.query(
+    `SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'users' AND column_name = 'personal_dictionary'`
+  );
+  if (col.rows.length === 0) return;
+  const users = await pool.query("SELECT username FROM users");
+  for (const row of users.rows) {
+    await ensureUserDictionaryBackfilled(row.username, "en");
+  }
+  await pool.query("ALTER TABLE users DROP COLUMN IF EXISTS personal_dictionary");
+  invalidatePersonalDictionaryColumnCache();
+  console.log("Migration: users.personal_dictionary dropped (data in user_saved_senses).");
+}
+
 async function start() {
   await initDb();
+  try {
+    await runPersonalDictionaryMigration();
+  } catch (e) {
+    console.warn("Personal dictionary migration skipped or failed:", e.message);
+  }
   server.listen(PORT, () => {
     console.log(`STroova API: http://localhost:${PORT}/api`);
     console.log(`CORS_ORIGIN: ${CORS_ORIGIN}`);

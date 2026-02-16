@@ -144,6 +144,104 @@ export type AdminDictionaryAiDraftResponse = {
   draft: AdminDictionaryAiDraft;
 };
 
+export type AdminDictionaryAiDraftRequest = {
+  lang?: string;
+  entryId?: number;
+  word?: string;
+  mode?: "full" | "forms_only";
+};
+
+export type AdminDictionaryAiImportPreviewRequest = {
+  lang?: string;
+  level: string;
+  topic?: string;
+  count: number;
+  register?: string;
+};
+
+export type AdminDictionaryAiImportPreviewResponse = {
+  items: Array<{
+    word: string;
+    lemmaKey: string;
+    exists: boolean;
+  }>;
+  status?: {
+    ok: boolean;
+    missing: number;
+    message: string;
+  };
+  stats: {
+    requested: number;
+    unique: number;
+    duplicates: number;
+  };
+};
+
+export type AdminDictionaryAiImportCommitRequest = {
+  lang?: string;
+  level: string;
+  register?: string;
+  words: string[];
+};
+
+export type AdminDictionaryAiImportCommitResponse = {
+  ok: true;
+  inserted: number;
+  skippedDuplicates: number;
+};
+
+export type AdminDictionaryDeleteFormCardBody = {
+  lang?: string;
+  entryId: number;
+  formCardId: number;
+};
+
+export type AdminDictionaryDeleteFormCardResponse = {
+  ok: true;
+  deleted: number;
+};
+
+export type AdminDictionaryDeleteEntryBody = {
+  lang?: string;
+  entryId: number;
+};
+
+export type AdminDictionaryDeleteEntryResponse = {
+  ok: true;
+};
+
+export type AdminDictionaryWizardChecklist = {
+  block1: { ready: boolean; label: string };
+  block2: { ready: boolean; label: string };
+  block3: { ready: boolean; label: string };
+  warnings: string[];
+};
+
+export type AdminDictionaryFormCard = {
+  id?: number;
+  entryId?: number;
+  lemmaId?: number | null;
+  sourceFormId?: number | null;
+  en: string;
+  ru: string;
+  level: string;
+  accent: string;
+  frequencyRank: number;
+  rarity: string;
+  register: string;
+  ipaUk: string;
+  ipaUs: string;
+  example: string;
+  exampleRu: string;
+  pos: string;
+  sortOrder?: number;
+};
+
+export type AdminDictionaryFormCardDraft = {
+  formCardsDraft: AdminDictionaryFormCard[];
+  warnings?: string[];
+};
+
 export type AdminDictionaryApplyDraftBody = {
   lang?: string;
   entryId: number;
@@ -161,4 +259,97 @@ export type AdminDictionaryApplyDraftBody = {
 export type AdminDictionaryApplyDraftResponse = {
   ok: true;
   entry: AdminDictionaryEntryV2Response | null;
+};
+
+export type DictionaryFormCard = {
+  id: number;
+  entryId: number;
+  sourceSenseId: number | null;
+  lemmaId: number | null;
+  sourceFormId: number | null;
+  en: string;
+  ru: string;
+  level: string;
+  accent: string;
+  frequencyRank: number;
+  rarity: string;
+  register: string;
+  ipaUk: string;
+  ipaUs: string;
+  example: string;
+  exampleRu: string;
+  pos: string;
+  sortOrder: number;
+  sourceForm: {
+    id: number;
+    form: string;
+    formType: string;
+    isIrregular: boolean;
+    notes: string;
+  } | null;
+};
+
+export type DictionaryFormCardLookupResponse = {
+  card: DictionaryFormCard | null;
+};
+
+export type DictionaryUnifiedItemType =
+  | "entry"
+  | "form"
+  | "form_card"
+  | "collocation"
+  | "pattern";
+
+export type DictionaryUnifiedItem = {
+  id: number;
+  itemType: DictionaryUnifiedItemType;
+  itemId: number;
+  entryId: number | null;
+  senseId: number | null;
+  en: string;
+  ru: string;
+  level: string;
+  example: string;
+  exampleRu: string;
+  isSaved: boolean;
+};
+
+export type UserDictionaryAllWordsResponse = {
+  items: DictionaryUnifiedItem[];
+  total: number;
+};
+
+export type AdminDictionaryCollection = {
+  id: number;
+  collectionKey: string;
+  title: string;
+  description: string;
+  levelFrom: string;
+  levelTo: string;
+  isPublic: boolean;
+  sortOrder: number;
+  total: number;
+};
+
+export type AdminDictionaryCollectionItem = {
+  id: number;
+  collectionId: number;
+  senseId: number;
+  sortOrder: number;
+  en: string;
+  ru: string;
+  level: string;
+  example: string;
+  exampleRu: string;
+};
+
+export type AdminDictionaryCollectionsListResponse = {
+  items: AdminDictionaryCollection[];
+  total: number;
+};
+
+export type AdminDictionaryCollectionItemsResponse = {
+  collection: Omit<AdminDictionaryCollection, "total"> | null;
+  items: AdminDictionaryCollectionItem[];
+  total: number;
 };

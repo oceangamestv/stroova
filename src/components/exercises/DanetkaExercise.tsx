@@ -10,6 +10,7 @@ import { playCorrectSound, playErrorSound } from "../../utils/sounds";
 import { authService } from "../../services/authService";
 import { guestPendingResultService } from "../../services/guestPendingResultService";
 import { useAuth } from "../../features/auth/AuthContext";
+import { hydrateUser } from "../../data/adapters/serverAuthAdapter";
 import { calculateXp, formatXp } from "../../domain/xp";
 import { useIsMobile } from "../../hooks/useIsMobile";
 import { useGameOnlyLayout } from "../../contexts/GameOnlyLayoutContext";
@@ -126,7 +127,12 @@ const DanetkaExercise: React.FC = () => {
   const setDictionarySource = (source: DictionarySource) => {
     authService.updateGameSettings({ dictionarySource: source });
     refreshUser();
+    if (source === "personal") void hydrateUser().then(() => refreshUser());
   };
+
+  useEffect(() => {
+    if (dictionarySource === "personal") void hydrateUser().then(() => refreshUser());
+  }, [dictionarySource]);
 
   const pickNextWord = useCallback((): Word | null => {
     if (poolWords.length === 0) return null;

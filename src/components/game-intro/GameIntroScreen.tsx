@@ -1,5 +1,6 @@
 import React from "react";
 import { useAuth } from "../../features/auth/AuthContext";
+import { hydrateUser } from "../../data/adapters/serverAuthAdapter";
 import { authService } from "../../services/authService";
 import type { DictionarySource } from "../../services/dictionaryService";
 
@@ -66,6 +67,9 @@ const GameIntroScreen: React.FC<GameIntroScreenProps> = ({ gameSlug, onStart }) 
   const setDictionarySource = (source: DictionarySource) => {
     authService.updateGameSettings({ dictionarySource: source });
     refreshUser();
+    if (source === "personal") {
+      void hydrateUser().then(() => refreshUser());
+    }
   };
 
   const setPuzzleDifficulty = (value: "easy" | "hard") => {

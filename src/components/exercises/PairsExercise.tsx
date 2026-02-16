@@ -11,6 +11,7 @@ import { buildPairsCards, isMatch, PairsCard } from "../../domain/exercises/pair
 import { authService } from "../../services/authService";
 import { guestPendingResultService } from "../../services/guestPendingResultService";
 import { useAuth } from "../../features/auth/AuthContext";
+import { hydrateUser } from "../../data/adapters/serverAuthAdapter";
 import { calculateXp, formatXp } from "../../domain/xp";
 import { useIsMobile } from "../../hooks/useIsMobile";
 import { useGameOnlyLayout } from "../../contexts/GameOnlyLayoutContext";
@@ -106,7 +107,12 @@ const PairsExercise: React.FC = () => {
   const setDictionarySource = (source: DictionarySource) => {
     authService.updateGameSettings({ dictionarySource: source });
     refreshUser();
+    if (source === "personal") void hydrateUser().then(() => refreshUser());
   };
+
+  useEffect(() => {
+    if (dictionarySource === "personal") void hydrateUser().then(() => refreshUser());
+  }, [dictionarySource]);
 
   useEffect(() => {
     if (wordsLoading || dictionaryWords.length === 0) return;

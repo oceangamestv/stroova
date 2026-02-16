@@ -3,10 +3,13 @@ import { useRoutes, useLocation, Navigate } from "react-router-dom";
 import DictionaryCasualPage from "../pages/DictionaryCasualPage";
 import DictionaryPage from "../pages/DictionaryPage";
 import DictionaryWordPage from "../pages/DictionaryWordPage";
+import DictionaryFormCardPage from "../pages/DictionaryFormCardPage";
 import ProfilePage from "../pages/ProfilePage";
 import LoginPage from "../pages/LoginPage";
 import RatingsPage from "../pages/RatingsPage";
 import AboutPage from "../pages/AboutPage";
+import TermsPage from "../pages/TermsPage";
+import PrivacyPolicyPage from "../pages/PrivacyPolicyPage";
 import AdminDictionaryPage from "../pages/AdminDictionaryPage";
 import { AuthProvider, useAuth } from "../features/auth/AuthContext";
 import ThemeProvider from "../features/theme/ThemeProvider";
@@ -35,6 +38,7 @@ const routeConfig = [
   { path: "/dictionary", element: <DictionaryCasualPage /> },
   { path: "/dictionary/advanced", element: <DictionaryPage /> },
   { path: "/dictionary/word/:senseId", element: <DictionaryWordPage /> },
+  { path: "/dictionary/form/:cardId", element: <DictionaryFormCardPage /> },
   {
     path: "/admin/dictionary",
     element: (
@@ -62,6 +66,8 @@ const routeConfig = [
   { path: "/settings", element: <Navigate to="/profile" replace /> },
   { path: "/rating", element: <RatingsPage /> },
   { path: "/about", element: <AboutPage /> },
+  { path: "/terms", element: <TermsPage /> },
+  { path: "/privacy", element: <PrivacyPolicyPage /> },
   { path: "/", element: <HomeOrHub /> },
   { path: "/pairs", element: <GameRoute /> },
   { path: "/puzzle", element: <GameRoute /> },

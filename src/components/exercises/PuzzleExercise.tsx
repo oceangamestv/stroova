@@ -20,6 +20,7 @@ import {
 import { authService } from "../../services/authService";
 import { guestPendingResultService } from "../../services/guestPendingResultService";
 import { useAuth } from "../../features/auth/AuthContext";
+import { hydrateUser } from "../../data/adapters/serverAuthAdapter";
 import { calculateXp, formatXp } from "../../domain/xp";
 import { ResultWordTile } from "../common/ResultWordTile";
 
@@ -167,7 +168,12 @@ const PuzzleExercise: React.FC = () => {
   const setDictionarySource = (source: DictionarySource) => {
     authService.updateGameSettings({ dictionarySource: source });
     refreshUser();
+    if (source === "personal") void hydrateUser().then(() => refreshUser());
   };
+
+  useEffect(() => {
+    if (dictionarySource === "personal") void hydrateUser().then(() => refreshUser());
+  }, [dictionarySource]);
 
   const progressType = difficulty === "hard" ? "experienced" : "beginner";
   const randomWord = useMemo(

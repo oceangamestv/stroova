@@ -1,6 +1,9 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { Word } from "../../data/contracts/types";
 import { personalDictionaryService } from "../../services/personalDictionaryService";
+import { useAuth } from "../../features/auth/AuthContext";
+import { hydrateUser } from "../../data/adapters/serverAuthAdapter";
+import { userDictionaryApi } from "../../api/endpoints";
 
 const AnimatedProgressBar: React.FC<{
   progressBefore: number;
@@ -42,9 +45,11 @@ export const ResultWordTile: React.FC<ResultWordTileProps> = ({
   isLoggedIn,
   onDictionaryChange,
 }) => {
+  const { refresh } = useAuth();
   const [inPersonal, setInPersonal] = useState(() =>
     personalDictionaryService.isInPersonal(word.id)
   );
+  const [toggling, setToggling] = useState(false);
   const enSpanRef = useRef<HTMLSpanElement>(null);
 
   useLayoutEffect(() => {
@@ -56,17 +61,26 @@ export const ResultWordTile: React.FC<ResultWordTileProps> = ({
     span.style.setProperty("--marquee-scroll", `${maxScroll}px`);
   }, [word.en, word.en.length]);
 
-  const handleToggleDictionary = (e: React.MouseEvent) => {
+  const handleToggleDictionary = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!isLoggedIn) return;
-    if (inPersonal) {
-      personalDictionaryService.removeWord(word.id);
-      setInPersonal(false);
-    } else {
-      personalDictionaryService.addWord(word.id);
-      setInPersonal(true);
+    if (!isLoggedIn || toggling) return;
+    const nextInPersonal = !inPersonal;
+    setInPersonal(nextInPersonal);
+    setToggling(true);
+    try {
+      if (nextInPersonal) {
+        await userDictionaryApi.add({ lang: "en", entryId: word.id });
+      } else {
+        await userDictionaryApi.remove({ lang: "en", entryId: word.id });
+      }
+      await hydrateUser();
+      refresh();
+      onDictionaryChange?.();
+    } catch {
+      setInPersonal(!nextInPersonal);
+    } finally {
+      setToggling(false);
     }
-    onDictionaryChange?.();
   };
 
   const enLen = word.en.length;
@@ -121,6 +135,7 @@ export const ResultWordTile: React.FC<ResultWordTileProps> = ({
             type="button"
             className="puzzle-result-word-tile-dict-indicator"
             onClick={handleToggleDictionary}
+            disabled={toggling}
             title={inPersonal ? "Удалить из моего словаря" : "Добавить в мой словарь"}
             aria-label={inPersonal ? "Удалить из моего словаря" : "Добавить в мой словарь"}
           >

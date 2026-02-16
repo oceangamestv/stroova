@@ -26,7 +26,6 @@ CREATE TABLE IF NOT EXISTS users (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   stats JSONB NOT NULL DEFAULT '{}',
   word_progress JSONB NOT NULL DEFAULT '{}',
-  personal_dictionary JSONB NOT NULL DEFAULT '[]',
   game_settings JSONB NOT NULL DEFAULT '{}'
 );
 
@@ -132,6 +131,34 @@ CREATE TABLE IF NOT EXISTS dictionary_forms (
   notes TEXT NOT NULL DEFAULT ''
 );
 CREATE UNIQUE INDEX IF NOT EXISTS idx_dictionary_forms_unique ON dictionary_forms(lemma_id, form, form_type);
+
+-- Полноценные карточки форм слова для пошагового редактора админки.
+CREATE TABLE IF NOT EXISTS dictionary_form_cards (
+  id SERIAL PRIMARY KEY,
+  entry_id INTEGER NOT NULL REFERENCES dictionary_entries(id) ON DELETE CASCADE,
+  lemma_id INTEGER NULL REFERENCES dictionary_lemmas(id) ON DELETE SET NULL,
+  source_form_id INTEGER NULL REFERENCES dictionary_forms(id) ON DELETE SET NULL,
+  en TEXT NOT NULL,
+  ru TEXT NOT NULL DEFAULT '',
+  level VARCHAR(10) NOT NULL DEFAULT 'A0',
+  accent VARCHAR(10) NOT NULL DEFAULT 'both',
+  frequency_rank INT NOT NULL DEFAULT 15000,
+  rarity VARCHAR(20) NOT NULL DEFAULT 'редкое',
+  register VARCHAR(20) NOT NULL DEFAULT 'разговорная',
+  ipa_uk VARCHAR(100) NOT NULL DEFAULT '',
+  ipa_us VARCHAR(100) NOT NULL DEFAULT '',
+  example TEXT NOT NULL DEFAULT '',
+  example_ru TEXT NOT NULL DEFAULT '',
+  pos VARCHAR(40) NOT NULL DEFAULT '',
+  sort_order INT NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT chk_dictionary_form_cards_rarity CHECK (rarity IN ('не редкое', 'редкое', 'очень редкое')),
+  CONSTRAINT chk_dictionary_form_cards_register CHECK (register IN ('официальная', 'разговорная'))
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_dictionary_form_cards_entry_en ON dictionary_form_cards(entry_id, en);
+CREATE INDEX IF NOT EXISTS idx_dictionary_form_cards_entry ON dictionary_form_cards(entry_id);
+CREATE INDEX IF NOT EXISTS idx_dictionary_form_cards_entry_sort ON dictionary_form_cards(entry_id, sort_order);
 
 CREATE TABLE IF NOT EXISTS dictionary_entry_links (
   entry_id INTEGER PRIMARY KEY REFERENCES dictionary_entries(id) ON DELETE CASCADE,
@@ -241,6 +268,20 @@ CREATE TABLE IF NOT EXISTS user_sense_progress (
 CREATE INDEX IF NOT EXISTS idx_user_sense_progress_username ON user_sense_progress(username);
 CREATE INDEX IF NOT EXISTS idx_user_sense_progress_next_review ON user_sense_progress(next_review_at);
 
+CREATE TABLE IF NOT EXISTS user_phrase_progress (
+  username VARCHAR(255) NOT NULL REFERENCES users(username) ON DELETE CASCADE,
+  item_type VARCHAR(20) NOT NULL,
+  item_id INTEGER NOT NULL,
+  status VARCHAR(20) NOT NULL DEFAULT 'queue',
+  added_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  source VARCHAR(20) NOT NULL DEFAULT 'manual',
+  PRIMARY KEY (username, item_type, item_id),
+  CONSTRAINT chk_user_phrase_progress_type CHECK (item_type IN ('collocation', 'pattern'))
+);
+CREATE INDEX IF NOT EXISTS idx_user_phrase_progress_username ON user_phrase_progress(username);
+CREATE INDEX IF NOT EXISTS idx_user_phrase_progress_status ON user_phrase_progress(status);
+
 CREATE TABLE IF NOT EXISTS user_collection_state (
   username VARCHAR(255) NOT NULL REFERENCES users(username) ON DELETE CASCADE,
   collection_id INTEGER NOT NULL REFERENCES dictionary_collections(id) ON DELETE CASCADE,
@@ -318,6 +359,10 @@ export async function initDb() {
     await client.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS is_admin BOOLEAN NOT NULL DEFAULT FALSE");
     await client.query("ALTER TABLE user_active_days ADD COLUMN IF NOT EXISTS max_streak INT NOT NULL DEFAULT 0");
     await client.query("ALTER TABLE languages ADD COLUMN IF NOT EXISTS version VARCHAR(32) DEFAULT NULL");
+    await client.query("ALTER TABLE user_phrase_progress DROP CONSTRAINT IF EXISTS chk_user_phrase_progress_type");
+    await client.query(
+      "ALTER TABLE user_phrase_progress ADD CONSTRAINT chk_user_phrase_progress_type CHECK (item_type IN ('collocation', 'pattern', 'form_card'))"
+    );
     await client.query(SEED_LANGUAGE_SQL);
 
     // Дефолтные коллекции (чтобы "путь" работал сразу)

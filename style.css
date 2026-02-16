@@ -741,9 +741,68 @@
 .dict-my-toolbar--sheet {
   margin-bottom: 12px;
 }
+
+.dict-my-filter-select {
+  min-height: 44px;
+  min-width: 140px;
+  padding: 10px 14px 10px 12px;
+  padding-right: 32px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  background: var(--card);
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+.dict-my-filter-select:hover {
+  border-color: var(--border);
+}
+.dict-my-filter-select:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.15);
+}
+[data-theme="dark"] .dict-my-filter-select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%239ca3af' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+}
+
 .dict-my-words-sheet__close {
   width: 100%;
   margin-top: 8px;
+}
+
+.dict-all-words-toolbar {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 12px;
+}
+.dict-all-words-toolbar .search-input {
+  flex: 1;
+  min-width: 0;
+}
+.dict-all-words-pagination {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.dict-all-words-pagination__info {
+  font-size: 13px;
+  color: var(--text-soft);
+}
+.dict-all-words-pagination__buttons {
+  display: flex;
+  gap: 8px;
 }
 
 .dict-my-summary {
@@ -876,6 +935,17 @@
   transform: translateY(0);
   scrollbar-width: none;
   -ms-overflow-style: none;
+}
+
+/* ПК: модалки без --in-card (Все слова, коллекция и т.д.) центрируем в области справа от сайдбара */
+@media (min-width: 1101px) {
+  .dict-modal:not(.dict-modal--in-card) {
+    padding-left: 284px;
+  }
+  .dict-modal:not(.dict-modal--in-card) .dict-modal__panel {
+    width: min(980px, calc(100vw - 284px - 36px));
+    max-height: min(82vh, 860px);
+  }
 }
 .dict-modal__panel::-webkit-scrollbar {
   display: none;
@@ -2398,8 +2468,20 @@
   cursor: pointer;
 }
 
+.dict-chip--link {
+  color: var(--accent-secondary);
+  border-color: rgba(33, 150, 243, 0.35);
+  background: rgba(33, 150, 243, 0.08);
+}
+
 .dict-chip--btn:hover {
   border-color: rgba(33, 150, 243, 0.35);
+}
+
+.dict-chip--btn.dict-chip--link:hover {
+  border-color: rgba(33, 150, 243, 0.55);
+  background: rgba(33, 150, 243, 0.14);
+  color: var(--accent-secondary);
 }
 
 .dict-token {
@@ -2546,6 +2628,21 @@
   transform: translateY(0);
 }
 
+.dict-adv-header__ipa {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 6px;
+  align-items: center;
+  font-size: 0.9rem;
+  color: var(--text-soft);
+}
+
+.dict-adv-header__ipa-item {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  letter-spacing: 0.02em;
+}
+
 .dict-adv-header__badges {
   display: flex;
   gap: 8px;
@@ -2559,6 +2656,14 @@
   gap: 10px;
   flex-shrink: 0;
   align-items: center;
+  margin-top: 12px;
+}
+
+.dict-adv-header__saved-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-muted, #6b7280);
+  padding: 8px 14px;
 }
 
 /* Кнопки в шапке страницы слова */
@@ -2617,6 +2722,34 @@
   background: rgba(220, 53, 69, 0.1);
   border: 1px solid rgba(220, 53, 69, 0.35);
   color: #c62828;
+}
+
+/* ===== Generic banners (used across dictionary/admin pages) ===== */
+.dictionary-error-banner,
+.dictionary-warning-banner,
+.dictionary-success-banner {
+  padding: 12px 16px;
+  border-radius: 10px;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.dictionary-warning-banner {
+  background: rgba(245, 158, 11, 0.12);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  color: var(--text);
+}
+
+.dictionary-error-banner {
+  background: rgba(220, 53, 69, 0.1);
+  border: 1px solid rgba(220, 53, 69, 0.35);
+  color: #c62828;
+}
+
+.dictionary-success-banner {
+  background: rgba(34, 197, 94, 0.12);
+  border: 1px solid rgba(34, 197, 94, 0.35);
+  color: var(--text);
 }
 
 .dict-adv-loading {
@@ -2883,6 +3016,280 @@
   color: var(--accent-secondary);
 }
 
+/* Формы слова: мини-карточки в стиле шапки основного слова */
+.dict-form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.dict-form-tile {
+  border: 1px solid var(--border-subtle);
+  background: color-mix(in oklab, var(--card-soft) 70%, transparent);
+  border-radius: 12px;
+  padding: 14px 16px;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  min-height: 0;
+  cursor: pointer;
+  color: var(--text);
+  transition: border-color 0.15s, background 0.15s, transform 0.15s, box-shadow 0.15s;
+}
+
+.dict-form-tile:hover {
+  border-color: rgba(33, 150, 243, 0.45);
+  background: rgba(33, 150, 243, 0.08);
+  box-shadow: var(--shadow-soft);
+  transform: translateY(-1px);
+}
+
+.dict-form-tile:focus-visible {
+  outline: none;
+  border-color: rgba(33, 150, 243, 0.7);
+  box-shadow: 0 0 0 3px rgba(33, 150, 243, 0.18);
+}
+
+.dict-form-tile:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.dict-form-tile__main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.dict-form-tile__title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.dict-form-tile__title {
+  margin: 0;
+  font-size: clamp(18px, 2.5vw, 24px);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--text);
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+}
+
+.dict-form-tile__speak {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  background: var(--card-soft);
+  color: var(--text);
+  font-size: 1rem;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s, border-color 0.2s, transform 0.15s;
+}
+
+.dict-form-tile__speak:hover {
+  background: rgba(33, 150, 243, 0.12);
+  border-color: rgba(33, 150, 243, 0.4);
+  transform: translateY(-1px);
+}
+
+.dict-form-tile__ipa {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+  font-size: 13px;
+  color: var(--text-soft);
+}
+
+.dict-form-tile__ipa-item {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  letter-spacing: 0.02em;
+}
+
+.dict-form-tile__badges {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.dict-form-tile__type {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-soft);
+  background: var(--card-soft);
+  border: 1px solid var(--border-subtle);
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.dict-form-tile__badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-soft);
+  background: var(--card);
+  border: 1px solid var(--border-subtle);
+}
+
+.dict-form-tile__badge--irregular {
+  color: #8a4b00;
+  border-color: rgba(245, 158, 11, 0.45);
+  background: rgba(245, 158, 11, 0.16);
+}
+
+.dict-form-tile__note {
+  font-size: 12px;
+  color: var(--text-soft);
+  line-height: 1.35;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dict-form-tile__example {
+  margin-top: 6px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.dict-form-tile__example-en {
+  margin: 0 0 2px;
+  font-size: 13px;
+  color: var(--text);
+  line-height: 1.4;
+  font-style: italic;
+}
+
+.dict-form-tile__example-ru {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-soft);
+  line-height: 1.35;
+}
+
+.dict-form-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.dict-form-page .dict-form-page__card {
+  max-width: 860px;
+}
+
+.dict-form-preview--page {
+  padding: 10px 4px 2px;
+}
+
+.dict-form-preview__badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.dict-form-preview__ru {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.dict-form-preview__example {
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  background: var(--card-soft);
+  padding: 10px 12px;
+}
+
+.dict-form-preview__meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.dict-form-preview__meta-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 8px;
+}
+
+.dict-form-preview__meta-item {
+  border: 1px solid var(--border-subtle);
+  background: var(--card-soft);
+  border-radius: 10px;
+  padding: 8px 10px;
+}
+
+.dict-form-preview__meta-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--text-soft);
+}
+
+.dict-form-preview__meta-value {
+  margin-top: 4px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+  word-break: break-word;
+}
+
+.dict-form-preview__note {
+  color: var(--text-soft);
+  font-size: 12px;
+}
+
+.dict-form-hint {
+  border: 1px solid var(--border-subtle);
+  background: color-mix(in oklab, var(--card-soft) 70%, transparent);
+  border-radius: 12px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.dict-form-hint__line {
+  margin: 0;
+  color: var(--text);
+  line-height: 1.45;
+  font-size: 14px;
+}
+
+.dict-form-hint__line strong {
+  font-weight: 800;
+}
+
+.dict-form-hint__note {
+  margin: 2px 0 0;
+  color: var(--text-soft);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
 /* Шаблоны употребления */
 .dict-adv-pattern-list {
   list-style: none;
@@ -3005,6 +3412,9 @@
   }
   .dict-adv-section {
     padding-top: 16px;
+  }
+  .dict-form-grid {
+    grid-template-columns: 1fr;
   }
   .dict-sense-card__actions .word-action-btn {
     flex: 1;
@@ -5081,6 +5491,12 @@ body::after {
     border-radius: 0;
     position: relative;
     transition: background-color var(--transition-theme), border-color var(--transition-theme), box-shadow var(--transition-theme);
+  }
+
+  /* Карточки словаря (слово/форма) — контент до краёв, без внутреннего отступа */
+  .dict-adv-page .page-card.dict-adv-card,
+  .dict-form-page .dict-form-page__card {
+    padding: 0;
   }
 
   .page-card::before {
@@ -11437,6 +11853,110 @@ body::after {
   color: var(--text-soft);
 }
 
+.auth-legal {
+  padding: 14px 14px;
+  border-radius: 12px;
+  background: rgba(33, 150, 243, 0.06);
+  border: 2px solid rgba(33, 150, 243, 0.18);
+  transition: background-color var(--transition-theme), border-color var(--transition-theme);
+}
+
+.auth-legal-title {
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 10px;
+  transition: color var(--transition-theme);
+}
+
+.auth-legal-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 6px;
+  border-radius: 10px;
+  transition: background-color var(--transition-fast);
+}
+
+.auth-legal-item:hover {
+  background: rgba(33, 150, 243, 0.08);
+}
+
+.auth-legal-item input[type="checkbox"] {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  accent-color: var(--accent-secondary);
+  cursor: pointer;
+}
+
+.auth-legal-item label {
+  cursor: pointer;
+  flex: 1;
+  font-size: 0.8125rem; /* как обычные label в форме */
+  font-weight: 600;
+  color: var(--text-soft);
+  line-height: 1.45;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  white-space: nowrap;
+  overflow: hidden;
+  min-width: 0;
+  transition: color var(--transition-theme);
+}
+
+.auth-legal-prefix {
+  flex: 0 0 auto;
+  color: var(--text-soft);
+  font-size: clamp(0.56rem, 2.2vw, 0.75rem);
+  font-weight: 600;
+}
+
+.auth-legal-link {
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  font-weight: 700;
+  font-size: clamp(0.56rem, 2.2vw, 0.75rem);
+}
+
+.auth-legal-hint {
+  margin-top: 8px;
+  font-size: 0.75rem;
+  color: var(--text-soft);
+  line-height: 1.4;
+  word-break: break-word;
+  transition: color var(--transition-theme);
+}
+
+.auth-legal--highlight {
+  animation: auth-legal-pulse 1.2s ease-out 2;
+}
+
+.auth-legal-item--highlight {
+  background: rgba(251, 113, 133, 0.12);
+  border-radius: 10px;
+  animation: auth-legal-item-pulse 1s ease-out 2;
+}
+
+@keyframes auth-legal-pulse {
+  0%, 100% { border-color: rgba(33, 150, 243, 0.18); box-shadow: none; }
+  30% { border-color: rgba(251, 113, 133, 0.5); box-shadow: 0 0 0 2px rgba(251, 113, 133, 0.2); }
+}
+
+@keyframes auth-legal-item-pulse {
+  0%, 100% { background: rgba(251, 113, 133, 0.12); }
+  40% { background: rgba(251, 113, 133, 0.22); }
+}
+
 .form-error {
   padding: 10px 14px;
   border-radius: 12px;
@@ -11447,6 +11967,55 @@ body::after {
   font-weight: 600;
   text-align: center;
   min-height: 20px;
+}
+
+@media (max-width: 720px) {
+  .auth-legal {
+    padding: 12px 12px;
+  }
+
+  .auth-legal-title {
+    margin-bottom: 8px;
+  }
+
+  .auth-legal-item {
+    padding: 6px 4px;
+    gap: 10px;
+  }
+
+  .auth-legal-item input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    margin: 0;
+  }
+
+  .auth-legal-item label {
+    font-size: 0.8125rem;
+    line-height: 1.5;
+  }
+
+  .auth-legal-hint {
+    font-size: 0.75rem;
+    line-height: 1.45;
+  }
+}
+
+@media (max-width: 400px) {
+  .auth-legal-item .auth-legal-prefix,
+  .auth-legal-item .auth-legal-link {
+    font-size: clamp(0.5rem, 3.2vw, 0.65rem);
+  }
+}
+
+@media (max-width: 360px) {
+  .auth-legal-item {
+    padding: 6px 2px;
+    gap: 6px;
+  }
+  .auth-legal-item .auth-legal-prefix,
+  .auth-legal-item .auth-legal-link {
+    font-size: 0.5rem;
+  }
 }
 
 /* Кнопка отправки — голубая, как активный пункт навигации */

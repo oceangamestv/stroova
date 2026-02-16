@@ -36,9 +36,7 @@ async function resetDictionaryData() {
       `
     );
 
-    await client.query(
-      "UPDATE users SET word_progress = '{}'::jsonb, personal_dictionary = '[]'::jsonb"
-    );
+    await client.query("UPDATE users SET word_progress = '{}'::jsonb");
     await client.query("UPDATE languages SET version = NULL WHERE code = 'en'");
     await client.query("COMMIT");
 

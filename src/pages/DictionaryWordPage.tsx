@@ -39,6 +39,21 @@ function splitTextToTokens(text: string): Array<{ kind: "word" | "sep"; value: s
   return out;
 }
 
+function formatFormTypeLabel(type: string): string {
+  const key = String(type || "").trim().toLowerCase();
+  const labels: Record<string, string> = {
+    ing: "Форма -ing",
+    past: "Past",
+    past_participle: "Past Participle",
+    third_person_singular: "3rd person singular",
+    plural: "Plural",
+    comparative: "Comparative",
+    superlative: "Superlative",
+    other: "Другая форма",
+  };
+  return labels[key] || key || "Другая форма";
+}
+
 const Chip: React.FC<{ children: React.ReactNode; onClick?: () => void; title?: string; variant?: "default" | "link" }> = ({
   children,
   onClick,
@@ -74,6 +89,7 @@ const DictionaryWordPage: React.FC = () => {
   const { user, refresh } = useAuth();
   const [searchParams] = useSearchParams();
   const trailParam = searchParams.get("trail") || "";
+  const fromFormParam = searchParams.get("fromForm") || "";
 
   const [state, setState] = useState<LoadState>("idle");
   const [error, setError] = useState<string | null>(null);
@@ -81,8 +97,10 @@ const DictionaryWordPage: React.FC = () => {
 
   const [senseState, setSenseState] = useState<{ isSaved: boolean; status: string | null } | null>(null);
   const [senseStateError, setSenseStateError] = useState<string | null>(null);
+  const [phraseStates, setPhraseStates] = useState<Record<string, { isSaved: boolean; status: string | null }>>({});
   const [backFabCompact, setBackFabCompact] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [formPickError, setFormPickError] = useState<string | null>(null);
   const isMobile = useIsMobile();
 
   const isLoggedIn = !!user;
@@ -111,11 +129,14 @@ const DictionaryWordPage: React.FC = () => {
     return items;
   }, [trailParam]);
 
-  const pushTrail = (label: string, nextSenseId: number) => {
+  const pushTrail = (label: string, nextSenseId: number, fromForm?: string) => {
     const base = [...trail, { label, senseId: nextSenseId }];
     const compact = base.slice(-8); // avoid huge URL
     const next = compact.map((x) => `${encodeURIComponent(x.label)}:${x.senseId}`).join(",");
-    navigate(`/dictionary/word/${nextSenseId}?trail=${next}`);
+    const qp = new URLSearchParams();
+    qp.set("trail", next);
+    if (fromForm) qp.set("fromForm", fromForm);
+    navigate(`/dictionary/word/${nextSenseId}?${qp.toString()}`);
   };
 
   const load = async () => {
@@ -205,12 +226,32 @@ const DictionaryWordPage: React.FC = () => {
     }
   };
 
+  const onFormClick = async (form: string) => {
+    const term = String(form || "").trim();
+    if (!term) return;
+    setFormPickError(null);
+    try {
+      const out = await dictionaryApi.getFormCard({ lang, senseId, form: term });
+      if (out?.card) {
+        const qp = new URLSearchParams();
+        qp.set("fromSenseId", String(senseId));
+        qp.set("fromForm", term);
+        navigate(`/dictionary/form/${out.card.id}?${qp.toString()}`);
+        return;
+      }
+      setFormPickError("Карточка формы пока не заполнена.");
+    } catch (e) {
+      setFormPickError(formatApiError(e, "Не удалось открыть карточку формы"));
+    }
+  };
+
   const entry = card?.entry;
   const senses = Array.isArray(card?.senses) ? card.senses : [];
   const forms = Array.isArray(card?.forms) ? card.forms : [];
   const links = Array.isArray(card?.links) ? card.links : [];
   const collocations = Array.isArray(card?.collocations) ? card.collocations : [];
   const patterns = Array.isArray(card?.patterns) ? card.patterns : [];
+  const phraseKey = (itemType: "collocation" | "pattern", itemId: number) => `${itemType}:${itemId}`;
 
   const currentSense = senses.find((s: any) => Number(s.id) === senseId) || senses[0] || null;
   const mainExample = currentSense?.examples?.find?.((e: any) => e.isMain) || currentSense?.examples?.[0] || null;
@@ -225,6 +266,78 @@ const DictionaryWordPage: React.FC = () => {
     }
     return Array.from(m.entries()).sort((a, b) => a[0].localeCompare(b[0]));
   }, [links]);
+
+  useEffect(() => {
+    if (!isLoggedIn || !card) {
+      setPhraseStates({});
+      return;
+    }
+    const loadPhraseStates = async () => {
+      const coll = collocations
+        .map((c: any) => ({ itemType: "collocation" as const, itemId: Number(c.id) }))
+        .filter((x) => Number.isFinite(x.itemId) && x.itemId > 0);
+      const pats = patterns
+        .map((p: any) => ({ itemType: "pattern" as const, itemId: Number(p.id) }))
+        .filter((x) => Number.isFinite(x.itemId) && x.itemId > 0);
+      const all = [...coll, ...pats];
+      if (all.length === 0) {
+        setPhraseStates({});
+        return;
+      }
+      try {
+        const entries = await Promise.all(
+          all.map(async (x) => {
+            const state = await userDictionaryApi.getPhraseState({ itemType: x.itemType, itemId: x.itemId });
+            return [phraseKey(x.itemType, x.itemId), state] as const;
+          })
+        );
+        setPhraseStates(Object.fromEntries(entries));
+      } catch {
+        // keep page usable even if phrase states fail
+      }
+    };
+    void loadPhraseStates();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [card, isLoggedIn]);
+
+  const setPhraseStateLocal = (itemType: "collocation" | "pattern", itemId: number, next: { isSaved: boolean; status: string | null }) => {
+    const key = phraseKey(itemType, itemId);
+    setPhraseStates((prev) => ({ ...prev, [key]: next }));
+  };
+
+  const onPhraseLearn = async (itemType: "collocation" | "pattern", itemId: number) => {
+    if (!isLoggedIn) {
+      setSenseStateError("Войдите, чтобы добавлять фразы.");
+      return;
+    }
+    try {
+      await userDictionaryApi.addPhrase({ itemType, itemId });
+      await userDictionaryApi.setPhraseStatus({ itemType, itemId, status: "learning" });
+      setPhraseStateLocal(itemType, itemId, { isSaved: true, status: "learning" });
+    } catch (e) {
+      setSenseStateError(formatApiError(e, "Не удалось добавить фразу"));
+    }
+  };
+
+  const onPhraseStatus = async (itemType: "collocation" | "pattern", itemId: number, status: "known" | "hard") => {
+    if (!isLoggedIn) return;
+    try {
+      await userDictionaryApi.setPhraseStatus({ itemType, itemId, status });
+      setPhraseStateLocal(itemType, itemId, { isSaved: true, status });
+    } catch (e) {
+      setSenseStateError(formatApiError(e, "Не удалось обновить статус фразы"));
+    }
+  };
+
+  const onPhraseRemove = async (itemType: "collocation" | "pattern", itemId: number) => {
+    if (!isLoggedIn) return;
+    try {
+      await userDictionaryApi.removePhrase({ itemType, itemId });
+      setPhraseStateLocal(itemType, itemId, { isSaved: false, status: null });
+    } catch (e) {
+      setSenseStateError(formatApiError(e, "Не удалось удалить фразу"));
+    }
+  };
 
   return (
     <div className="app-shell dict-adv-page">
@@ -257,11 +370,19 @@ const DictionaryWordPage: React.FC = () => {
                   🔊
                 </button>
               </div>
+              {(entry?.ipaUs || card?.lemma?.ipaUs) && (
+                <div className="dict-adv-header__ipa">
+                  <span className="dict-adv-header__ipa-item" title="US">
+                    {"\u{1F1FA}\u{1F1F8}"} {entry?.ipaUs || card?.lemma?.ipaUs}
+                  </span>
+                </div>
+              )}
               <div className="dict-adv-header__badges">
                 {currentSense?.level && (
                   <span className={`word-level-badge word-level-${currentSense.level}`}>{currentSense.level}</span>
                 )}
                 {currentSense?.register && <span className="dict-mini-badge">{currentSense.register}</span>}
+                {!!fromFormParam && <span className="dict-mini-badge">Форма: {fromFormParam}</span>}
                 {senseState?.isSaved && (
                   <span className="dict-mini-badge dict-mini-badge--saved">{senseState.status || "в моём"}</span>
                 )}
@@ -282,10 +403,11 @@ const DictionaryWordPage: React.FC = () => {
           </header>
 
           {/* Ошибки — один блок */}
-          {(senseStateError || error) && (
+          {(senseStateError || error || formPickError) && (
             <div className="dict-adv-alerts">
               {senseStateError && <div className="dict-adv-alert dict-adv-alert--warning">{senseStateError}</div>}
               {error && <div className="dict-adv-alert dict-adv-alert--error">{error}</div>}
+              {formPickError && <div className="dict-adv-alert dict-adv-alert--warning">{formPickError}</div>}
             </div>
           )}
 
@@ -333,10 +455,12 @@ const DictionaryWordPage: React.FC = () => {
                 </section>
               )}
 
-              {senses.length > 0 && (
+              {senses.some((s: any) => Number(s.id) !== senseId) && (
                 <Section title="Варианты значений слова">
                   <ul className="dict-adv-sense-list">
-                    {senses.map((s: any) => (
+                    {senses
+                      .filter((s: any) => Number(s.id) !== senseId)
+                      .map((s: any) => (
                       <li key={s.id} className={`dict-sense-card ${Number(s.id) === senseId ? "dict-sense-card--active" : ""}`}>
                         <div className="dict-sense-card__head">
                           <span className={`word-level-badge word-level-${s.level}`}>{s.level}</span>
@@ -384,12 +508,73 @@ const DictionaryWordPage: React.FC = () => {
 
               {forms.length > 0 && (
                 <Section title="Формы">
-                  <div className="dict-chip-row">
-                    {forms.map((f: any) => (
-                      <Chip key={`${f.formType}-${f.form}`}>
-                        <b>{f.form}</b> <span className="muted">({f.formType})</span>
-                      </Chip>
-                    ))}
+                  <div className="dict-form-grid">
+                    {forms.map((f: any, idx: number) => {
+                      const formText = String(f.form || "").trim();
+                      const typeRaw = String(f.formType || "").trim();
+                      const typeLabel = formatFormTypeLabel(typeRaw);
+                      const note = String(f.notes || "").trim();
+                      const irregular = Boolean(f.isIrregular);
+                      const formLevel = String(f.level || "").trim();
+                      const formExample = String(f.example || "").trim();
+                      const formExampleRu = String(f.exampleRu || "").trim();
+                      const formRegister = String(f.register || "").trim();
+                      const levelToShow = formLevel || currentSense?.level || entry?.level || "";
+                      return (
+                        <button
+                          key={`${f.formType}-${f.form}-${idx}`}
+                          type="button"
+                          className="dict-form-tile"
+                          onClick={() => onFormClick(formText)}
+                          title="Открыть форму"
+                          disabled={!formText}
+                        >
+                          <div className="dict-form-tile__main">
+                            <div className="dict-form-tile__title-row">
+                              <span className="dict-form-tile__title">{formText || "—"}</span>
+                              <span
+                                className="dict-form-tile__speak"
+                                role="button"
+                                tabIndex={0}
+                                title="Озвучить"
+                                aria-label="Озвучить"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  if (formText) speakWord(formText, "both");
+                                }}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter" || e.key === " ") {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    if (formText) speakWord(formText, "both");
+                                  }
+                                }}
+                              >
+                                🔊
+                              </span>
+                            </div>
+                            <div className="dict-form-tile__badges">
+                              <span className="dict-form-tile__type">{typeLabel}</span>
+                              {levelToShow && (
+                                <span className={`word-level-badge word-level-${levelToShow}`}>{levelToShow}</span>
+                              )}
+                              {formRegister && <span className="dict-mini-badge">{formRegister}</span>}
+                              <span className={`dict-form-tile__badge${irregular ? " dict-form-tile__badge--irregular" : ""}`}>
+                                {irregular ? "irregular" : "regular"}
+                              </span>
+                              {!!note && <span className="dict-form-tile__note">{note}</span>}
+                            </div>
+                            {(formExample || formExampleRu) && (
+                              <div className="dict-form-tile__example">
+                                {formExample && <p className="dict-form-tile__example-en">{formExample}</p>}
+                                {formExampleRu && <p className="dict-form-tile__example-ru">{formExampleRu}</p>}
+                              </div>
+                            )}
+                          </div>
+                        </button>
+                      );
+                    })}
                   </div>
                 </Section>
               )}
@@ -401,6 +586,25 @@ const DictionaryWordPage: React.FC = () => {
                       <li key={p.id} className="dict-pattern-item">
                         <div className="dict-example__en">{p.en}</div>
                         {!!p.ru && <div className="dict-example__ru">{p.ru}</div>}
+                        <div className="dict-card__actions" style={{ marginTop: 8 }}>
+                          {!phraseStates[phraseKey("pattern", Number(p.id))]?.isSaved ? (
+                            <button type="button" className="word-action-btn word-action-add-personal" onClick={() => onPhraseLearn("pattern", Number(p.id))}>
+                              Учить фразу
+                            </button>
+                          ) : (
+                            <>
+                              <button type="button" className="word-action-btn" onClick={() => onPhraseStatus("pattern", Number(p.id), "known")}>
+                                Знаю
+                              </button>
+                              <button type="button" className="word-action-btn" onClick={() => onPhraseStatus("pattern", Number(p.id), "hard")}>
+                                На повтор
+                              </button>
+                              <button type="button" className="word-action-btn word-action-remove-personal" onClick={() => onPhraseRemove("pattern", Number(p.id))}>
+                                Удалить
+                              </button>
+                            </>
+                          )}
+                        </div>
                       </li>
                     ))}
                   </ul>
@@ -434,6 +638,25 @@ const DictionaryWordPage: React.FC = () => {
                             {!!c.exampleRu && <div className="dict-example__ru">{c.exampleRu}</div>}
                           </div>
                         )}
+                        <div className="dict-card__actions">
+                          {!phraseStates[phraseKey("collocation", Number(c.id))]?.isSaved ? (
+                            <button type="button" className="word-action-btn word-action-add-personal" onClick={() => onPhraseLearn("collocation", Number(c.id))}>
+                              Учить фразу
+                            </button>
+                          ) : (
+                            <>
+                              <button type="button" className="word-action-btn" onClick={() => onPhraseStatus("collocation", Number(c.id), "known")}>
+                                Знаю
+                              </button>
+                              <button type="button" className="word-action-btn" onClick={() => onPhraseStatus("collocation", Number(c.id), "hard")}>
+                                На повтор
+                              </button>
+                              <button type="button" className="word-action-btn word-action-remove-personal" onClick={() => onPhraseRemove("collocation", Number(c.id))}>
+                                Удалить
+                              </button>
+                            </>
+                          )}
+                        </div>
                       </li>
                     ))}
                   </ul>

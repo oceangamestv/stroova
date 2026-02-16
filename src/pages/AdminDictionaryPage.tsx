@@ -5,12 +5,28 @@ import { useAuth } from "../features/auth/AuthContext";
 import { useNavigate, useParams } from "react-router-dom";
 import type { Word } from "../data/contracts/types";
 import { adminDictionaryApi } from "../api/endpoints";
-import type { AdminDictionaryAiDraft, AdminDictionaryEntryV2Response, AdminDictionaryListItem } from "../api/types";
+import type {
+  AdminDictionaryAiDraft,
+  AdminDictionaryCollection,
+  AdminDictionaryCollectionItem,
+  AdminDictionaryEntryV2Response,
+  AdminDictionaryFormCard,
+  AdminDictionaryFormCardDraft,
+  AdminDictionaryListItem,
+  AdminDictionaryWizardChecklist,
+  DictionaryUnifiedItem,
+} from "../api/types";
 import { ApiError } from "../api/client";
 
 type LoadState = "idle" | "loading" | "error";
 
 type ReviewedFilter = "all" | "yes" | "no";
+
+type AiImportItem = {
+  word: string;
+  lemmaKey: string;
+  exists: boolean;
+};
 
 const LEVELS: Word["level"][] = ["A0", "A1", "A2", "B1", "B2", "C1", "C2"];
 const ACCENTS: Word["accent"][] = ["both", "UK", "US"];
@@ -212,16 +228,9 @@ const AdminDictionaryPage: React.FC = () => {
   const [editingSenseId, setEditingSenseId] = useState<number | null>(null);
   const [senseEdit, setSenseEdit] = useState<{ glossRu: string; level: string; register: string; definitionRu: string; usageNote: string } | null>(null);
   const [newExampleBySense, setNewExampleBySense] = useState<Record<number, { en: string; ru: string; isMain: boolean }>>({});
-  const [newForm, setNewForm] = useState<{ form: string; formType: string; isIrregular: boolean; notes: string }>({
-    form: "",
-    formType: "",
-    isIrregular: false,
-    notes: "",
-  });
+  const [addExampleSenseId, setAddExampleSenseId] = useState<number | null>(null);
   const [editingExampleId, setEditingExampleId] = useState<number | null>(null);
   const [exampleEdit, setExampleEdit] = useState<{ en: string; ru: string; isMain: boolean; sortOrder: number } | null>(null);
-  const [editingFormId, setEditingFormId] = useState<number | null>(null);
-  const [formEdit, setFormEdit] = useState<{ form: string; formType: string; isIrregular: boolean; notes: string } | null>(null);
   const [senseDraft, setSenseDraft] = useState<{ glossRu: string; level: string; register: string; definitionRu: string; usageNote: string }>({
     glossRu: "",
     level: "A1",
@@ -229,6 +238,7 @@ const AdminDictionaryPage: React.FC = () => {
     definitionRu: "",
     usageNote: "",
   });
+  const [addSenseOpen, setAddSenseOpen] = useState(false);
 
   const [aiState, setAiState] = useState<LoadState>("idle");
   const [ipaFillState, setIpaFillState] = useState<LoadState>("idle");
@@ -243,6 +253,17 @@ const AdminDictionaryPage: React.FC = () => {
   const [aiDraftError, setAiDraftError] = useState<string | null>(null);
   const [aiDraftJson, setAiDraftJson] = useState<string>("");
   const [aiDraft, setAiDraft] = useState<AdminDictionaryAiDraft | null>(null);
+  const [formsDraftState, setFormsDraftState] = useState<LoadState>("idle");
+  const [formsDraftError, setFormsDraftError] = useState<string | null>(null);
+  const [formsDraft, setFormsDraft] = useState<AdminDictionaryFormCardDraft | null>(null);
+  const [formsDraftJson, setFormsDraftJson] = useState<string>("");
+  const [formsDraftStatusText, setFormsDraftStatusText] = useState<string>("");
+  const [wizardStep, setWizardStep] = useState<1 | 2 | 3>(1);
+  const [wizardChecklist, setWizardChecklist] = useState<AdminDictionaryWizardChecklist | null>(null);
+  const [formCards, setFormCards] = useState<AdminDictionaryFormCard[]>([]);
+  const [formCardsState, setFormCardsState] = useState<LoadState>("idle");
+  const [formCardsError, setFormCardsError] = useState<string | null>(null);
+  const [formCardsStatus, setFormCardsStatus] = useState<string>("");
   const [openaiCheckResult, setOpenaiCheckResult] = useState<{
     keySet: boolean;
     keyLength: number;
@@ -253,6 +274,8 @@ const AdminDictionaryPage: React.FC = () => {
     model: string;
   } | null>(null);
   const [openaiCheckError, setOpenaiCheckError] = useState<string | null>(null);
+  const [block2AiState, setBlock2AiState] = useState<LoadState>("idle");
+  const [block2AiStatus, setBlock2AiStatus] = useState<string>("");
   const [applyDraftEntryPatch, setApplyDraftEntryPatch] = useState(true);
   const [applyDraftLemmaPatch, setApplyDraftLemmaPatch] = useState(true);
   const [applyDraftSenseNos, setApplyDraftSenseNos] = useState<number[]>([]);
@@ -263,6 +286,62 @@ const AdminDictionaryPage: React.FC = () => {
   const [importText, setImportText] = useState("");
   const [importState, setImportState] = useState<LoadState>("idle");
   const [importLog, setImportLog] = useState<string>("");
+
+  const [aiImportOpen, setAiImportOpen] = useState(false);
+  const [aiImportLevel, setAiImportLevel] = useState<string>("A0");
+  const [aiImportRegister, setAiImportRegister] = useState<NonNullable<Word["register"]>>("разговорная");
+  const [aiImportTopic, setAiImportTopic] = useState("");
+  const [aiImportCount, setAiImportCount] = useState(30);
+  const [aiImportPreviewState, setAiImportPreviewState] = useState<LoadState>("idle");
+  const [aiImportCommitState, setAiImportCommitState] = useState<LoadState>("idle");
+  const [aiImportError, setAiImportError] = useState<string | null>(null);
+  const [aiImportPreview, setAiImportPreview] = useState<AiImportItem[]>([]);
+  const [aiImportStats, setAiImportStats] = useState<{ requested: number; unique: number; duplicates: number } | null>(null);
+  const [aiImportStatus, setAiImportStatus] = useState<{ ok: boolean; missing: number; message: string } | null>(null);
+  const [aiImportCommitResult, setAiImportCommitResult] = useState<{ inserted: number; skippedDuplicates: number } | null>(null);
+
+  const [batchSelectedIds, setBatchSelectedIds] = useState<number[]>([]);
+  const [batchState, setBatchState] = useState<LoadState>("idle");
+  const [batchReport, setBatchReport] = useState<Array<{ id: number; en: string; status: "ok" | "error"; formsCount: number; warnings: string[]; error?: string }>>([]);
+  const [batchDelayMs, setBatchDelayMs] = useState(350);
+  const [batchRetryCount, setBatchRetryCount] = useState(1);
+  const [adminView, setAdminView] = useState<"words" | "collections">("words");
+  const [collectionsList, setCollectionsList] = useState<AdminDictionaryCollection[]>([]);
+  const [collectionsTotal, setCollectionsTotal] = useState(0);
+  const [collectionsState, setCollectionsState] = useState<LoadState>("idle");
+  const [collectionsError, setCollectionsError] = useState<string | null>(null);
+  const [collectionsQuery, setCollectionsQuery] = useState("");
+  const [selectedCollectionId, setSelectedCollectionId] = useState<number | null>(null);
+  const [collectionItems, setCollectionItems] = useState<AdminDictionaryCollectionItem[]>([]);
+  const [collectionItemsTotal, setCollectionItemsTotal] = useState(0);
+  const [collectionItemsState, setCollectionItemsState] = useState<LoadState>("idle");
+  const [collectionItemsError, setCollectionItemsError] = useState<string | null>(null);
+  const [collectionCandidates, setCollectionCandidates] = useState<DictionaryUnifiedItem[]>([]);
+  const [collectionCandidatesState, setCollectionCandidatesState] = useState<LoadState>("idle");
+  const [collectionCandidatesError, setCollectionCandidatesError] = useState<string | null>(null);
+  const [collectionCandidatesQ, setCollectionCandidatesQ] = useState("");
+  const [collectionSaving, setCollectionSaving] = useState<LoadState>("idle");
+  const [collectionForm, setCollectionForm] = useState<{
+    mode: "create" | "edit";
+    collectionId: number | null;
+    collectionKey: string;
+    title: string;
+    description: string;
+    levelFrom: string;
+    levelTo: string;
+    isPublic: boolean;
+    sortOrder: number;
+  }>({
+    mode: "create",
+    collectionId: null,
+    collectionKey: "",
+    title: "",
+    description: "",
+    levelFrom: "A0",
+    levelTo: "C2",
+    isPublic: true,
+    sortOrder: 0,
+  });
 
   const canAccess = !!user?.isAdmin && !isMobile;
 
@@ -287,7 +366,6 @@ const AdminDictionaryPage: React.FC = () => {
     () => IMPORTANT_EMPTY_FIELDS.filter((field) => isFieldEmpty(field)),
     [editedDraft]
   );
-
   const loadList = async (reset = true) => {
     setSearchState("loading");
     setSearchError(null);
@@ -305,6 +383,10 @@ const AdminDictionaryPage: React.FC = () => {
     setAiDraftJson("");
     setAiDraftError(null);
     setAiDraft(null);
+    setFormsDraft(null);
+    setFormsDraftJson("");
+    setFormsDraftError(null);
+    setFormsDraftStatusText("");
     try {
       const { items, total } = await adminDictionaryApi.list({
         lang,
@@ -329,6 +411,55 @@ const AdminDictionaryPage: React.FC = () => {
     }
   };
 
+  const runAiImportPreview = async () => {
+    setAiImportPreviewState("loading");
+    setAiImportError(null);
+    setAiImportCommitResult(null);
+    setAiImportStatus(null);
+    try {
+      const resp = await adminDictionaryApi.aiImportPreview({
+        lang,
+        level: aiImportLevel,
+        topic: aiImportTopic.trim() || undefined,
+        count: Math.max(1, Math.min(200, Number(aiImportCount) || 1)),
+        register: aiImportRegister,
+      });
+      setAiImportPreview(resp.items || []);
+      setAiImportStats(resp.stats || null);
+      setAiImportStatus(resp.status || null);
+      setAiImportPreviewState("idle");
+    } catch (e) {
+      setAiImportPreviewState("error");
+      setAiImportError(formatApiError(e, "Ошибка AI‑импорта (preview)"));
+    }
+  };
+
+  const runAiImportCommit = async () => {
+    const words = aiImportPreview.filter((i) => !i.exists).map((i) => i.word);
+    if (words.length === 0) return;
+    setAiImportCommitState("loading");
+    setAiImportError(null);
+    try {
+      const resp = await adminDictionaryApi.aiImportCommit({
+        lang,
+        level: aiImportLevel,
+        register: aiImportRegister,
+        words,
+      });
+      setAiImportCommitResult({ inserted: resp.inserted, skippedDuplicates: resp.skippedDuplicates });
+      setAiImportPreview([]);
+      setAiImportStats(null);
+      setAiImportStatus(null);
+      setAiImportCommitState("idle");
+      await loadList(true);
+    } catch (e) {
+      setAiImportCommitState("error");
+      setAiImportError(formatApiError(e, "Ошибка AI‑импорта (commit)"));
+    }
+  };
+
+  const aiImportSavableCount = useMemo(() => aiImportPreview.filter((i) => !i.exists).length, [aiImportPreview]);
+
   useEffect(() => {
     if (!canAccess) return;
     void loadList(true);
@@ -342,6 +473,246 @@ const AdminDictionaryPage: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [canAccess, editingEntryId]);
 
+  useEffect(() => {
+    if (!canAccess) return;
+    if (adminView !== "collections") return;
+    void loadCollectionsAdmin(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canAccess, adminView]);
+
+  const resetCollectionForm = () => {
+    setCollectionForm({
+      mode: "create",
+      collectionId: null,
+      collectionKey: "",
+      title: "",
+      description: "",
+      levelFrom: "A0",
+      levelTo: "C2",
+      isPublic: true,
+      sortOrder: 0,
+    });
+  };
+
+  const syncCollectionFormFromSelected = (col: AdminDictionaryCollection) => {
+    setCollectionForm({
+      mode: "edit",
+      collectionId: Number(col.id),
+      collectionKey: String(col.collectionKey || ""),
+      title: String(col.title || ""),
+      description: String(col.description || ""),
+      levelFrom: String(col.levelFrom || "A0"),
+      levelTo: String(col.levelTo || "C2"),
+      isPublic: !!col.isPublic,
+      sortOrder: Number(col.sortOrder || 0),
+    });
+  };
+
+  const loadCollectionsAdmin = async (reset = true) => {
+    setCollectionsState("loading");
+    setCollectionsError(null);
+    try {
+      const out = await adminDictionaryApi.collectionsList({
+        lang,
+        q: collectionsQuery.trim() || undefined,
+        offset: 0,
+        limit: 120,
+      });
+      const next = Array.isArray(out?.items) ? out.items : [];
+      setCollectionsList(next);
+      setCollectionsTotal(Number(out?.total || 0));
+      setCollectionsState("idle");
+
+      const selectedStillExists = next.some((x) => Number(x.id) === Number(selectedCollectionId));
+      if (!selectedStillExists) {
+        const first = next[0] || null;
+        if (first) {
+          setSelectedCollectionId(Number(first.id));
+          syncCollectionFormFromSelected(first);
+          await loadCollectionItemsAdmin(Number(first.id));
+        } else {
+          setSelectedCollectionId(null);
+          setCollectionItems([]);
+          setCollectionItemsTotal(0);
+          if (reset) resetCollectionForm();
+        }
+      } else if (selectedCollectionId != null) {
+        const selected = next.find((x) => Number(x.id) === Number(selectedCollectionId));
+        if (selected && collectionForm.mode === "edit" && Number(collectionForm.collectionId) === Number(selected.id)) {
+          syncCollectionFormFromSelected(selected);
+        }
+      }
+    } catch (e) {
+      setCollectionsState("error");
+      setCollectionsError(formatApiError(e, "Не удалось загрузить коллекции"));
+    }
+  };
+
+  const loadCollectionItemsAdmin = async (collectionId: number) => {
+    if (!Number.isFinite(collectionId) || collectionId <= 0) return;
+    setCollectionItemsState("loading");
+    setCollectionItemsError(null);
+    try {
+      const out = await adminDictionaryApi.collectionsItems({ lang, collectionId, offset: 0, limit: 500 });
+      setCollectionItems(Array.isArray(out?.items) ? out.items : []);
+      setCollectionItemsTotal(Number(out?.total || 0));
+      setCollectionItemsState("idle");
+    } catch (e) {
+      setCollectionItemsState("error");
+      setCollectionItemsError(formatApiError(e, "Не удалось загрузить элементы коллекции"));
+    }
+  };
+
+  const selectCollectionAdmin = async (collectionId: number) => {
+    setSelectedCollectionId(collectionId);
+    const selected = collectionsList.find((x) => Number(x.id) === Number(collectionId));
+    if (selected) syncCollectionFormFromSelected(selected);
+    await loadCollectionItemsAdmin(collectionId);
+  };
+
+  const saveCollectionAdmin = async () => {
+    const title = String(collectionForm.title || "").trim();
+    if (!title) {
+      setCollectionsError("Укажите название коллекции");
+      return;
+    }
+    setCollectionSaving("loading");
+    setCollectionsError(null);
+    try {
+      if (collectionForm.mode === "edit" && collectionForm.collectionId) {
+        await adminDictionaryApi.updateCollection({
+          lang,
+          collectionId: Number(collectionForm.collectionId),
+          collectionKey: collectionForm.collectionKey || undefined,
+          title: title,
+          description: collectionForm.description || "",
+          levelFrom: collectionForm.levelFrom || "A0",
+          levelTo: collectionForm.levelTo || "C2",
+          isPublic: collectionForm.isPublic,
+          sortOrder: Number(collectionForm.sortOrder || 0),
+        });
+        await loadCollectionsAdmin(false);
+        if (selectedCollectionId) await loadCollectionItemsAdmin(Number(selectedCollectionId));
+      } else {
+        const out = await adminDictionaryApi.createCollection({
+          lang,
+          collectionKey: collectionForm.collectionKey || undefined,
+          title: title,
+          description: collectionForm.description || "",
+          levelFrom: collectionForm.levelFrom || "A0",
+          levelTo: collectionForm.levelTo || "C2",
+          isPublic: collectionForm.isPublic,
+          sortOrder: Number(collectionForm.sortOrder || 0),
+        });
+        await loadCollectionsAdmin(false);
+        const createdId = Number((out as any)?.collection?.id || 0) || null;
+        if (createdId) {
+          setSelectedCollectionId(createdId);
+          await loadCollectionItemsAdmin(createdId);
+          const created = collectionsList.find((x) => Number(x.id) === createdId);
+          if (created) syncCollectionFormFromSelected(created);
+          else {
+            setCollectionForm((prev) => ({ ...prev, mode: "edit", collectionId: createdId }));
+          }
+        }
+      }
+      setCollectionSaving("idle");
+    } catch (e) {
+      setCollectionSaving("error");
+      setCollectionsError(formatApiError(e, "Не удалось сохранить коллекцию"));
+    }
+  };
+
+  const deleteCollectionAdmin = async () => {
+    if (!collectionForm.collectionId) return;
+    const ok = window.confirm("Удалить коллекцию? Это удалит и её состав.");
+    if (!ok) return;
+    setCollectionSaving("loading");
+    setCollectionsError(null);
+    try {
+      await adminDictionaryApi.deleteCollection({ lang, collectionId: Number(collectionForm.collectionId) });
+      resetCollectionForm();
+      setSelectedCollectionId(null);
+      setCollectionItems([]);
+      setCollectionItemsTotal(0);
+      await loadCollectionsAdmin(true);
+      setCollectionSaving("idle");
+    } catch (e) {
+      setCollectionSaving("error");
+      setCollectionsError(formatApiError(e, "Не удалось удалить коллекцию"));
+    }
+  };
+
+  const loadCollectionCandidatesAdmin = async () => {
+    setCollectionCandidatesState("loading");
+    setCollectionCandidatesError(null);
+    try {
+      const out = await adminDictionaryApi.collectionsCandidates({
+        lang,
+        q: collectionCandidatesQ.trim() || undefined,
+        offset: 0,
+        limit: 80,
+      });
+      setCollectionCandidates(Array.isArray(out?.items) ? out.items : []);
+      setCollectionCandidatesState("idle");
+    } catch (e) {
+      setCollectionCandidatesState("error");
+      setCollectionCandidatesError(formatApiError(e, "Не удалось загрузить кандидатов"));
+    }
+  };
+
+  const addCandidateToCollection = async (candidate: DictionaryUnifiedItem) => {
+    if (!selectedCollectionId) return;
+    try {
+      await adminDictionaryApi.addCollectionItem({
+        lang,
+        collectionId: Number(selectedCollectionId),
+        itemType: candidate.itemType,
+        itemId: Number(candidate.itemId),
+      });
+      await loadCollectionItemsAdmin(Number(selectedCollectionId));
+    } catch (e) {
+      setCollectionItemsError(formatApiError(e, "Не удалось добавить элемент в коллекцию"));
+    }
+  };
+
+  const removeCollectionSense = async (senseId: number) => {
+    if (!selectedCollectionId) return;
+    try {
+      await adminDictionaryApi.removeCollectionItem({
+        lang,
+        collectionId: Number(selectedCollectionId),
+        senseId: Number(senseId),
+      });
+      await loadCollectionItemsAdmin(Number(selectedCollectionId));
+    } catch (e) {
+      setCollectionItemsError(formatApiError(e, "Не удалось удалить элемент из коллекции"));
+    }
+  };
+
+  const reorderCollectionItems = async (senseIds: number[]) => {
+    if (!selectedCollectionId) return;
+    try {
+      await adminDictionaryApi.reorderCollectionItems({
+        lang,
+        collectionId: Number(selectedCollectionId),
+        senseIds,
+      });
+    } catch (e) {
+      setCollectionItemsError(formatApiError(e, "Не удалось сохранить порядок коллекции"));
+    }
+  };
+
+  const moveCollectionItem = async (fromIdx: number, toIdx: number) => {
+    if (toIdx < 0 || toIdx >= collectionItems.length) return;
+    const next = [...collectionItems];
+    const [moved] = next.splice(fromIdx, 1);
+    next.splice(toIdx, 0, moved);
+    setCollectionItems(next);
+    const senseIds = next.map((x) => Number(x.senseId)).filter((n) => Number.isFinite(n) && n > 0);
+    await reorderCollectionItems(senseIds);
+  };
+
   const loadEntryData = async (id: number) => {
     setSelectedId(id);
     setDraft(null);
@@ -353,15 +724,23 @@ const AdminDictionaryPage: React.FC = () => {
     setSenseEdit(null);
     setEditingExampleId(null);
     setExampleEdit(null);
-    setEditingFormId(null);
-    setFormEdit(null);
+    setAddExampleSenseId(null);
+    setAddSenseOpen(false);
     setAiJson("");
     setAiError(null);
     setAiDraftJson("");
     setAiDraftError(null);
     setAiDraft(null);
+    setFormsDraft(null);
+    setFormsDraftJson("");
+    setFormsDraftError(null);
+    setFormsDraftStatusText("");
     setAiSuggestedFields(null);
     setAiAppliedSensesCount(null);
+    setWizardStep(1);
+    setWizardChecklist(null);
+    setFormCards([]);
+    setFormCardsError(null);
     try {
       const { entry } = await adminDictionaryApi.getEntry({ lang, id });
       setDraft(entry);
@@ -370,11 +749,36 @@ const AdminDictionaryPage: React.FC = () => {
       setV2(v2Data);
     } catch (e) {
       setSaveError(e instanceof Error ? e.message : "Не удалось загрузить запись");
+      return;
+    }
+    try {
+      const [checklist, block3] = await Promise.all([
+        adminDictionaryApi.wizardChecklist({ lang, id }),
+        adminDictionaryApi.getBlock3({ id }),
+      ]);
+      setWizardChecklist(checklist);
+      setFormCards(Array.isArray(block3.cards) ? block3.cards : []);
+    } catch (e) {
+      // Не ломаем открытие карточки, если вспомогательные wizard-данные недоступны.
+      setFormCardsError(e instanceof Error ? e.message : "Не удалось загрузить данные мастера");
     }
   };
 
   const loadEntry = async (id: number) => {
     navigate(`/admin/dictionary/word/${id}`);
+  };
+
+  const refreshWizardState = async (id: number) => {
+    try {
+      const [checklist, block3] = await Promise.all([
+        adminDictionaryApi.wizardChecklist({ lang, id }),
+        adminDictionaryApi.getBlock3({ id }),
+      ]);
+      setWizardChecklist(checklist);
+      setFormCards(Array.isArray(block3.cards) ? block3.cards : []);
+    } catch (e) {
+      setFormCardsError(e instanceof Error ? e.message : "Не удалось обновить мастер");
+    }
   };
 
   const save = async () => {
@@ -431,6 +835,7 @@ const AdminDictionaryPage: React.FC = () => {
       const data = await adminDictionaryApi.createSense({ lang, entryId: draft.id, sense: senseDraft });
       setV2(data);
       setSenseDraft({ glossRu: "", level: "A1", register: "разговорная", definitionRu: "", usageNote: "" });
+      setAddSenseOpen(false);
     } catch (e) {
       setV2Error(e instanceof Error ? e.message : "Не удалось добавить значение");
     }
@@ -482,8 +887,54 @@ const AdminDictionaryPage: React.FC = () => {
         setV2(v2Data);
       }
       setNewExampleBySense((prev) => ({ ...prev, [senseId]: { en: "", ru: "", isMain: false } }));
+      setAddExampleSenseId(null);
     } catch (e) {
       setV2Error(formatApiError(e, "Не удалось добавить пример"));
+    }
+  };
+
+  const askAiBlock2 = async () => {
+    const id = draft?.id || selected?.id || selectedId;
+    const w = (draft?.en || selected?.en || query).trim();
+    if (!id && !w) return;
+    setBlock2AiState("loading");
+    setBlock2AiStatus("Генерирую смыслы и примеры для блока 2...");
+    setV2Error(null);
+    try {
+      const { draft: out } = await adminDictionaryApi.aiDraftBlock2({
+        lang,
+        entryId: id ?? undefined,
+        word: id ? undefined : w,
+      });
+      const senses = Array.isArray(out?.senses) ? out.senses : [];
+      if (!id || senses.length === 0) {
+        setBlock2AiStatus("AI не вернул новых смыслов/примеров.");
+        setBlock2AiState("idle");
+        return;
+      }
+      const senseNos = senses.map((s) => Number(s?.senseNo)).filter((n) => Number.isFinite(n) && n > 0);
+      await adminDictionaryApi.applyDraft({
+        lang,
+        entryId: id,
+        draft: { senses, warnings: out?.warnings || [] },
+        apply: {
+          entryPatch: false,
+          lemmaPatch: false,
+          selectedSenseNos: senseNos,
+          replaceExamples: true,
+          applySense1Core: true,
+          selectedFormIndexes: [],
+        },
+      });
+      const v2Data = await adminDictionaryApi.getEntryV2({ lang, id });
+      setV2(v2Data);
+      await refreshWizardState(id);
+      setBlock2AiStatus(`Готово: обновлено смыслов — ${senses.length}.`);
+      setBlock2AiState("idle");
+    } catch (e) {
+      setBlock2AiState("error");
+      setV2Error(formatApiError(e, "Ошибка AI блока 2"));
+      setBlock2AiStatus("Ошибка AI блока 2.");
     }
   };
 
@@ -525,65 +976,6 @@ const AdminDictionaryPage: React.FC = () => {
       setExampleEdit(null);
     } catch (e) {
       setV2Error(formatApiError(e, "Не удалось сохранить пример"));
-    }
-  };
-
-  const addForm = async () => {
-    if (!v2?.lemma?.id) return;
-    if (!newForm.form.trim()) return;
-    try {
-      await adminDictionaryApi.addForm({
-        lang,
-        lemmaId: v2.lemma.id,
-        form: {
-          form: newForm.form,
-          formType: newForm.formType,
-          isIrregular: newForm.isIrregular,
-          notes: newForm.notes,
-        },
-      });
-      if (draft?.id) {
-        const v2Data = await adminDictionaryApi.getEntryV2({ lang, id: draft.id });
-        setV2(v2Data);
-      }
-      setNewForm({ form: "", formType: "", isIrregular: false, notes: "" });
-    } catch (e) {
-      setV2Error(formatApiError(e, "Не удалось добавить форму"));
-    }
-  };
-
-  const deleteForm = async (formId: number) => {
-    if (!draft?.id) return;
-    if (!confirm("Удалить форму?")) return;
-    try {
-      await adminDictionaryApi.deleteForm({ lang, id: formId });
-      const v2Data = await adminDictionaryApi.getEntryV2({ lang, id: draft.id });
-      setV2(v2Data);
-    } catch (e) {
-      setV2Error(formatApiError(e, "Не удалось удалить форму"));
-    }
-  };
-
-  const startEditForm = (f: { id: number; form: string; formType: string; isIrregular: boolean; notes: string }) => {
-    setEditingFormId(f.id);
-    setFormEdit({
-      form: f.form || "",
-      formType: f.formType || "",
-      isIrregular: !!f.isIrregular,
-      notes: f.notes || "",
-    });
-  };
-
-  const saveForm = async (formId: number) => {
-    if (!formEdit || !draft?.id) return;
-    try {
-      await adminDictionaryApi.patchForm({ lang, id: formId, patch: formEdit });
-      const v2Data = await adminDictionaryApi.getEntryV2({ lang, id: draft.id });
-      setV2(v2Data);
-      setEditingFormId(null);
-      setFormEdit(null);
-    } catch (e) {
-      setV2Error(formatApiError(e, "Не удалось сохранить форму"));
     }
   };
 
@@ -724,13 +1116,92 @@ const AdminDictionaryPage: React.FC = () => {
     }
   };
 
+  const toggleBatchId = (id: number) => {
+    setBatchSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  };
+
+  const selectAllVisibleForBatch = () => {
+    setBatchSelectedIds((prev) => {
+      const visible = items.map((x) => Number(x.id)).filter((x) => Number.isFinite(x) && x > 0);
+      const allSelected = visible.length > 0 && visible.every((id) => prev.includes(id));
+      if (allSelected) return prev.filter((id) => !visible.includes(id));
+      return Array.from(new Set([...prev, ...visible]));
+    });
+  };
+
+  const runBatchFormsDraft = async () => {
+    if (batchSelectedIds.length === 0) return;
+    setBatchState("loading");
+    setBatchReport([]);
+    const report: Array<{ id: number; en: string; status: "ok" | "error"; formsCount: number; warnings: string[]; error?: string }> = [];
+    const selectedWords = items.filter((x) => batchSelectedIds.includes(Number(x.id)));
+    const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+    for (const w of selectedWords) {
+      let attempt = 0;
+      let success = false;
+      let lastErr = "";
+      while (!success && attempt <= batchRetryCount) {
+        attempt++;
+        try {
+          const { draft: out } = await adminDictionaryApi.aiDraft({
+            lang,
+            entryId: Number(w.id),
+            mode: "forms_only",
+          });
+          report.push({
+            id: Number(w.id),
+            en: String(w.en || ""),
+            status: "ok",
+            formsCount: Array.isArray(out?.forms) ? out.forms.length : 0,
+            warnings: Array.isArray(out?.warnings) ? out.warnings.map((x) => String(x)) : [],
+          });
+          success = true;
+        } catch (e) {
+          lastErr = formatApiError(e, "Ошибка генерации forms-only");
+          if (attempt > batchRetryCount) {
+            report.push({
+              id: Number(w.id),
+              en: String(w.en || ""),
+              status: "error",
+              formsCount: 0,
+              warnings: [],
+              error: lastErr,
+            });
+          }
+        }
+      }
+      setBatchReport([...report]);
+      if (batchDelayMs > 0) await pause(batchDelayMs);
+    }
+    setBatchState("idle");
+  };
+
+  const exportBatchReport = () => {
+    if (!batchReport.length) return;
+    const header = ["id", "en", "status", "formsCount", "warnings", "error"];
+    const lines = [header.join(",")];
+    for (const row of batchReport) {
+      lines.push(
+        [
+          row.id,
+          row.en,
+          row.status,
+          row.formsCount,
+          (row.warnings || []).join(" | "),
+          row.error || "",
+        ].map(csvEscape).join(",")
+      );
+    }
+    downloadText(`forms_batch_report_${new Date().toISOString().slice(0, 10)}.csv`, lines.join("\n"), "text/csv;charset=utf-8");
+  };
+
   const askAi = async () => {
     const id = draft?.id ?? null;
     const w = (editedDraft?.en || draft?.en || selected?.en || query).trim();
     if (!w) return;
     if (!id) {
-      setAiError("Откройте слово для полной подсказки (карточка + смыслы).");
-      setAiStatusText("Ожидание: откройте слово, затем запустите AI‑подсказку.");
+      setAiError("Откройте слово для подсказки по карточке (блок 1).");
+      setAiStatusText("Ожидание: откройте слово, затем запустите AI‑подсказку для блока 1.");
       return;
     }
     setAiState("loading");
@@ -740,27 +1211,16 @@ const AdminDictionaryPage: React.FC = () => {
     setAiAppliedSensesCount(null);
     const prev = editedDraft ?? draft ?? {};
     try {
-      const { draft: fullDraft } = await adminDictionaryApi.aiDraft({
+      const { suggestion } = await adminDictionaryApi.aiSuggest({
         lang,
-        entryId: id,
         word: w,
+        existing: prev,
       });
-      if (!fullDraft || typeof fullDraft !== "object") {
+      if (!suggestion || typeof suggestion !== "object") {
         setAiState("idle");
         return;
       }
-      const raw = fullDraft as Record<string, unknown>;
-      const fromRoot = pickCardFieldsFromObject(raw);
-      const fromLemmaPatch =
-        raw.lemmaPatch && typeof raw.lemmaPatch === "object"
-          ? pickCardFieldsFromObject(raw.lemmaPatch as Record<string, unknown>)
-          : {};
-      const fromEntryPatch =
-        raw.entryPatch && typeof raw.entryPatch === "object"
-          ? pickCardFieldsFromObject(raw.entryPatch as Record<string, unknown>)
-          : {};
-      const entryPatch: Partial<Word> = { ...fromRoot, ...fromLemmaPatch, ...fromEntryPatch };
-      const senses = Array.isArray(fullDraft.senses) ? fullDraft.senses : [];
+      const entryPatch = pickCardFieldsFromObject(suggestion as Record<string, unknown>) as Partial<Word>;
       const prevEntry = editedDraft ?? draft ?? {};
       const changedByAi = (WORD_EDIT_FIELDS as readonly string[]).filter(
         (field) => {
@@ -771,28 +1231,7 @@ const AdminDictionaryPage: React.FC = () => {
       ) as WordEditField[];
       setAiSuggestedFields(changedByAi);
       setEditedDraft((prevState) => ({ ...(prevState || {}), ...(entryPatch as Partial<Word>) }));
-
-      if (senses.length > 0) {
-        const senseNos = senses.map((s) => Number(s?.senseNo)).filter((n) => Number.isFinite(n) && n > 0);
-        const formIndexes = Array.isArray(fullDraft.forms) ? fullDraft.forms.map((_, i) => i) : [];
-        await adminDictionaryApi.applyDraft({
-          lang,
-          entryId: id,
-          draft: fullDraft,
-          apply: {
-            entryPatch: false,
-            lemmaPatch: true,
-            selectedSenseNos: senseNos.length > 0 ? senseNos : undefined,
-            selectedFormIndexes: formIndexes.length > 0 ? formIndexes : undefined,
-            replaceExamples: true,
-            applySense1Core: true,
-          },
-        });
-        setAiAppliedSensesCount(senses.length);
-        const v2Data = await adminDictionaryApi.getEntryV2({ lang, id });
-        setV2(v2Data);
-      }
-      setAiStatusText(`Готово: AI обновил ${changedByAi.length} полей карточки, смыслов применено: ${senses.length}.`);
+      setAiStatusText(`Готово: AI предложил обновить ${changedByAi.length} полей карточки (блок 1).`);
     } catch (e) {
       const msg = formatApiError(e, "Ошибка AI-подсказки");
       setAiError(msg);
@@ -862,6 +1301,189 @@ const AdminDictionaryPage: React.FC = () => {
     } catch (e) {
       setAiDraftState("error");
       setAiDraftError(formatApiError(e, "Ошибка AI‑черновика"));
+    }
+  };
+
+  const askAiFormsDraft = async () => {
+    const id = draft?.id || selected?.id || selectedId;
+    const w = (draft?.en || selected?.en || query).trim();
+    if (!id && !w) return;
+    setFormsDraftState("loading");
+    setFormsDraftError(null);
+    setFormsDraftJson("");
+    setFormsDraft(null);
+    setFormsDraftStatusText("Генерация черновика форм...");
+    try {
+      const { draft: out } = await adminDictionaryApi.aiDraftBlock3({
+        lang,
+        entryId: id ?? undefined,
+        word: id ? undefined : w,
+      });
+      const clean = out || null;
+      setFormsDraft(clean);
+      setFormsDraftJson(JSON.stringify(clean || {}, null, 2));
+      setFormsDraftStatusText(`Готово: сгенерировано карточек форм — ${Array.isArray(clean?.formCardsDraft) ? clean.formCardsDraft.length : 0}.`);
+      setFormsDraftState("idle");
+    } catch (e) {
+      setFormsDraftState("error");
+      setFormsDraftError(formatApiError(e, "Ошибка AI‑черновика форм"));
+      setFormsDraftStatusText("Ошибка генерации форм.");
+    }
+  };
+
+  const applyFormsDraft = async () => {
+    if (!formsDraft) return;
+    setFormsDraftState("loading");
+    setFormsDraftError(null);
+    setFormsDraftStatusText("Применение форм из черновика...");
+    try {
+      const nextCards = (Array.isArray(formsDraft.formCardsDraft) ? formsDraft.formCardsDraft : []).map((x, idx) => ({
+        ...x,
+        en: String(x?.en || "").trim(),
+        sortOrder: idx,
+      })) as AdminDictionaryFormCard[];
+      if (nextCards.length > 0) {
+        setFormCards(nextCards);
+      }
+      setFormsDraftStatusText("Готово: формы применены в карточки блока 3.");
+      setFormsDraftState("idle");
+    } catch (e) {
+      setFormsDraftState("error");
+      setFormsDraftError(formatApiError(e, "Не удалось применить формы из черновика"));
+      setFormsDraftStatusText("Ошибка применения форм.");
+    }
+  };
+
+  const addFormCard = () => {
+    const base = editedDraft || draft;
+    setFormCards((prev) => [
+      ...prev,
+      {
+        en: "",
+        ru: String(base?.ru || ""),
+        level: String(base?.level || "A0"),
+        accent: String(base?.accent || "both"),
+        frequencyRank: Number(base?.frequencyRank || 15000),
+        rarity: String(base?.rarity || "редкое"),
+        register: String(base?.register || "разговорная"),
+        ipaUk: String(base?.ipaUk || ""),
+        ipaUs: String(base?.ipaUs || ""),
+        example: String(base?.example || ""),
+        exampleRu: String(base?.exampleRu || ""),
+        pos: String((v2 as any)?.lemma?.pos || ""),
+      },
+    ]);
+  };
+
+  const patchFormCard = (idx: number, patch: Partial<AdminDictionaryFormCard>) => {
+    setFormCards((prev) => prev.map((item, i) => (i === idx ? { ...item, ...patch } : item)));
+  };
+
+  const removeFormCard = (idx: number) => {
+    setFormCards((prev) => prev.filter((_, i) => i !== idx));
+  };
+
+  const deleteFormCard = async (idx: number) => {
+    const card = formCards[idx];
+    if (!card) return;
+    // Not saved yet — only local removal
+    if (!card.id) {
+      removeFormCard(idx);
+      return;
+    }
+    if (!draft?.id) return;
+
+    const en = String(card.en || "").trim() || `#${idx + 1}`;
+    if (!window.confirm(`Удалить карточку формы "${en}"? Она исчезнет из «Все слова».`)) return;
+
+    setFormCardsState("loading");
+    setFormCardsError(null);
+    setFormCardsStatus("");
+    try {
+      const res = await adminDictionaryApi.deleteFormCard({
+        lang,
+        entryId: draft.id,
+        formCardId: Number(card.id),
+      });
+      if (!res?.ok) throw new Error("deleteFormCard: unexpected response");
+      setFormCards((prev) => prev.filter((_, i) => i !== idx));
+      setFormCardsState("idle");
+      setFormCardsStatus(`Удалено: "${en}".`);
+    } catch (e) {
+      setFormCardsState("error");
+      setFormCardsError(formatApiError(e, "Не удалось удалить карточку формы"));
+    }
+  };
+
+  const deleteEntryFully = async (entryId: number, label: string) => {
+    if (!window.confirm(`Полностью удалить слово "${label}"?`)) return;
+    setSearchState("loading");
+    setSearchError(null);
+    try {
+      const res = await adminDictionaryApi.deleteEntry({ lang, entryId });
+      if (!res?.ok) throw new Error("deleteEntry: unexpected response");
+      if (Number(editingEntryId) === Number(entryId)) {
+        navigate("/admin/dictionary");
+      }
+      setBatchSelectedIds((prev) => prev.filter((id) => Number(id) !== Number(entryId)));
+      await loadList(true);
+      setSearchState("idle");
+    } catch (e) {
+      setSearchState("error");
+      setSearchError(formatApiError(e, "Не удалось удалить слово"));
+    }
+  };
+
+  const saveFormCards = async () => {
+    if (!draft?.id) return;
+    setFormCardsState("loading");
+    setFormCardsError(null);
+    setFormCardsStatus("");
+    try {
+      const normalized = formCards.map((c, idx) => ({
+        ...c,
+        en: String(c.en || "").trim(),
+        ru: String(c.ru || "").trim(),
+        level: String(c.level || "A0").trim() || "A0",
+        accent: String(c.accent || "both").trim() || "both",
+        frequencyRank: Math.max(1, Number(c.frequencyRank || 15000) || 15000),
+        rarity: String(c.rarity || "редкое").trim() || "редкое",
+        register: String(c.register || "разговорная").trim() || "разговорная",
+        ipaUk: String(c.ipaUk || "").trim(),
+        ipaUs: String(c.ipaUs || "").trim(),
+        example: String(c.example || "").trim(),
+        exampleRu: String(c.exampleRu || "").trim(),
+        pos: String(c.pos || "").trim(),
+        sortOrder: idx,
+      }));
+      const errors: string[] = [];
+      const dupes = new Set<string>();
+      const seen = new Set<string>();
+      normalized.forEach((c, idx) => {
+        if (!c.en) errors.push(`Карточка #${idx + 1}: пустое поле EN.`);
+        if (!c.level || !c.register || !c.example || !c.exampleRu) {
+          errors.push(`Карточка #${idx + 1}: заполните level/register/example/exampleRu.`);
+        }
+        const key = c.en.toLowerCase();
+        if (key) {
+          if (seen.has(key)) dupes.add(c.en);
+          seen.add(key);
+        }
+      });
+      if (dupes.size > 0) {
+        errors.push(`Дубли EN форм: ${Array.from(dupes).join(", ")}`);
+      }
+      if (errors.length > 0) {
+        setFormCardsState("error");
+        setFormCardsError(errors.join(" "));
+        return;
+      }
+      await adminDictionaryApi.saveBlock3({ entryId: draft.id, cards: normalized });
+      await refreshWizardState(draft.id);
+      setFormCardsState("idle");
+    } catch (e) {
+      setFormCardsState("error");
+      setFormCardsError(formatApiError(e, "Не удалось сохранить карточки форм"));
     }
   };
 
@@ -1044,13 +1666,177 @@ const AdminDictionaryPage: React.FC = () => {
               </button>
             </div>
           </div>
+
+          {adminView === "words" && !editingEntryId && (
+            <div className="admin-dict-section" style={{ marginTop: 12 }}>
+              <div className="admin-dict-section-title" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+                <span>AI‑импорт слов</span>
+                <button
+                  type="button"
+                  className="admin-dict-btn admin-dict-btn--secondary"
+                  onClick={() => setAiImportOpen((v) => !v)}
+                  title="Показать/скрыть инструмент AI‑импорта"
+                >
+                  {aiImportOpen ? "Скрыть" : "Показать"}
+                </button>
+              </div>
+
+              {aiImportOpen && (
+                <div className="admin-dict-form" style={{ marginTop: 8 }}>
+                  <label className="admin-dict-field">
+                    <span className="admin-dict-label">Уровень</span>
+                    <select value={aiImportLevel} onChange={(e) => setAiImportLevel(e.target.value)}>
+                      {LEVELS.map((l) => (
+                        <option key={l} value={l}>
+                          {l}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <label className="admin-dict-field">
+                    <span className="admin-dict-label">Регистр</span>
+                    <select value={aiImportRegister} onChange={(e) => setAiImportRegister(e.target.value as any)}>
+                      {REGISTERS.map((r) => (
+                        <option key={r} value={r}>
+                          {r}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <label className="admin-dict-field">
+                    <span className="admin-dict-label">Тема (опционально)</span>
+                    <input
+                      value={aiImportTopic}
+                      onChange={(e) => setAiImportTopic(e.target.value)}
+                      placeholder="Напр.: IT, медицина, путешествия…"
+                    />
+                  </label>
+
+                  <label className="admin-dict-field">
+                    <span className="admin-dict-label">Количество</span>
+                    <input
+                      type="number"
+                      min={1}
+                      max={200}
+                      value={aiImportCount}
+                      onChange={(e) => setAiImportCount(Number(e.target.value))}
+                    />
+                    <HelpText>Сначала генерируется предпросмотр. Дубликаты уже в словаре будут пропущены автоматически.</HelpText>
+                  </label>
+
+                  <div className="admin-dict-actions" style={{ marginTop: 0 }}>
+                    <button
+                      type="button"
+                      className="admin-dict-btn admin-dict-btn--primary"
+                      onClick={runAiImportPreview}
+                      disabled={aiImportPreviewState === "loading" || aiImportCommitState === "loading"}
+                    >
+                      {aiImportPreviewState === "loading" ? "Генерация…" : "Сгенерировать список"}
+                    </button>
+
+                    <button
+                      type="button"
+                      className="admin-dict-btn admin-dict-btn--secondary"
+                      onClick={runAiImportCommit}
+                      disabled={aiImportCommitState === "loading" || aiImportSavableCount === 0}
+                      title={aiImportSavableCount === 0 ? "Нет новых слов для сохранения" : `Сохранить ${aiImportSavableCount}`}
+                    >
+                      {aiImportCommitState === "loading" ? "Сохранение…" : `Сохранить (${aiImportSavableCount})`}
+                    </button>
+                  </div>
+
+                  {aiImportError && (
+                    <div className="dictionary-error-banner" style={{ padding: "8px 12px", marginTop: 8 }}>
+                      {aiImportError}
+                    </div>
+                  )}
+
+                  {aiImportCommitResult && (
+                    <div className="dictionary-success-banner" style={{ padding: "8px 12px", marginTop: 8 }}>
+                      Добавлено: {aiImportCommitResult.inserted}. Пропущено (дубликаты): {aiImportCommitResult.skippedDuplicates}.
+                    </div>
+                  )}
+
+                  {(aiImportStats || aiImportPreview.length > 0) && (
+                    <div style={{ marginTop: 10 }}>
+                      {aiImportStatus && !aiImportStatus.ok && (
+                        <div className="dictionary-warning-banner" style={{ padding: "8px 12px", marginTop: 8 }}>
+                          {aiImportStatus.message}
+                        </div>
+                      )}
+                      {aiImportStats && (
+                        <div className="admin-dict-help">
+                          Предпросмотр: {aiImportStats.unique} (из них дубликаты: {aiImportStats.duplicates}) при запросе {aiImportStats.requested}.
+                        </div>
+                      )}
+
+                      {aiImportPreview.length > 0 && (
+                        <ul className="admin-dict-results-list" style={{ marginTop: 8 }}>
+                          {aiImportPreview.map((it) => (
+                            <li key={it.lemmaKey}>
+                              <div
+                                className="admin-dict-result"
+                                style={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "space-between",
+                                  gap: 10,
+                                  opacity: it.exists ? 0.55 : 1,
+                                }}
+                              >
+                                <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                                  <div style={{ fontWeight: 700 }}>{it.word}</div>
+                                  {it.exists && <div className="admin-dict-help">уже в словаре (будет пропущено)</div>}
+                                </div>
+                                <button
+                                  type="button"
+                                  className="admin-dict-btn admin-dict-btn--ghost"
+                                  onClick={() => setAiImportPreview((prev) => prev.filter((x) => x.lemmaKey !== it.lemmaKey))}
+                                  title="Удалить из списка"
+                                >
+                                  Удалить
+                                </button>
+                              </div>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
           {searchError && (
             <div className="dictionary-error-banner" style={{ padding: "8px 12px", marginTop: 8 }}>
               {searchError}
             </div>
           )}
 
-          {editingEntryId && (
+          <div className="admin-dict-nav-row">
+            <button
+              type="button"
+              className={`admin-dict-btn ${adminView === "words" ? "admin-dict-btn--primary" : "admin-dict-btn--secondary"}`}
+              onClick={() => setAdminView("words")}
+            >
+              Слова
+            </button>
+            <button
+              type="button"
+              className={`admin-dict-btn ${adminView === "collections" ? "admin-dict-btn--primary" : "admin-dict-btn--secondary"}`}
+              onClick={() => {
+                setAdminView("collections");
+                void loadCollectionsAdmin(true);
+              }}
+            >
+              Коллекции
+            </button>
+          </div>
+
+          {adminView === "words" && editingEntryId && (
             <div className="admin-dict-nav-row">
               <button type="button" className="admin-dict-btn admin-dict-btn--secondary" onClick={() => navigate("/admin/dictionary")}>
                 ← К списку слов
@@ -1090,36 +1876,330 @@ const AdminDictionaryPage: React.FC = () => {
             </div>
           </div>}
 
+          {adminView === "collections" && (
+            <div className="admin-dict-section" style={{ marginTop: 12 }}>
+              {collectionsError && <div className="dictionary-error-banner" style={{ padding: "8px 12px", marginBottom: 8 }}>{collectionsError}</div>}
+
+              <div className="admin-dict-section-title">Управление коллекциями</div>
+              <div className="admin-dict-help">
+                Коллекции поддерживают добавление элементов разных типов (слово, форма, карточка формы, фраза, паттерн).
+                В состав коллекции сохраняется соответствующий смысл (`sense`), поэтому дубликаты автоматически схлопываются.
+              </div>
+
+              <div className="admin-dict-row" style={{ marginTop: 10 }}>
+                <label className="admin-dict-field">
+                  <span className="admin-dict-label">Поиск коллекций</span>
+                  <input
+                    value={collectionsQuery}
+                    onChange={(e) => setCollectionsQuery(e.target.value)}
+                    placeholder="Название / key / описание"
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") void loadCollectionsAdmin(true);
+                    }}
+                  />
+                </label>
+                <div className="admin-dict-actions" style={{ alignSelf: "end" }}>
+                  <button type="button" className="admin-dict-btn admin-dict-btn--secondary" onClick={() => void loadCollectionsAdmin(true)}>
+                    Обновить список
+                  </button>
+                  <button
+                    type="button"
+                    className="admin-dict-btn admin-dict-btn--secondary"
+                    onClick={() => {
+                      resetCollectionForm();
+                      setSelectedCollectionId(null);
+                      setCollectionItems([]);
+                      setCollectionItemsTotal(0);
+                    }}
+                  >
+                    Новая коллекция
+                  </button>
+                </div>
+              </div>
+
+              <div className="admin-dict-layout" style={{ marginTop: 12 }}>
+                <div className="admin-dict-results">
+                  <div className="admin-dict-results-title">
+                    Коллекции ({collectionsList.length}/{collectionsTotal})
+                  </div>
+                  {collectionsState === "loading" && <div className="admin-dict-muted">Загрузка коллекций…</div>}
+                  <ul className="admin-dict-results-list" role="list">
+                    {collectionsList.map((c) => (
+                      <li key={`col-${c.id}`}>
+                        <button
+                          type="button"
+                          className={`admin-dict-result ${Number(selectedCollectionId) === Number(c.id) ? "active" : ""}`}
+                          onClick={() => void selectCollectionAdmin(Number(c.id))}
+                        >
+                          <div className="admin-dict-result-top">
+                            <span className="admin-dict-result-en">{c.title}</span>
+                            <span className="admin-dict-chip">#{c.sortOrder}</span>
+                          </div>
+                          <div className="admin-dict-result-bottom">
+                            <span className="admin-dict-result-ru">{c.collectionKey}</span>
+                            <span className="admin-dict-muted">{c.total} эл.</span>
+                          </div>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
+                <div className="admin-dict-editor">
+                  <div className="admin-dict-results-title">
+                    {collectionForm.mode === "edit" ? "Редактирование коллекции" : "Создание коллекции"}
+                  </div>
+                  <div className="admin-dict-form admin-dict-form--compact">
+                    <label className="admin-dict-field">
+                      <span className="admin-dict-label">Collection key</span>
+                      <input
+                        value={collectionForm.collectionKey}
+                        onChange={(e) => setCollectionForm((prev) => ({ ...prev, collectionKey: e.target.value }))}
+                        placeholder="my_custom_collection"
+                      />
+                    </label>
+                    <label className="admin-dict-field">
+                      <span className="admin-dict-label">Название</span>
+                      <input
+                        value={collectionForm.title}
+                        onChange={(e) => setCollectionForm((prev) => ({ ...prev, title: e.target.value }))}
+                        placeholder="Название коллекции"
+                      />
+                    </label>
+                    <label className="admin-dict-field">
+                      <span className="admin-dict-label">Описание</span>
+                      <textarea
+                        rows={2}
+                        value={collectionForm.description}
+                        onChange={(e) => setCollectionForm((prev) => ({ ...prev, description: e.target.value }))}
+                      />
+                    </label>
+                    <div className="admin-dict-row">
+                      <label className="admin-dict-field">
+                        <span className="admin-dict-label">Level from</span>
+                        <select value={collectionForm.levelFrom} onChange={(e) => setCollectionForm((prev) => ({ ...prev, levelFrom: e.target.value }))}>
+                          {LEVELS.map((l) => <option key={`col-lf-${l}`} value={l}>{l}</option>)}
+                        </select>
+                      </label>
+                      <label className="admin-dict-field">
+                        <span className="admin-dict-label">Level to</span>
+                        <select value={collectionForm.levelTo} onChange={(e) => setCollectionForm((prev) => ({ ...prev, levelTo: e.target.value }))}>
+                          {LEVELS.map((l) => <option key={`col-lt-${l}`} value={l}>{l}</option>)}
+                        </select>
+                      </label>
+                    </div>
+                    <div className="admin-dict-row">
+                      <label className="admin-dict-field">
+                        <span className="admin-dict-label">Порядок (sort order)</span>
+                        <input
+                          type="number"
+                          value={collectionForm.sortOrder}
+                          onChange={(e) => setCollectionForm((prev) => ({ ...prev, sortOrder: toNumber(e.target.value, 0) }))}
+                        />
+                      </label>
+                      <label className="admin-dict-field" style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                        <input
+                          type="checkbox"
+                          checked={collectionForm.isPublic}
+                          onChange={(e) => setCollectionForm((prev) => ({ ...prev, isPublic: e.target.checked }))}
+                        />
+                        <span className="admin-dict-label" style={{ margin: 0 }}>Публичная коллекция</span>
+                      </label>
+                    </div>
+                    <div className="admin-dict-actions">
+                      <button
+                        type="button"
+                        className="admin-dict-btn admin-dict-btn--primary"
+                        onClick={() => void saveCollectionAdmin()}
+                        disabled={collectionSaving === "loading"}
+                      >
+                        {collectionSaving === "loading" ? "Сохранение…" : "Сохранить коллекцию"}
+                      </button>
+                      {collectionForm.mode === "edit" && collectionForm.collectionId && (
+                        <button
+                          type="button"
+                          className="admin-dict-btn admin-dict-btn--secondary"
+                          onClick={() => void deleteCollectionAdmin()}
+                          disabled={collectionSaving === "loading"}
+                        >
+                          Удалить коллекцию
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {selectedCollectionId && (
+                    <div style={{ marginTop: 14 }}>
+                      <div className="admin-dict-section-title">Состав коллекции ({collectionItemsTotal})</div>
+                      {collectionItemsError && <div className="dictionary-error-banner" style={{ padding: "8px 12px", marginTop: 8 }}>{collectionItemsError}</div>}
+                      {collectionItemsState === "loading" && <div className="admin-dict-muted">Загрузка состава…</div>}
+                      <div style={{ display: "grid", gap: 8, marginTop: 8 }}>
+                        {collectionItems.map((it, idx) => (
+                          <div key={`ci-${it.id}-${it.senseId}`} style={{ border: "1px solid var(--border-subtle)", background: "var(--card)", padding: 8 }}>
+                            <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
+                              <div style={{ minWidth: 0 }}>
+                                <div style={{ fontWeight: 700 }}>{it.en}</div>
+                                <div className="admin-dict-muted">{it.ru || "—"} • {it.level || "—"} • sense #{it.senseId}</div>
+                              </div>
+                              <div className="admin-dict-actions" style={{ marginTop: 0 }}>
+                                <button type="button" className="admin-dict-btn admin-dict-btn--ghost" onClick={() => void moveCollectionItem(idx, idx - 1)} disabled={idx === 0}>↑</button>
+                                <button type="button" className="admin-dict-btn admin-dict-btn--ghost" onClick={() => void moveCollectionItem(idx, idx + 1)} disabled={idx === collectionItems.length - 1}>↓</button>
+                                <button type="button" className="admin-dict-btn admin-dict-btn--secondary" onClick={() => void removeCollectionSense(Number(it.senseId))}>Удалить</button>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                        {collectionItems.length === 0 && collectionItemsState !== "loading" && <div className="admin-dict-muted">Пока пусто.</div>}
+                      </div>
+
+                      <div style={{ marginTop: 14 }}>
+                        <div className="admin-dict-section-title">Добавить элементы</div>
+                        <div className="admin-dict-help">
+                          Поиск работает по всем сущностям: слова, формы, карточки форм, фразы и паттерны.
+                        </div>
+                        <div className="admin-dict-row" style={{ marginTop: 6 }}>
+                          <label className="admin-dict-field">
+                            <span className="admin-dict-label">Поиск кандидатов</span>
+                            <input
+                              value={collectionCandidatesQ}
+                              onChange={(e) => setCollectionCandidatesQ(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") void loadCollectionCandidatesAdmin();
+                              }}
+                              placeholder="Введите слово/форму/фразу…"
+                            />
+                          </label>
+                          <div className="admin-dict-actions" style={{ alignSelf: "end" }}>
+                            <button type="button" className="admin-dict-btn admin-dict-btn--secondary" onClick={() => void loadCollectionCandidatesAdmin()}>
+                              Найти
+                            </button>
+                          </div>
+                        </div>
+                        {collectionCandidatesError && <div className="dictionary-error-banner" style={{ padding: "8px 12px", marginTop: 8 }}>{collectionCandidatesError}</div>}
+                        {collectionCandidatesState === "loading" && <div className="admin-dict-muted">Загрузка кандидатов…</div>}
+                        <div style={{ display: "grid", gap: 8, marginTop: 8 }}>
+                          {collectionCandidates.map((c) => (
+                            <div key={`cand-${c.itemType}-${c.itemId}`} style={{ border: "1px solid var(--border-subtle)", background: "var(--card)", padding: 8 }}>
+                              <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
+                                <div>
+                                  <div style={{ fontWeight: 700 }}>{c.en}</div>
+                                  <div className="admin-dict-muted">{c.ru || "—"}</div>
+                                  <div className="admin-dict-muted">
+                                    {c.itemType} • sense #{c.senseId ?? "—"} • level {c.level || "—"}
+                                  </div>
+                                </div>
+                                <div className="admin-dict-actions" style={{ marginTop: 0 }}>
+                                  <button type="button" className="admin-dict-btn admin-dict-btn--secondary" onClick={() => void addCandidateToCollection(c)}>
+                                    Добавить
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                          {collectionCandidates.length === 0 && collectionCandidatesState !== "loading" && (
+                            <div className="admin-dict-muted">Кандидаты не найдены. Уточните запрос.</div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {adminView === "words" && (
           <div className="admin-dict-layout admin-dict-layout--single">
             <div className="admin-dict-results" style={editingEntryId ? { display: "none" } : undefined}>
               <div className="admin-dict-results-title">
                 Слова ({items.length}/{total})
               </div>
+              <div className="admin-dict-help" style={{ marginBottom: 8 }}>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                  <button type="button" className="admin-dict-btn admin-dict-btn--secondary" onClick={selectAllVisibleForBatch}>
+                    {items.length > 0 && items.every((w) => batchSelectedIds.includes(Number(w.id))) ? "Снять выбор с видимых" : "Выбрать видимые"}
+                  </button>
+                  <button
+                    type="button"
+                    className="admin-dict-btn admin-dict-btn--secondary"
+                    onClick={() => void runBatchFormsDraft()}
+                    disabled={batchState === "loading" || batchSelectedIds.length === 0}
+                  >
+                    {batchState === "loading" ? "Batch…" : "Batch forms-draft"}
+                  </button>
+                  <button type="button" className="admin-dict-btn admin-dict-btn--secondary" onClick={exportBatchReport} disabled={batchReport.length === 0}>
+                    Экспорт отчёта batch
+                  </button>
+                </div>
+                <div style={{ display: "flex", gap: 10, alignItems: "center", marginTop: 8, flexWrap: "wrap" }}>
+                  <span>Выбрано: <b>{batchSelectedIds.length}</b></span>
+                  <label style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
+                    Пауза, мс:
+                    <input
+                      style={{ width: 90 }}
+                      type="number"
+                      value={batchDelayMs}
+                      onChange={(e) => setBatchDelayMs(Math.max(0, Number(e.target.value) || 0))}
+                    />
+                  </label>
+                  <label style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
+                    Retry:
+                    <input
+                      style={{ width: 70 }}
+                      type="number"
+                      value={batchRetryCount}
+                      onChange={(e) => setBatchRetryCount(Math.max(0, Math.min(5, Number(e.target.value) || 0)))}
+                    />
+                  </label>
+                </div>
+                {batchReport.length > 0 && (
+                  <div style={{ marginTop: 8 }}>
+                    Готово: {batchReport.filter((x) => x.status === "ok").length} ok / {batchReport.filter((x) => x.status === "error").length} error
+                  </div>
+                )}
+              </div>
               <ul className="admin-dict-results-list" role="list">
                 {items.map((w) => (
                   <li key={w.id}>
-                    <button
-                      type="button"
-                      className={`admin-dict-result ${selectedId === w.id ? "active" : ""}`}
-                      onClick={() => loadEntry(w.id)}
-                    >
-                      <div className="admin-dict-result-top">
-                        <span className="admin-dict-result-en">{w.en}</span>
-                        <span className={`word-level-badge word-level-${w.level}`}>{w.level}</span>
-                      </div>
-                      <div className="admin-dict-result-bottom">
-                        <span className="admin-dict-result-ru">{w.ru}</span>
-                        <span className="admin-dict-qc-badges" aria-hidden>
-                          {!String(w.ru || "").trim() ? <span className="admin-dict-chip">no ru</span> : null}
-                          {!Number.isFinite(Number(w.frequencyRank)) ? <span className="admin-dict-chip">no freq</span> : null}
-                          {!w.hasExample ? <span className="admin-dict-chip">no ex</span> : null}
-                          {!w.hasIpa ? <span className="admin-dict-chip">no ipa</span> : null}
-                        </span>
-                        <span className={`admin-dict-review-pill ${w.reviewedAt ? "ok" : "todo"}`}>
-                          {w.reviewedAt ? "Проверено" : "Не проверено"}
-                        </span>
-                      </div>
-                    </button>
+                    <div style={{ display: "flex", gap: 8, alignItems: "stretch" }}>
+                      <input
+                        type="checkbox"
+                        checked={batchSelectedIds.includes(Number(w.id))}
+                        onChange={() => toggleBatchId(Number(w.id))}
+                        style={{ marginTop: 10 }}
+                      />
+                      <button
+                        type="button"
+                        className={`admin-dict-result ${selectedId === w.id ? "active" : ""}`}
+                        onClick={() => loadEntry(w.id)}
+                      >
+                        <div className="admin-dict-result-top">
+                          <span className="admin-dict-result-en">{w.en}</span>
+                          <span className={`word-level-badge word-level-${w.level}`}>{w.level}</span>
+                        </div>
+                        <div className="admin-dict-result-bottom">
+                          <span className="admin-dict-result-ru">{w.ru}</span>
+                          <span className="admin-dict-qc-badges" aria-hidden>
+                            {!String(w.ru || "").trim() ? <span className="admin-dict-chip">no ru</span> : null}
+                            {!Number.isFinite(Number(w.frequencyRank)) ? <span className="admin-dict-chip">no freq</span> : null}
+                            {!w.hasExample ? <span className="admin-dict-chip">no ex</span> : null}
+                            {!w.hasIpa ? <span className="admin-dict-chip">no ipa</span> : null}
+                          </span>
+                          <span className={`admin-dict-review-pill ${w.reviewedAt ? "ok" : "todo"}`}>
+                            {w.reviewedAt ? "Проверено" : "Не проверено"}
+                          </span>
+                        </div>
+                      </button>
+                      <button
+                        type="button"
+                        className="admin-dict-btn admin-dict-btn--secondary"
+                        onClick={() => void deleteEntryFully(Number(w.id), String(w.en || w.id))}
+                        title="Полностью удалить слово"
+                        disabled={searchState === "loading"}
+                      >
+                        Удалить
+                      </button>
+                    </div>
                   </li>
                 ))}
               </ul>
@@ -1151,8 +2231,28 @@ const AdminDictionaryPage: React.FC = () => {
                     </div>
                   )}
 
-                  <div className="admin-dict-section">
-                    <div className="admin-dict-section-title">Карточка слова (то, что видит пользователь)</div>
+                  <div className="admin-dict-section" style={{ marginBottom: 12 }}>
+                    <div className="admin-dict-section-title">Пошаговый мастер (soft-gate)</div>
+                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
+                      <button type="button" className={`admin-dict-btn ${wizardStep === 1 ? "admin-dict-btn--primary" : "admin-dict-btn--secondary"}`} onClick={() => setWizardStep(1)}>
+                        1. Карточка {wizardChecklist?.block1?.ready ? "✅" : "⚠️"}
+                      </button>
+                      <button type="button" className={`admin-dict-btn ${wizardStep === 2 ? "admin-dict-btn--primary" : "admin-dict-btn--secondary"}`} onClick={() => setWizardStep(2)}>
+                        2. Смыслы {wizardChecklist?.block2?.ready ? "✅" : "⚠️"}
+                      </button>
+                      <button type="button" className={`admin-dict-btn ${wizardStep === 3 ? "admin-dict-btn--primary" : "admin-dict-btn--secondary"}`} onClick={() => setWizardStep(3)}>
+                        3. Формы {wizardChecklist?.block3?.ready ? "✅" : "⚠️"}
+                      </button>
+                    </div>
+                    {Array.isArray(wizardChecklist?.warnings) && wizardChecklist!.warnings.length > 0 && (
+                      <div className="admin-dict-help">
+                        {wizardChecklist!.warnings.join(" • ")}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="admin-dict-section" style={wizardStep === 1 ? undefined : { display: "none" }}>
+                    <div className="admin-dict-section-title" id="admin-card">Карточка слова (то, что видит пользователь)</div>
                     {draft && editedDraft && (
                     <div className="admin-dict-card-grid">
                       <div className="admin-dict-modal-pane">
@@ -1170,6 +2270,13 @@ const AdminDictionaryPage: React.FC = () => {
                             )}
                           </label>
                         ))}
+                        <label className="admin-dict-field admin-dict-field--mirror">
+                          <div className="admin-dict-field-head admin-dict-field-head--readonly">
+                            <span className="admin-dict-label">POS (lemma)</span>
+                            <span className="admin-dict-field-head-spacer" aria-hidden />
+                          </div>
+                          <input value={String((v2 as any)?.lemma?.pos || "—")} readOnly />
+                        </label>
                       </div>
                       <div className="admin-dict-modal-pane">
                         <div className="admin-dict-results-title">Редактируемые поля</div>
@@ -1221,6 +2328,12 @@ const AdminDictionaryPage: React.FC = () => {
                             </label>
                           );
                         })}
+                        <label className="admin-dict-field admin-dict-field--mirror">
+                          <div className="admin-dict-field-head">
+                            <span className="admin-dict-label">POS (lemma)</span>
+                          </div>
+                          <input value={String((v2 as any)?.lemma?.pos || "—")} readOnly />
+                        </label>
                         <div className="admin-dict-help">
                           Изменено: <b>{changedFields.length}</b>
                           {emptyImportantFields.length > 0 && (
@@ -1233,7 +2346,7 @@ const AdminDictionaryPage: React.FC = () => {
                             className="admin-dict-btn admin-dict-btn--secondary"
                             onClick={() => void askAi()}
                             disabled={aiState === "loading"}
-                            title="Заполнит поля карточки и смыслы по подсказке AI (нужен OPENAI_API_KEY на сервере)."
+                            title="Заполнит поля карточки (блок 1) по подсказке AI (нужен OPENAI_API_KEY на сервере)."
                           >
                             {aiState === "loading" ? "AI…" : "AI‑подсказка"}
                           </button>
@@ -1245,6 +2358,15 @@ const AdminDictionaryPage: React.FC = () => {
                             title="Сгенерировать IPA UK/US по полю EN."
                           >
                             {ipaFillState === "loading" ? "IPA…" : "Заполнить IPA"}
+                          </button>
+                          <button
+                            type="button"
+                            className="admin-dict-btn admin-dict-btn--primary"
+                            onClick={save}
+                            disabled={saveState === "loading" || changedFields.length === 0}
+                            title="Сохранить изменения блока 1"
+                          >
+                            {saveState === "loading" ? "Сохранение…" : "Сохранить блок 1"}
                           </button>
                         </div>
                         {(aiStatusText || ipaStatusText) && (
@@ -1266,18 +2388,38 @@ const AdminDictionaryPage: React.FC = () => {
                       </div>
                     </div>
                     )}
+                    <div className="admin-dict-actions" style={{ marginTop: 10 }}>
+                      <button type="button" className="admin-dict-btn admin-dict-btn--secondary" onClick={() => setWizardStep(2)}>
+                        Далее: блок 2
+                      </button>
+                    </div>
                   </div>
 
                   {(v2Error || v2) && (
-                    <div className="admin-dict-section" style={{ marginTop: 14 }}>
-                      <div className="admin-dict-section-title">Значения слова (смыслы)</div>
-                      <HelpText>
-                        <b>Значение #1</b> связано с карточкой пользователя (игры/прогресс). Поэтому его <b>глосс/уровень/регистр</b>{" "}
-                        редактируются в блоке «Карточка слова». В v2 для #1 можно дополнять только определение и пометы.
-                      </HelpText>
-                      {v2Error && <div className="dictionary-error-banner" style={{ padding: "8px 12px" }}>{v2Error}</div>}
-                      {v2?.senses && Array.isArray(v2.senses) && (
-                        <div className="admin-dict-senses">
+                    <div className="admin-dict-section" style={wizardStep === 1 ? { display: "none" } : { marginTop: 14 }}>
+                      {wizardStep === 2 && (
+                        <>
+                          <div className="admin-dict-section-title">Значения слова (смыслы)</div>
+                          <HelpText>
+                            <b>Значение #1</b> связано с карточкой пользователя (игры/прогресс). Поэтому его <b>глосс/уровень/регистр</b>{" "}
+                            редактируются в блоке «Карточка слова». В v2 для #1 можно дополнять только определение и пометы.
+                          </HelpText>
+                          {v2Error && <div className="dictionary-error-banner" style={{ padding: "8px 12px" }}>{v2Error}</div>}
+                          <div className="admin-dict-actions" style={{ marginBottom: 10 }}>
+                            <button
+                              type="button"
+                              className="admin-dict-btn admin-dict-btn--secondary"
+                              onClick={() => void askAiBlock2()}
+                              disabled={block2AiState === "loading"}
+                            >
+                              {block2AiState === "loading" ? "AI…" : "AI для блока 2"}
+                            </button>
+                            {block2AiStatus ? <span className="admin-dict-muted">{block2AiStatus}</span> : null}
+                          </div>
+                        </>
+                      )}
+                      {wizardStep === 2 && v2?.senses && Array.isArray(v2.senses) && (
+                        <div className="admin-dict-senses" id="admin-senses">
                           {v2.senses.map((s) => (
                             <div key={s.id} className="admin-dict-sense-card">
                               <div className="admin-dict-sense-head">
@@ -1387,7 +2529,7 @@ const AdminDictionaryPage: React.FC = () => {
                                 <div className="admin-dict-section-title" style={{ marginBottom: 6 }}>Примеры для этого смысла</div>
                                 <HelpText>Можно несколько примеров. Главный пример используется для синхронизации в карточку (если это sense #1).</HelpText>
                                 <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                                  {(s.examples || []).map((ex) => (
+                                  {(s.examples || []).map((ex, exIdx) => (
                                     <div key={ex.id} style={{ border: "1px solid var(--border-subtle)", padding: 10, background: "var(--card)" }}>
                                       {editingExampleId === ex.id && exampleEdit ? (
                                         <div className="admin-dict-form admin-dict-form--compact" style={{ marginTop: 0 }}>
@@ -1411,6 +2553,7 @@ const AdminDictionaryPage: React.FC = () => {
                                       ) : (
                                         <div style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
                                           <div style={{ flex: 1, minWidth: 0 }}>
+                                            <div className="admin-dict-muted">Пример #{exIdx + 1}</div>
                                             <div style={{ fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{ex.en}</div>
                                             <div style={{ color: "var(--text-soft)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{ex.ru || "—"}</div>
                                           </div>
@@ -1434,147 +2577,207 @@ const AdminDictionaryPage: React.FC = () => {
                                     </div>
                                   ))}
                                 </div>
-                                <div className="admin-dict-form admin-dict-form--compact" style={{ marginTop: 8 }}>
-                                  <label className="admin-dict-field">
-                                    <span className="admin-dict-label">Пример (EN)</span>
-                                    <HelpText>Одно предложение. Лучше без редких слов и без слишком сложной грамматики.</HelpText>
-                                    <input
-                                      value={(newExampleBySense[s.id]?.en ?? "")}
-                                      onChange={(e) =>
-                                        setNewExampleBySense((prev) => ({
-                                          ...prev,
-                                          [s.id]: { ...(prev[s.id] || { en: "", ru: "", isMain: true }), en: e.target.value },
-                                        }))
-                                      }
-                                    />
-                                  </label>
-                                  <label className="admin-dict-field">
-                                    <span className="admin-dict-label">Перевод (RU)</span>
-                                    <input
-                                      value={(newExampleBySense[s.id]?.ru ?? "")}
-                                      onChange={(e) =>
-                                        setNewExampleBySense((prev) => ({
-                                          ...prev,
-                                          [s.id]: { ...(prev[s.id] || { en: "", ru: "", isMain: true }), ru: e.target.value },
-                                        }))
-                                      }
-                                    />
-                                  </label>
-                                  <label className="admin-dict-field" style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-                                    <input
-                                      type="checkbox"
-                                      checked={newExampleBySense[s.id]?.isMain ?? true}
-                                      onChange={(e) =>
-                                        setNewExampleBySense((prev) => ({
-                                          ...prev,
-                                          [s.id]: { ...(prev[s.id] || { en: "", ru: "", isMain: true }), isMain: e.target.checked },
-                                        }))
-                                      }
-                                    />
-                                    <span className="admin-dict-label" style={{ margin: 0 }}>Сделать главным примером</span>
-                                  </label>
-                                  <button type="button" className="admin-dict-btn admin-dict-btn--secondary" onClick={() => addExample(s.id)}>
-                                    Добавить пример
+                                <div className="admin-dict-actions" style={{ marginTop: 8 }}>
+                                  <button
+                                    type="button"
+                                    className="admin-dict-btn admin-dict-btn--secondary"
+                                    onClick={() => setAddExampleSenseId((prev) => (prev === s.id ? null : s.id))}
+                                  >
+                                    {addExampleSenseId === s.id ? "Отмена" : "Добавить пример"}
                                   </button>
                                 </div>
+                                {addExampleSenseId === s.id && (
+                                  <div className="admin-dict-form admin-dict-form--compact" style={{ marginTop: 8 }}>
+                                    <label className="admin-dict-field">
+                                      <span className="admin-dict-label">Пример (EN)</span>
+                                      <HelpText>Одно предложение. Лучше без редких слов и без слишком сложной грамматики.</HelpText>
+                                      <input
+                                        value={(newExampleBySense[s.id]?.en ?? "")}
+                                        onChange={(e) =>
+                                          setNewExampleBySense((prev) => ({
+                                            ...prev,
+                                            [s.id]: { ...(prev[s.id] || { en: "", ru: "", isMain: true }), en: e.target.value },
+                                          }))
+                                        }
+                                      />
+                                    </label>
+                                    <label className="admin-dict-field">
+                                      <span className="admin-dict-label">Перевод (RU)</span>
+                                      <input
+                                        value={(newExampleBySense[s.id]?.ru ?? "")}
+                                        onChange={(e) =>
+                                          setNewExampleBySense((prev) => ({
+                                            ...prev,
+                                            [s.id]: { ...(prev[s.id] || { en: "", ru: "", isMain: true }), ru: e.target.value },
+                                          }))
+                                        }
+                                      />
+                                    </label>
+                                    <label className="admin-dict-field" style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                                      <input
+                                        type="checkbox"
+                                        checked={newExampleBySense[s.id]?.isMain ?? true}
+                                        onChange={(e) =>
+                                          setNewExampleBySense((prev) => ({
+                                            ...prev,
+                                            [s.id]: { ...(prev[s.id] || { en: "", ru: "", isMain: true }), isMain: e.target.checked },
+                                          }))
+                                        }
+                                      />
+                                      <span className="admin-dict-label" style={{ margin: 0 }}>Сделать главным примером</span>
+                                    </label>
+                                    <button type="button" className="admin-dict-btn admin-dict-btn--primary" onClick={() => addExample(s.id)}>
+                                      Сохранить пример
+                                    </button>
+                                  </div>
+                                )}
                               </div>
                             </div>
                           ))}
                         </div>
                       )}
-
-                      {v2?.lemma?.id && (
-                        <div style={{ marginTop: 14 }}>
-                          <div className="admin-dict-section-title">Формы слова (морфология)</div>
+                      {wizardStep === 3 && v2?.lemma?.id && (
+                        <div style={{ marginTop: 14 }} id="admin-forms">
+                          <div className="admin-dict-section-title">Формы слова (полноценные карточки)</div>
                           <HelpText>
-                            Заполняй только если нужно для обучения/упражнений. Типы можно писать свободно, рекомендуемые:{" "}
-                            <b>past</b>, <b>past_participle</b>, <b>ing</b>, <b>3sg</b>, <b>plural</b>, <b>comparative</b>,{" "}
-                            <b>superlative</b>.
+                            В этом блоке формы редактируются как отдельные карточки с полями уровня/IPA/примеров.
                           </HelpText>
-                          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                            {(v2.forms || []).map((f) => (
-                              <div key={f.id} style={{ border: "1px solid var(--border-subtle)", padding: 10, background: "var(--card)", display: "flex", justifyContent: "space-between", gap: 10 }}>
-                                {editingFormId === f.id && formEdit ? (
-                                  <div className="admin-dict-form admin-dict-form--compact" style={{ marginTop: 0, width: "100%" }}>
-                                    <div className="admin-dict-row">
-                                      <label className="admin-dict-field">
-                                        <span className="admin-dict-label">Form</span>
-                                        <input value={formEdit.form} onChange={(e) => setFormEdit({ ...formEdit, form: e.target.value })} />
-                                      </label>
-                                      <label className="admin-dict-field">
-                                        <span className="admin-dict-label">Type</span>
-                                        <input value={formEdit.formType} onChange={(e) => setFormEdit({ ...formEdit, formType: e.target.value })} />
-                                      </label>
-                                    </div>
-                                    <label className="admin-dict-field" style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-                                      <input type="checkbox" checked={formEdit.isIrregular} onChange={(e) => setFormEdit({ ...formEdit, isIrregular: e.target.checked })} />
-                                      <span className="admin-dict-label" style={{ margin: 0 }}>Irregular</span>
-                                    </label>
-                                    <label className="admin-dict-field">
-                                      <span className="admin-dict-label">Notes</span>
-                                      <textarea value={formEdit.notes} onChange={(e) => setFormEdit({ ...formEdit, notes: e.target.value })} rows={2} />
-                                    </label>
-                                    <div className="admin-dict-actions" style={{ marginTop: 6 }}>
-                                      <button type="button" className="admin-dict-btn admin-dict-btn--secondary" onClick={() => saveForm(f.id)}>
-                                        Сохранить
-                                      </button>
-                                      <button type="button" className="admin-dict-btn admin-dict-btn--secondary" onClick={() => { setEditingFormId(null); setFormEdit(null); }}>
-                                        Отмена
-                                      </button>
-                                    </div>
+                          {formCardsError && <div className="dictionary-error-banner" style={{ padding: "8px 12px", marginBottom: 8 }}>{formCardsError}</div>}
+                          {formCardsStatus && <div className="dictionary-success-banner" style={{ padding: "8px 12px", marginBottom: 8 }}>{formCardsStatus}</div>}
+                          <div style={{ display: "flex", gap: 8, marginBottom: 8, flexWrap: "wrap" }}>
+                            <button
+                              type="button"
+                              className="admin-dict-btn admin-dict-btn--secondary"
+                              onClick={() => void askAiFormsDraft()}
+                              disabled={formsDraftState === "loading"}
+                              title="Сгенерировать формы слова в черновик (блок 3)."
+                            >
+                              {formsDraftState === "loading" ? "Формы…" : "AI: заполнить формы"}
+                            </button>
+                            <button
+                              type="button"
+                              className="admin-dict-btn admin-dict-btn--secondary"
+                              onClick={() => void applyFormsDraft()}
+                              disabled={formsDraftState === "loading" || !Array.isArray(formsDraft?.formCardsDraft) || formsDraft.formCardsDraft.length === 0}
+                              title="Применить формы из AI-черновика в блок 3."
+                            >
+                              Применить формы
+                            </button>
+                            <button type="button" className="admin-dict-btn admin-dict-btn--secondary" onClick={addFormCard}>
+                              + Карточка формы
+                            </button>
+                            <button type="button" className="admin-dict-btn admin-dict-btn--primary" onClick={() => void saveFormCards()} disabled={formCardsState === "loading"}>
+                              {formCardsState === "loading" ? "Сохранение…" : "Сохранить блок 3"}
+                            </button>
+                          </div>
+                          <div className="admin-dict-help">
+                            <b>Flow:</b> 1) AI: заполнить формы → 2) Применить формы → 3) Сохранить блок 3
+                          </div>
+                          {(formsDraftError || formsDraft || formsDraftStatusText) && (
+                            <div className="admin-dict-help admin-dict-ai-changed" style={{ marginTop: 8 }}>
+                              {formsDraftStatusText && <div><strong>Статус форм:</strong> {formsDraftStatusText}</div>}
+                              {formsDraftError && <div><strong>Ошибка форм:</strong> {formsDraftError}</div>}
+                              {formsDraft && (
+                                <>
+                                  <div style={{ marginTop: 8, fontWeight: 700 }}>
+                                    Черновик форм: {Array.isArray(formsDraft.formCardsDraft) ? formsDraft.formCardsDraft.length : 0}
                                   </div>
-                                ) : (
-                                  <>
-                                    <div>
-                                      <div style={{ fontWeight: 800 }}>{f.form}</div>
-                                      <div className="admin-dict-muted">{[f.formType || "—", f.isIrregular ? "irregular" : "regular"].join(" • ")}</div>
-                                      {f.notes ? <div className="admin-dict-sense-note">{f.notes}</div> : null}
+                                  {Array.isArray(formsDraft.warnings) && formsDraft.warnings.length > 0 && (
+                                    <ul style={{ margin: "6px 0 0", paddingLeft: 18 }}>
+                                      {formsDraft.warnings.map((w, idx) => <li key={`fd-w-${idx}`}>{w}</li>)}
+                                    </ul>
+                                  )}
+                                  {Array.isArray(formsDraft.formCardsDraft) && formsDraft.formCardsDraft.length > 0 && (
+                                    <div style={{ marginTop: 8, display: "grid", gap: 6 }}>
+                                      {formsDraft.formCardsDraft.map((f, idx) => (
+                                        <div key={`fd-f-${idx}`} style={{ border: "1px solid var(--border-subtle)", padding: 8, background: "var(--card)" }}>
+                                          <b>{String((f as any).en || "")}</b> • {String((f as any).level || "A0")} • {String((f as any).register || "разговорная")}
+                                          {String((f as any).example || "").trim() ? <div className="admin-dict-muted">{String((f as any).example || "")}</div> : null}
+                                        </div>
+                                      ))}
                                     </div>
-                                    <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", justifyContent: "flex-end" }}>
-                                      <button type="button" className="admin-dict-btn admin-dict-btn--secondary" onClick={() => startEditForm(f)}>
-                                        Редактировать
-                                      </button>
-                                      <button type="button" className="admin-dict-btn admin-dict-btn--secondary" onClick={() => deleteForm(f.id)}>
-                                        Удалить
-                                      </button>
-                                    </div>
-                                  </>
-                                )}
+                                  )}
+                                  <div style={{ marginTop: 8, display: "flex", gap: 8, flexWrap: "wrap" }}>
+                                    <button
+                                      type="button"
+                                      className="admin-dict-btn admin-dict-btn--secondary"
+                                      onClick={() => void applyFormsDraft()}
+                                      disabled={formsDraftState === "loading" || !Array.isArray(formsDraft.formCardsDraft) || formsDraft.formCardsDraft.length === 0}
+                                    >
+                                      Применить формы из черновика
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className="admin-dict-btn admin-dict-btn--secondary"
+                                      onClick={() => downloadText(`forms_draft_${draft?.id || selectedId || "word"}.json`, formsDraftJson || "{}")}
+                                      disabled={!formsDraftJson}
+                                    >
+                                      Экспорт forms-draft JSON
+                                    </button>
+                                  </div>
+                                </>
+                              )}
+                            </div>
+                          )}
+                          <div style={{ display: "grid", gap: 8 }}>
+                            {formCards.map((card, idx) => (
+                              <div key={`fc-${idx}-${card.id || "new"}`} style={{ border: "1px solid var(--border-subtle)", padding: 10, background: "var(--card)" }}>
+                                <div className="admin-dict-row">
+                                  <label className="admin-dict-field"><span className="admin-dict-label">EN форма</span><input value={String(card.en || "")} onChange={(e) => patchFormCard(idx, { en: e.target.value })} /></label>
+                                  <label className="admin-dict-field"><span className="admin-dict-label">RU</span><input value={String(card.ru || "")} onChange={(e) => patchFormCard(idx, { ru: e.target.value })} /></label>
+                                </div>
+                                <div className="admin-dict-row">
+                                  <label className="admin-dict-field"><span className="admin-dict-label">Level</span><select value={String(card.level || "A0")} onChange={(e) => patchFormCard(idx, { level: e.target.value })}>{LEVELS.map((l) => <option key={`fc-l-${idx}-${l}`} value={l}>{l}</option>)}</select></label>
+                                  <label className="admin-dict-field"><span className="admin-dict-label">Accent</span><select value={String(card.accent || "both")} onChange={(e) => patchFormCard(idx, { accent: e.target.value })}>{ACCENTS.map((a) => <option key={`fc-a-${idx}-${a}`} value={a}>{a}</option>)}</select></label>
+                                </div>
+                                <div className="admin-dict-row">
+                                  <label className="admin-dict-field"><span className="admin-dict-label">Частотность (rank)</span><input value={String(card.frequencyRank ?? 15000)} onChange={(e) => patchFormCard(idx, { frequencyRank: toNumber(e.target.value, 15000) })} /></label>
+                                  <label className="admin-dict-field"><span className="admin-dict-label">Rarity</span><select value={String(card.rarity || "редкое")} onChange={(e) => patchFormCard(idx, { rarity: e.target.value })}>{RARITIES.map((r) => <option key={`fc-r-${idx}-${r}`} value={r}>{r}</option>)}</select></label>
+                                </div>
+                                <div className="admin-dict-row">
+                                  <label className="admin-dict-field"><span className="admin-dict-label">Register</span><select value={String(card.register || "разговорная")} onChange={(e) => patchFormCard(idx, { register: e.target.value })}>{REGISTERS.map((r) => <option key={`fc-reg-${idx}-${r}`} value={r}>{r}</option>)}</select></label>
+                                  <label className="admin-dict-field"><span className="admin-dict-label">POS</span><input value={String(card.pos || "")} onChange={(e) => patchFormCard(idx, { pos: e.target.value })} /></label>
+                                </div>
+                                <div className="admin-dict-row">
+                                  <label className="admin-dict-field"><span className="admin-dict-label">IPA UK</span><input value={String(card.ipaUk || "")} onChange={(e) => patchFormCard(idx, { ipaUk: e.target.value })} /></label>
+                                  <label className="admin-dict-field"><span className="admin-dict-label">IPA US</span><input value={String(card.ipaUs || "")} onChange={(e) => patchFormCard(idx, { ipaUs: e.target.value })} /></label>
+                                </div>
+                                <label className="admin-dict-field"><span className="admin-dict-label">Example</span><textarea rows={2} value={String(card.example || "")} onChange={(e) => patchFormCard(idx, { example: e.target.value })} /></label>
+                                <label className="admin-dict-field"><span className="admin-dict-label">Example RU</span><textarea rows={2} value={String(card.exampleRu || "")} onChange={(e) => patchFormCard(idx, { exampleRu: e.target.value })} /></label>
+                                <div className="admin-dict-actions" style={{ marginTop: 6 }}>
+                                  <button
+                                    type="button"
+                                    className="admin-dict-btn admin-dict-btn--secondary"
+                                    onClick={() => void deleteFormCard(idx)}
+                                    disabled={formCardsState === "loading"}
+                                  >
+                                    Удалить карточку формы
+                                  </button>
+                                </div>
                               </div>
                             ))}
                           </div>
-                          <div className="admin-dict-form admin-dict-form--compact" style={{ marginTop: 10 }}>
-                            <div className="admin-dict-row">
-                              <label className="admin-dict-field">
-                                <span className="admin-dict-label">Форма</span>
-                                <HelpText>Например: <i>went</i>, <i>running</i>, <i>children</i>.</HelpText>
-                                <input value={newForm.form} onChange={(e) => setNewForm({ ...newForm, form: e.target.value })} placeholder="например: went" />
-                              </label>
-                              <label className="admin-dict-field">
-                                <span className="admin-dict-label">Тип формы</span>
-                                <HelpText>Короткая метка: past / ing / plural …</HelpText>
-                                <input value={newForm.formType} onChange={(e) => setNewForm({ ...newForm, formType: e.target.value })} placeholder="past / ing / plural …" />
-                              </label>
-                            </div>
-                            <label className="admin-dict-field" style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-                              <input type="checkbox" checked={newForm.isIrregular} onChange={(e) => setNewForm({ ...newForm, isIrregular: e.target.checked })} />
-                              <span className="admin-dict-label" style={{ margin: 0 }}>Irregular</span>
-                            </label>
-                            <label className="admin-dict-field">
-                              <span className="admin-dict-label">Комментарий</span>
-                              <HelpText>Например: «устар.», «редко», «только в выражении …».</HelpText>
-                              <textarea value={newForm.notes} onChange={(e) => setNewForm({ ...newForm, notes: e.target.value })} rows={2} />
-                            </label>
-                            <button type="button" className="admin-dict-btn admin-dict-btn--secondary" onClick={addForm}>
-                              Добавить форму
+                          <div className="admin-dict-actions" style={{ marginTop: 10 }}>
+                            <button type="button" className="admin-dict-btn admin-dict-btn--secondary" onClick={() => setWizardStep(2)}>
+                              Назад
                             </button>
                           </div>
                         </div>
                       )}
-
+                      {wizardStep === 2 && (
                       <div style={{ marginTop: 12 }}>
                         <div className="admin-dict-section-title">Добавить новое значение (sense #2+)</div>
                         <HelpText>Добавляй, если у слова есть отдельный смысл. Для каждого смысла — свои примеры и пометы.</HelpText>
+                        <div className="admin-dict-actions" style={{ marginTop: 8 }}>
+                          <button
+                            type="button"
+                            className="admin-dict-btn admin-dict-btn--secondary"
+                            onClick={() => setAddSenseOpen((v) => !v)}
+                          >
+                            {addSenseOpen ? "Скрыть форму нового значения" : "Добавить новое значение"}
+                          </button>
+                        </div>
+                        {addSenseOpen && (
                         <div className="admin-dict-form admin-dict-form--compact">
                           <label className="admin-dict-field">
                             <span className="admin-dict-label">Короткий перевод (RU)</span>
@@ -1618,7 +2821,20 @@ const AdminDictionaryPage: React.FC = () => {
                             Добавить значение
                           </button>
                         </div>
+                        )}
+                        <div className="admin-dict-actions" style={{ marginTop: 10 }}>
+                          <button type="button" className="admin-dict-btn admin-dict-btn--secondary" onClick={() => draft?.id && void refreshWizardState(draft.id)}>
+                            Сохранить блок 2
+                          </button>
+                          <button type="button" className="admin-dict-btn admin-dict-btn--secondary" onClick={() => setWizardStep(3)}>
+                            Далее: блок 3
+                          </button>
+                          <button type="button" className="admin-dict-btn admin-dict-btn--secondary" onClick={() => setWizardStep(1)}>
+                            Назад
+                          </button>
+                        </div>
                       </div>
+                      )}
                     </div>
                   )}
 
@@ -1660,6 +2876,7 @@ const AdminDictionaryPage: React.FC = () => {
               )}
             </div>
           </div>
+          )}
 
         </div>
       </main>
