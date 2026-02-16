@@ -3065,8 +3065,8 @@ const server = http.createServer(async (req, res) => {
   try {
     await handler(req, res, body, url);
   } catch (e) {
-    console.error(e);
-    send(res, 500, { error: "Internal server error" });
+    console.error(path, e);
+    send(res, 500, { error: "Internal server error", details: e?.message || String(e) });
   }
 });
 
