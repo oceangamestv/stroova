@@ -365,6 +365,7 @@ const DictionaryCasualPage: React.FC = () => {
   const [myStatus, setMyStatus] = useState<StatusFilter>("all");
   const [myItems, setMyItems] = useState<any[]>([]);
   const [myTotal, setMyTotal] = useState(0);
+  const [summaryData, setSummaryData] = useState<{ total: number; queue: number; learning: number; known: number; hard: number } | null>(null);
   const [myPhraseItems, setMyPhraseItems] = useState<any[]>([]);
   const [myPhraseTotal, setMyPhraseTotal] = useState(0);
   const [myContentMode, setMyContentMode] = useState<"words" | "phrases">("words");
@@ -430,6 +431,24 @@ const DictionaryCasualPage: React.FC = () => {
     }
   };
 
+  const loadSummary = async () => {
+    if (!isLoggedIn) return;
+    try {
+      const out = await userDictionaryApi.summary({ lang });
+      if (out && typeof out.total === "number") {
+        setSummaryData({
+          total: out.total,
+          queue: out.queue ?? 0,
+          learning: out.learning ?? 0,
+          known: out.known ?? 0,
+          hard: out.hard ?? 0,
+        });
+      }
+    } catch {
+      setSummaryData(null);
+    }
+  };
+
   const loadMy = async () => {
     if (!isLoggedIn) return;
     setMyState("loading");
@@ -492,6 +511,7 @@ const DictionaryCasualPage: React.FC = () => {
       setTodayNew(Array.isArray(out?.new) ? out.new : []);
       refresh();
       await loadMy();
+      await loadSummary();
       await loadCollections();
     } catch (e) {
       setTodayError(formatApiError(e, "Не удалось сохранить стартовый профиль"));
@@ -507,6 +527,7 @@ const DictionaryCasualPage: React.FC = () => {
       await userDictionaryApi.setStatus({ senseId: Number(out.senseId), status: "learning" });
       await loadToday();
       await loadMy();
+      await loadSummary();
     } catch (e) {
       setTodayError(formatApiError(e, "Не удалось добавить слово"));
     }
@@ -619,6 +640,7 @@ const DictionaryCasualPage: React.FC = () => {
       await userDictionaryApi.setStatus({ senseId: Number(senseId), status: "learning" });
       await loadToday();
       await loadMy();
+      await loadSummary();
     } catch (e) {
       setTodayError(formatApiError(e, "Не удалось обновить статус"));
     }
@@ -630,6 +652,7 @@ const DictionaryCasualPage: React.FC = () => {
       await userDictionaryApi.removeSense({ senseId });
       await loadToday();
       await loadMy();
+      await loadSummary();
     } catch (e) {
       setMyError(formatApiError(e, "Не удалось удалить слово"));
     }
@@ -707,6 +730,7 @@ const DictionaryCasualPage: React.FC = () => {
       await openCollection(Number(collection.id));
       await loadToday();
       await loadMy();
+      await loadSummary();
       setCollectionState("idle");
     } catch (e) {
       setCollectionState("error");
@@ -728,6 +752,7 @@ const DictionaryCasualPage: React.FC = () => {
       );
       await loadToday();
       await loadMy();
+      await loadSummary();
     } catch (e) {
       setCollectionError(formatApiError(e, "Не удалось добавить слово"));
     }
@@ -820,6 +845,7 @@ const DictionaryCasualPage: React.FC = () => {
         );
         await loadToday();
         await loadMy();
+        await loadSummary();
       } else {
         const senseId = Number(item.senseId || 0);
         if (!senseId) throw new Error("Для выбранной сущности не найден senseId");
@@ -834,6 +860,7 @@ const DictionaryCasualPage: React.FC = () => {
         );
         await loadToday();
         await loadMy();
+        await loadSummary();
       }
     } catch (e) {
       setAllWordsError(formatApiError(e, "Не удалось добавить слово"));
@@ -852,6 +879,7 @@ const DictionaryCasualPage: React.FC = () => {
     if (!isLoggedIn) return;
     void loadToday();
     void loadMy();
+    void loadSummary();
     void loadCollections();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLoggedIn]);
@@ -951,15 +979,19 @@ const DictionaryCasualPage: React.FC = () => {
     : (todayPhraseDue.length > 0 || todayPhraseNew.length > 0);
 
   const mySummary = useMemo(() => {
+    if (summaryData) {
+      return summaryData;
+    }
     if (!myItems.length && !myTotal) return null;
     const items = myItems.length ? myItems : [];
     const known = items.filter((x) => x.status === "known").length;
     const learning = items.filter((x) => x.status === "learning").length;
     const hard = items.filter((x) => x.status === "hard").length;
+    const queue = items.filter((x) => x.status === "queue").length;
     const total = myTotal ?? items.length;
-    return { known, learning, hard, total };
-  }, [myItems, myTotal]);
-  const totalForBar = (mySummary?.known ?? 0) + (mySummary?.learning ?? 0) + (mySummary?.hard ?? 0);
+    return { total, queue, learning, known, hard };
+  }, [summaryData, myItems, myTotal]);
+  const totalForBar = (mySummary?.total ?? 0) || 1;
   const selectedProfileOption = useMemo(
     () => START_PROFILE_OPTIONS.find((x) => x.id === startProfile) || null,
     [startProfile]
@@ -1051,28 +1083,36 @@ const DictionaryCasualPage: React.FC = () => {
 
               <div className="dict-progress-bar">
                 <div
-                  className="dict-progress-bar__segment dict-progress-bar__segment--known"
-                  style={{ width: `${totalForBar ? (100 * (mySummary?.known ?? 0) / totalForBar) : 0}%` }}
-                  title={`Знаю: ${mySummary?.known ?? 0}`}
+                  className="dict-progress-bar__segment dict-progress-bar__segment--queue"
+                  style={{ width: `${100 * (mySummary?.queue ?? 0) / totalForBar}%` }}
+                  title={`В очереди: ${mySummary?.queue ?? 0}`}
                 />
                 <div
                   className="dict-progress-bar__segment dict-progress-bar__segment--learning"
-                  style={{ width: `${totalForBar ? (100 * (mySummary?.learning ?? 0) / totalForBar) : 0}%` }}
+                  style={{ width: `${100 * (mySummary?.learning ?? 0) / totalForBar}%` }}
                   title={`Изучаю: ${mySummary?.learning ?? 0}`}
                 />
                 <div
+                  className="dict-progress-bar__segment dict-progress-bar__segment--known"
+                  style={{ width: `${100 * (mySummary?.known ?? 0) / totalForBar}%` }}
+                  title={`Знаю: ${mySummary?.known ?? 0}`}
+                />
+                <div
                   className="dict-progress-bar__segment dict-progress-bar__segment--forgot"
-                  style={{ width: `${totalForBar ? (100 * (mySummary?.hard ?? 0) / totalForBar) : 0}%` }}
+                  style={{ width: `${100 * (mySummary?.hard ?? 0) / totalForBar}%` }}
                   title={`На повтор: ${mySummary?.hard ?? 0}`}
                 />
               </div>
 
               <div className="dict-progress-block__chips" aria-label="Разбивка по статусам">
-                <span className="dict-progress-chip dict-progress-chip--known" title={`Знаю: ${mySummary?.known ?? 0}`}>
-                  Знаю · <b>{mySummary?.known ?? 0}</b>
+                <span className="dict-progress-chip dict-progress-chip--queue" title={`В очереди: ${mySummary?.queue ?? 0}`}>
+                  Очередь · <b>{mySummary?.queue ?? 0}</b>
                 </span>
                 <span className="dict-progress-chip dict-progress-chip--learning" title={`Изучаю: ${mySummary?.learning ?? 0}`}>
                   Изучаю · <b>{mySummary?.learning ?? 0}</b>
+                </span>
+                <span className="dict-progress-chip dict-progress-chip--known" title={`Знаю: ${mySummary?.known ?? 0}`}>
+                  Знаю · <b>{mySummary?.known ?? 0}</b>
                 </span>
                 <span className="dict-progress-chip dict-progress-chip--repeat" title={`На повтор: ${mySummary?.hard ?? 0}`}>
                   Повтор · <b>{mySummary?.hard ?? 0}</b>

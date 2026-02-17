@@ -298,6 +298,8 @@ export async function listMyWords(username, langCode, params = {}, db = pool) {
 export async function getMyWordsSummary(username, langCode, db = pool) {
   const u = String(username || "").trim();
   if (!u) return { total: 0, queue: 0, learning: 0, known: 0, hard: 0 };
+  const languageId = await getLanguageId(langCode, db);
+  if (!languageId) return { total: 0, queue: 0, learning: 0, known: 0, hard: 0 };
 
   const res = await db.query(
     `
@@ -305,10 +307,10 @@ export async function getMyWordsSummary(username, langCode, db = pool) {
       FROM user_saved_senses us
       JOIN dictionary_senses s ON s.id = us.sense_id
       JOIN dictionary_lemmas m ON m.id = s.lemma_id
-      WHERE us.username = $1
+      WHERE us.username = $1 AND m.language_id = $2
       GROUP BY us.status
     `,
-    [u]
+    [u, languageId]
   );
 
   const out = { total: 0, queue: 0, learning: 0, known: 0, hard: 0 };
@@ -1703,7 +1705,7 @@ export async function getTodayPack(username, langCode, db = pool) {
       LEFT JOIN user_sense_progress p ON p.username = us.username AND p.sense_id = us.sense_id
       WHERE us.username = $1 AND m.language_id = $2
         AND us.status <> 'known'
-      ORDER BY (COALESCE(p.beginner, 0) + COALESCE(p.experienced, 0)) ASC, us.updated_at DESC
+      ORDER BY us.updated_at DESC, (COALESCE(p.beginner, 0) + COALESCE(p.experienced, 0)) ASC
       LIMIT 7
     `,
     [u, languageId]

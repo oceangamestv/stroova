@@ -8,6 +8,7 @@ import PairsExercise from "../components/exercises/PairsExercise";
 import PuzzleExercise from "../components/exercises/PuzzleExercise";
 import DanetkaExercise from "../components/exercises/DanetkaExercise";
 import OneOfThreeExercise from "../components/exercises/OneOfThreeExercise";
+import GatesOfKnowledgeExercise from "../components/exercises/GatesOfKnowledgeExercise";
 import { getSoundEnabled, ensureMediaPlaybackOnIOS } from "../utils/sounds";
 
 /**
@@ -31,7 +32,9 @@ export const GameRoute: React.FC = () => {
         ? "danetka"
         : pathname === "/one-of-three"
           ? "one-of-three"
-          : "pairs";
+          : pathname === "/gates-of-knowledge"
+            ? "gates-of-knowledge"
+            : "pairs";
 
   useEffect(() => {
     setShowIntro(true);
@@ -60,6 +63,8 @@ export const GameRoute: React.FC = () => {
       <DanetkaExercise />
     ) : exercise === "one-of-three" ? (
       <OneOfThreeExercise />
+    ) : exercise === "gates-of-knowledge" ? (
+      <GatesOfKnowledgeExercise />
     ) : (
       <PairsExercise />
     );

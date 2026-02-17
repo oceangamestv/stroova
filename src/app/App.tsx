@@ -73,6 +73,7 @@ const routeConfig = [
   { path: "/puzzle", element: <GameRoute /> },
   { path: "/danetka", element: <GameRoute /> },
   { path: "/one-of-three", element: <GameRoute /> },
+  { path: "/gates-of-knowledge", element: <GameRoute /> },
   { path: "*", element: <Navigate to="/" replace /> },
 ];
 

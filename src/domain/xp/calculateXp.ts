@@ -29,6 +29,9 @@ function getGameMultiplier(
   if (gameType === "ONE_OF_THREE") {
     return GAME_MULTIPLIERS.ONE_OF_THREE;
   }
+  if (gameType === "GATES_OF_KNOWLEDGE") {
+    return GAME_MULTIPLIERS.GATES_OF_KNOWLEDGE;
+  }
   return 1.0;
 }
 

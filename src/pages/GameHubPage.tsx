@@ -37,6 +37,15 @@ const IconOneOfThree: React.FC<{ className?: string }> = ({ className }) => (
   </svg>
 );
 
+/** Иконка: врата и звезда (режим забега по боссам) */
+const IconGates: React.FC<{ className?: string }> = ({ className }) => (
+  <svg className={className} viewBox="0 0 48 48" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+    <path d="M8 40V10a4 4 0 0 1 4-4h24a4 4 0 0 1 4 4v30" />
+    <path d="M16 40V18h16v22" />
+    <path d="M24 24l1.8 3.6 4 .6-2.9 2.8.7 4-3.6-1.9-3.6 1.9.7-4-2.9-2.8 4-.6L24 24z" />
+  </svg>
+);
+
 const GAMES = [
   {
     to: "/pairs",
@@ -61,6 +70,12 @@ const GAMES = [
     title: "1 из 3",
     description: "Выберите правильный перевод из трёх вариантов. Проверка словарного запаса.",
     Icon: IconOneOfThree,
+  },
+  {
+    to: "/gates-of-knowledge",
+    title: "Врата познаний",
+    description: "Пройдите 5 врат A0: выполняйте задания, бейте боссов и удерживайте таймер.",
+    Icon: IconGates,
   },
 ] as const;
 

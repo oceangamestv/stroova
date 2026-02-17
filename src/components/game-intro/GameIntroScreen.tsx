@@ -4,7 +4,12 @@ import { hydrateUser } from "../../data/adapters/serverAuthAdapter";
 import { authService } from "../../services/authService";
 import type { DictionarySource } from "../../services/dictionaryService";
 
-export type GameSlug = "pairs" | "puzzle" | "danetka" | "one-of-three";
+export type GameSlug =
+  | "pairs"
+  | "puzzle"
+  | "danetka"
+  | "one-of-three"
+  | "gates-of-knowledge";
 
 const GAME_INTRO: Record<
   GameSlug,
@@ -48,6 +53,18 @@ const GAME_INTRO: Record<
       "Показано английское слово и три варианта перевода. Верный — только один.",
       "Выберите правильный вариант одним нажатием.",
       "За верный ответ — опыт; за ошибку прогресс слова уменьшается.",
+    ],
+  },
+  "gates-of-knowledge": {
+    title: "🚪 Врата познаний",
+    description:
+      "Режим забега из 5 врат: решайте микрозадания и наносите урон боссам словарным запасом A0.",
+    rules: [
+      "В забеге 5 врат подряд. У каждого босса свой запас HP и таймер.",
+      "Правильный ответ наносит урон и дает бонус ко времени; ошибка снижает время и сбрасывает комбо.",
+      "Типы заданий в MVP: собери слово, напиши перевод, подставь слово в пропуск.",
+      "Для этого режима используются слова уровня A0 из общего словаря.",
+      "Победа — открыть все 5 врат до истечения времени.",
     ],
   },
 };
@@ -112,24 +129,30 @@ const GameIntroScreen: React.FC<GameIntroScreenProps> = ({ gameSlug, onStart }) 
           <span className="game-intro__zone-icon" aria-hidden="true">⚙️</span>
           Настройки
         </h2>
-        <div className="game-intro__setting">
-          <div className="game-dictionary-source-btns">
-            <button
-              type="button"
-              className={`game-dictionary-source-btn ${dictionarySource === "general" ? "active" : ""}`}
-              onClick={() => setDictionarySource("general")}
-            >
-              Общий словарь
-            </button>
-            <button
-              type="button"
-              className={`game-dictionary-source-btn ${dictionarySource === "personal" ? "active" : ""}`}
-              onClick={() => setDictionarySource("personal")}
-            >
-              Мой словарь
-            </button>
+        {gameSlug !== "gates-of-knowledge" ? (
+          <div className="game-intro__setting">
+            <div className="game-dictionary-source-btns">
+              <button
+                type="button"
+                className={`game-dictionary-source-btn ${dictionarySource === "general" ? "active" : ""}`}
+                onClick={() => setDictionarySource("general")}
+              >
+                Общий словарь
+              </button>
+              <button
+                type="button"
+                className={`game-dictionary-source-btn ${dictionarySource === "personal" ? "active" : ""}`}
+                onClick={() => setDictionarySource("personal")}
+              >
+                Мой словарь
+              </button>
+            </div>
           </div>
-        </div>
+        ) : (
+          <p className="game-intro__setting-label">
+            В MVP для этого режима используется только общий словарь A0.
+          </p>
+        )}
         {gameSlug === "puzzle" && (
           <div className="game-intro__setting">
             <span className="game-intro__setting-label">Сложность:</span>

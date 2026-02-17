@@ -26,6 +26,295 @@
     "Segoe UI", sans-serif;
 }
 
+/* =========================
+   Gates Of Knowledge (MVP)
+   ========================= */
+.gates-root {
+  gap: 16px;
+}
+
+.gates-hud {
+  background: var(--card);
+  border: 1px solid var(--border-subtle);
+  border-radius: 14px;
+  padding: 16px;
+}
+
+.gates-hud-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.gates-boss-title {
+  margin-bottom: 4px;
+}
+
+.gates-timer {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+}
+
+.gates-timer--warning {
+  animation: gates-timer-warning 0.8s ease-in-out infinite;
+}
+
+.gates-bars {
+  margin-top: 12px;
+}
+
+.gates-bar-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin: 10px 0 6px;
+  font-size: 14px;
+}
+
+.gates-hp-bar,
+.gates-time-bar {
+  height: 10px;
+}
+
+.gates-hp-fill,
+.gates-time-fill {
+  height: 100%;
+  border-radius: 999px;
+  transition: width var(--transition-fast);
+}
+
+.gates-hp-fill {
+  background: linear-gradient(90deg, #ef4444, #f97316);
+  animation: gates-hurt-bar 0.3s ease;
+}
+
+.gates-time-fill {
+  background: linear-gradient(90deg, #22c55e, #10b981);
+}
+
+.gates-stats-strip {
+  margin-top: 12px;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.gates-stats-strip span {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  padding: 8px 10px;
+  font-size: 13px;
+  text-align: center;
+}
+
+.gates-battle-zone {
+  background: var(--card);
+  border: 1px solid var(--border-subtle);
+  border-radius: 14px;
+  padding: 16px;
+  position: relative;
+  animation: gate-enter 220ms ease;
+}
+
+.gates-status {
+  margin-top: 0;
+  color: var(--text-soft);
+}
+
+.gates-damage-pop {
+  position: absolute;
+  right: 16px;
+  top: 14px;
+  font-weight: 800;
+  color: #ef4444;
+  animation: combo-pop 320ms ease-out;
+}
+
+.gates-task-card {
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  background: var(--bg-elevated);
+  padding: 14px;
+}
+
+.gates-task-title {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.gates-task-subtitle {
+  margin: 8px 0;
+}
+
+.gates-task-hint {
+  margin: 0 0 12px;
+  color: var(--text-soft);
+}
+
+.gates-task-sentence {
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+
+.gates-task-form {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+}
+
+.gates-task-input {
+  border-radius: 10px;
+  border: 1px solid var(--border-subtle);
+  background: var(--card);
+  padding: 10px 12px;
+  color: var(--text-main);
+  font-size: 15px;
+}
+
+.gates-options-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.gates-option-btn {
+  border-radius: 10px;
+  border: 1px solid var(--border-subtle);
+  background: var(--card);
+  color: var(--text-main);
+  font-weight: 600;
+  padding: 10px;
+  cursor: pointer;
+  transition: transform var(--transition-fast), border-color var(--transition-fast);
+}
+
+.gates-option-btn:hover {
+  transform: translateY(-1px);
+  border-color: var(--accent);
+}
+
+.gates-gate-clear-card {
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  background: var(--bg-elevated);
+  padding: 14px;
+  animation: gate-clear 260ms ease;
+}
+
+.gates-result-modal {
+  max-width: 880px;
+}
+
+.gates-result-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin: 12px 0 14px;
+}
+
+.gates-result-cell {
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  background: var(--bg-elevated);
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.gates-result-cell span {
+  color: var(--text-soft);
+  font-size: 12px;
+}
+
+.gates-result-cell strong {
+  font-size: 1.05rem;
+}
+
+.gates-result-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.gates-secondary-btn {
+  background: transparent;
+  color: var(--text-main);
+  border: 1px solid var(--border-subtle);
+}
+
+@keyframes gates-timer-warning {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.03); }
+  100% { transform: scale(1); }
+}
+
+@keyframes gates-hurt-bar {
+  0% { filter: brightness(1); }
+  50% { filter: brightness(1.35); }
+  100% { filter: brightness(1); }
+}
+
+@keyframes combo-pop {
+  0% { transform: translateY(4px); opacity: 0; }
+  60% { transform: translateY(-2px); opacity: 1; }
+  100% { transform: translateY(-8px); opacity: 0; }
+}
+
+@keyframes gate-enter {
+  0% { opacity: 0; transform: translateY(8px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes gate-clear {
+  0% { opacity: 0.75; transform: scale(0.98); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+@media (max-width: 768px) {
+  .gates-hud-top {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .gates-stats-strip {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .gates-task-form {
+    grid-template-columns: 1fr;
+  }
+
+  .gates-options-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .gates-result-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .gates-result-actions {
+    flex-direction: column;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gates-battle-zone,
+  .gates-gate-clear-card,
+  .gates-timer--warning,
+  .gates-damage-pop,
+  .gates-hp-fill {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
 /* ===== Casual dictionary (user) ===== */
 .dict-casual-page .main {
   padding-top: 4px;
@@ -1868,6 +2157,11 @@
   color: var(--text);
   font-weight: 1000;
 }
+.dict-progress-chip--queue {
+  border-color: rgba(100, 116, 139, 0.35);
+  background: rgba(100, 116, 139, 0.08);
+  color: #64748b;
+}
 .dict-progress-chip--known {
   border-color: rgba(34, 197, 94, 0.35);
   background: rgba(34, 197, 94, 0.08);
@@ -1913,11 +2207,14 @@
   min-width: 0;
   transition: width var(--transition-fast);
 }
-.dict-progress-bar__segment--known {
-  background: #22c55e;
+.dict-progress-bar__segment--queue {
+  background: #94a3b8;
 }
 .dict-progress-bar__segment--learning {
   background: #3b82f6;
+}
+.dict-progress-bar__segment--known {
+  background: #22c55e;
 }
 .dict-progress-bar__segment--forgot {
   background: #f59e0b;

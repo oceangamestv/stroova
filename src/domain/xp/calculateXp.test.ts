@@ -82,6 +82,18 @@ export function runXpTests(): void {
     "C2 ADVANCED PUZZLE HARD 1 word"
   );
 
+  // A0, BEGINNER, GATES_OF_KNOWLEDGE, correct, 1 слово -> 1 x 1.0 x 1.0 x 1.35 = 1.35 XP
+  assertEqual(
+    calculateXp({
+      level: "A0",
+      exerciseType: "BEGINNER",
+      gameType: "GATES_OF_KNOWLEDGE",
+      isCorrect: true,
+    }),
+    1.35,
+    "A0 BEGINNER GATES_OF_KNOWLEDGE 1 word"
+  );
+
   // Любой вариант с isCorrect === false → 0 XP
   const wrongInputs: XpInput[] = [
     {
