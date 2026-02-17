@@ -1129,20 +1129,21 @@ export async function addSavedByEntryIds(username, langCode, entryIds, source = 
   return addManySavedSenses(username, senseIds, source, db);
 }
 
-export async function addManySavedSenses(username, senseIds, source = "collection", db = pool) {
+export async function addManySavedSenses(username, senseIds, source = "collection", db = pool, initialStatus = "queue") {
   const u = String(username || "").trim();
   if (!u) return { ok: false };
   const ids = Array.from(new Set((senseIds || []).map((n) => Number(n)).filter((n) => Number.isFinite(n) && n > 0)));
   if (ids.length === 0) return { ok: true, inserted: 0 };
+  const status = normalizeStatus(initialStatus);
   const res = await db.query(
     `
       INSERT INTO user_saved_senses (username, sense_id, status, source, added_at, updated_at)
-      SELECT $1, s.id, 'queue', $2, NOW(), NOW()
-      FROM UNNEST($3::int[]) AS t(sense_id)
+      SELECT $1, s.id, $2, $3, NOW(), NOW()
+      FROM UNNEST($4::int[]) AS t(sense_id)
       JOIN dictionary_senses s ON s.id = t.sense_id
       ON CONFLICT (username, sense_id) DO NOTHING
     `,
-    [u, String(source || "collection"), ids]
+    [u, status, String(source || "collection"), ids]
   );
   return { ok: true, inserted: res.rowCount || 0 };
 }
@@ -2244,14 +2245,14 @@ export async function ensureDefaultCollectionEnrolled(username, langCode, collec
     [u, collectionId]
   );
 
-  // add all senses from collection as queue
+  // add all senses from collection as learning so they show in progress bar
   const sensesRes = await db.query(
     `SELECT sense_id AS "senseId" FROM dictionary_collection_items WHERE collection_id = $1 ORDER BY sort_order ASC, id ASC`,
     [collectionId]
   );
   const senseIds = (sensesRes.rows || []).map((r) => Number(r.senseId)).filter((n) => Number.isFinite(n) && n > 0);
   if (senseIds.length > 0) {
-    await addManySavedSenses(u, senseIds, "collection", db);
+    await addManySavedSenses(u, senseIds, "collection", db, "learning");
   }
   return { ok: true, enrolled: true, collectionId, added: senseIds.length };
 }

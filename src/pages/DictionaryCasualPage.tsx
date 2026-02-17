@@ -514,6 +514,15 @@ const DictionaryCasualPage: React.FC = () => {
       setCurrentCollection(out?.currentCollection ?? null);
       setTodayDue(Array.isArray(out?.due) ? out.due : []);
       setTodayNew(Array.isArray(out?.new) ? out.new : []);
+      if (out?.summary && typeof out.summary === "object") {
+        setSummaryData({
+          total: Number(out.summary.total ?? 0),
+          queue: Number(out.summary.queue ?? 0),
+          learning: Number(out.summary.learning ?? 0),
+          known: Number(out.summary.known ?? 0),
+          hard: Number(out.summary.hard ?? 0),
+        });
+      }
       refresh();
       await refreshProgress();
       await loadCollections();

@@ -477,7 +477,8 @@ const routes = {
     }
     const pack = await getTodayPack(user.username, lang);
     const currentCollection = await getCollectionProgress(user.username, lang, collectionKey);
-    send(res, 200, { ok: true, profile, collectionKey, currentCollection, ...pack });
+    const summary = await getMyWordsSummary(user.username, lang);
+    send(res, 200, { ok: true, profile, collectionKey, currentCollection, summary, ...pack });
   },
 
   "GET /api/user-dictionary/summary": async (req, res, body, url) => {

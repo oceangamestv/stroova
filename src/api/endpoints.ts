@@ -197,10 +197,15 @@ export const userDictionaryApi = {
     return api.get<{ isSaved: boolean; status: string | null }>(`/user-dictionary/phrase-state?${search.toString()}`);
   },
   setStartProfile: (body: { lang?: string; profile: "beginner" | "basic_sentences" | "everyday_topics" }) =>
-    api.post<{ ok: true; profile: string; collectionKey: string; currentCollection?: any; due?: any[]; new?: any[] }>(
-      `/user-dictionary/start-profile`,
-      body
-    ),
+    api.post<{
+      ok: true;
+      profile: string;
+      collectionKey: string;
+      currentCollection?: any;
+      summary?: { total: number; queue: number; learning: number; known: number; hard: number };
+      due?: any[];
+      new?: any[];
+    }>(`/user-dictionary/start-profile`, body),
 };
 
 export const adminDictionaryApi = {
