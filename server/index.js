@@ -629,7 +629,7 @@ const routes = {
       return;
     }
     const senseIds = (col.items || []).map((x) => Number(x.senseId)).filter((n) => Number.isFinite(n) && n > 0);
-    const out = await addManySavedSenses(auth.user.username, senseIds, "collection");
+    const out = await addManySavedSenses(auth.user.username, senseIds, "collection", pool, "learning");
     send(res, 200, out);
   },
 
