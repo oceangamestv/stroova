@@ -449,6 +449,11 @@ const DictionaryCasualPage: React.FC = () => {
     }
   };
 
+  const refreshProgress = async () => {
+    await loadMy();
+    await loadSummary();
+  };
+
   const loadMy = async () => {
     if (!isLoggedIn) return;
     setMyState("loading");
@@ -510,8 +515,7 @@ const DictionaryCasualPage: React.FC = () => {
       setTodayDue(Array.isArray(out?.due) ? out.due : []);
       setTodayNew(Array.isArray(out?.new) ? out.new : []);
       refresh();
-      await loadMy();
-      await loadSummary();
+      await refreshProgress();
       await loadCollections();
     } catch (e) {
       setTodayError(formatApiError(e, "Не удалось сохранить стартовый профиль"));
@@ -526,8 +530,7 @@ const DictionaryCasualPage: React.FC = () => {
       const out = await userDictionaryApi.add({ lang, entryId });
       await userDictionaryApi.setStatus({ senseId: Number(out.senseId), status: "learning" });
       await loadToday();
-      await loadMy();
-      await loadSummary();
+      await refreshProgress();
     } catch (e) {
       setTodayError(formatApiError(e, "Не удалось добавить слово"));
     }
@@ -639,8 +642,7 @@ const DictionaryCasualPage: React.FC = () => {
     try {
       await userDictionaryApi.setStatus({ senseId: Number(senseId), status: "learning" });
       await loadToday();
-      await loadMy();
-      await loadSummary();
+      await refreshProgress();
     } catch (e) {
       setTodayError(formatApiError(e, "Не удалось обновить статус"));
     }
@@ -651,8 +653,7 @@ const DictionaryCasualPage: React.FC = () => {
     try {
       await userDictionaryApi.removeSense({ senseId });
       await loadToday();
-      await loadMy();
-      await loadSummary();
+      await refreshProgress();
     } catch (e) {
       setMyError(formatApiError(e, "Не удалось удалить слово"));
     }
@@ -729,8 +730,7 @@ const DictionaryCasualPage: React.FC = () => {
       await userDictionaryApi.addAllFromCollection({ lang, collectionId: Number(collection.id) });
       await openCollection(Number(collection.id));
       await loadToday();
-      await loadMy();
-      await loadSummary();
+      await refreshProgress();
       setCollectionState("idle");
     } catch (e) {
       setCollectionState("error");
@@ -751,8 +751,7 @@ const DictionaryCasualPage: React.FC = () => {
         )
       );
       await loadToday();
-      await loadMy();
-      await loadSummary();
+      await refreshProgress();
     } catch (e) {
       setCollectionError(formatApiError(e, "Не удалось добавить слово"));
     }
@@ -844,8 +843,7 @@ const DictionaryCasualPage: React.FC = () => {
           )
         );
         await loadToday();
-        await loadMy();
-        await loadSummary();
+        await refreshProgress();
       } else {
         const senseId = Number(item.senseId || 0);
         if (!senseId) throw new Error("Для выбранной сущности не найден senseId");
@@ -859,8 +857,7 @@ const DictionaryCasualPage: React.FC = () => {
           )
         );
         await loadToday();
-        await loadMy();
-        await loadSummary();
+        await refreshProgress();
       }
     } catch (e) {
       setAllWordsError(formatApiError(e, "Не удалось добавить слово"));
@@ -878,8 +875,7 @@ const DictionaryCasualPage: React.FC = () => {
   useEffect(() => {
     if (!isLoggedIn) return;
     void loadToday();
-    void loadMy();
-    void loadSummary();
+    void refreshProgress();
     void loadCollections();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLoggedIn]);
@@ -991,7 +987,7 @@ const DictionaryCasualPage: React.FC = () => {
     const total = myTotal ?? items.length;
     return { total, queue, learning, known, hard };
   }, [summaryData, myItems, myTotal]);
-  const totalForBar = (mySummary?.total ?? 0) || 1;
+  const totalForBar = (mySummary?.learning ?? 0) + (mySummary?.known ?? 0) + (mySummary?.hard ?? 0) || 1;
   const selectedProfileOption = useMemo(
     () => START_PROFILE_OPTIONS.find((x) => x.id === startProfile) || null,
     [startProfile]
@@ -1083,11 +1079,6 @@ const DictionaryCasualPage: React.FC = () => {
 
               <div className="dict-progress-bar">
                 <div
-                  className="dict-progress-bar__segment dict-progress-bar__segment--queue"
-                  style={{ width: `${100 * (mySummary?.queue ?? 0) / totalForBar}%` }}
-                  title={`В очереди: ${mySummary?.queue ?? 0}`}
-                />
-                <div
                   className="dict-progress-bar__segment dict-progress-bar__segment--learning"
                   style={{ width: `${100 * (mySummary?.learning ?? 0) / totalForBar}%` }}
                   title={`Изучаю: ${mySummary?.learning ?? 0}`}
@@ -1105,9 +1096,6 @@ const DictionaryCasualPage: React.FC = () => {
               </div>
 
               <div className="dict-progress-block__chips" aria-label="Разбивка по статусам">
-                <span className="dict-progress-chip dict-progress-chip--queue" title={`В очереди: ${mySummary?.queue ?? 0}`}>
-                  Очередь · <b>{mySummary?.queue ?? 0}</b>
-                </span>
                 <span className="dict-progress-chip dict-progress-chip--learning" title={`Изучаю: ${mySummary?.learning ?? 0}`}>
                   Изучаю · <b>{mySummary?.learning ?? 0}</b>
                 </span>
@@ -2253,7 +2241,7 @@ const DictionaryCasualPage: React.FC = () => {
                       setDeleteConfirm({ open: false, type: "sense", senseId: null, itemId: null, wordLabel: "" });
                     } else if (deleteConfirm.type === "form_card" && deleteConfirm.itemId !== null) {
                       await removeMyPhrase("form_card", deleteConfirm.itemId);
-                      await loadMy();
+                      await refreshProgress();
                       setDeleteConfirm({ open: false, type: "sense", senseId: null, itemId: null, wordLabel: "" });
                     }
                   }}

@@ -194,30 +194,15 @@ const tryPlayPreGenerated = async (
   const base = getAudioBaseUrl();
   const isCapacitor = typeof window !== "undefined" && !!(window as unknown as { Capacitor?: unknown }).Capacitor;
   const url = base && isCapacitor ? `${base}${path}` : path;
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/039ed3c9-0fe6-43d1-a385-bc2c487e240a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'sounds.ts:tryPlayPreGenerated',message:'fetch url',data:{url,path,base,wordEn,voice},timestamp:Date.now(),hypothesisId:'B'})}).catch(()=>{});
-  // #endregion
   try {
     const res = await fetch(url);
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/039ed3c9-0fe6-43d1-a385-bc2c487e240a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'sounds.ts:afterFetch',message:'response',data:{ok:res.ok,status:res.status,url},timestamp:Date.now(),hypothesisId:'C'})}).catch(()=>{});
-    // #endregion
     if (!res.ok) return false;
     const buf = await res.arrayBuffer();
     const audioContext = await getAudioContext();
     const audioBuffer = await audioContext.decodeAudioData(buf);
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/039ed3c9-0fe6-43d1-a385-bc2c487e240a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'sounds.ts:afterDecode',message:'decoded',data:{url},timestamp:Date.now(),hypothesisId:'D'})}).catch(()=>{});
-    // #endregion
     await playAudioBuffer(audioBuffer, rate);
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/039ed3c9-0fe6-43d1-a385-bc2c487e240a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'sounds.ts:afterPlay',message:'played',data:{url},timestamp:Date.now(),hypothesisId:'D'})}).catch(()=>{});
-    // #endregion
     return true;
-  } catch (e) {
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/039ed3c9-0fe6-43d1-a385-bc2c487e240a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'sounds.ts:tryPlayCatch',message:'catch',data:{url,err:String(e&&(e as Error).message? (e as Error).message : e)},timestamp:Date.now(),hypothesisId:'C'})}).catch(()=>{});
-    // #endregion
+  } catch {
     return false;
   }
 };
@@ -230,9 +215,6 @@ export const speakWord = async (
 ): Promise<void> => {
   const soundOn = getSoundEnabled();
   const wordEn = String(word || "").trim();
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/039ed3c9-0fe6-43d1-a385-bc2c487e240a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'sounds.ts:speakWord',message:'entry',data:{soundOn,wordEn,preferredVoiceUri,wordRaw:word},timestamp:Date.now(),hypothesisId:'A'})}).catch(()=>{});
-  // #endregion
   if (!soundOn) return;
   if (!wordEn) return;
   await getAudioContext();

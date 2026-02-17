@@ -292,8 +292,8 @@ export async function listMyWords(username, langCode, params = {}, db = pool) {
 }
 
 /**
- * РЎРІРѕРґРєР° РїРѕ СЃР»РѕРІР°СЂСЋ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ: РІСЃРµРіРѕ СЃР»РѕРІ Рё СЂР°Р·Р±РёРІРєР° РїРѕ СЃС‚Р°С‚СѓСЃР°Рј (РґР»СЏ Р±Р»РѕРєР° В«РњРѕР№ РїСЂРѕРіСЂРµСЃСЃВ»).
- * РЈС‡РёС‚С‹РІР°СЋС‚СЃСЏ РІСЃРµ СЃРѕС…СЂР°РЅС‘РЅРЅС‹Рµ СЃРјС‹СЃР»С‹ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ (Р±РµР· С„РёР»СЊС‚СЂР° РїРѕ СЏР·С‹РєСѓ), С‡С‚РѕР±С‹ СЃС‡С‘С‚С‡РёРєРё СЃРѕРІРїР°РґР°Р»Рё СЃ В«РњРѕРё СЃР»РѕРІР°В» Рё РєРѕР»Р»РµРєС†РёСЏРјРё.
+ * Сводка по словарю пользователя: всего слов и разбивка по статусам (для блока «Мой прогресс»).
+ * Учитываются те же сущности, что и в listMyWords: user_saved_senses (senses) и user_phrase_progress (form_card).
  */
 export async function getMyWordsSummary(username, langCode, db = pool) {
   const u = String(username || "").trim();
@@ -301,7 +301,17 @@ export async function getMyWordsSummary(username, langCode, db = pool) {
   const languageId = await getLanguageId(langCode, db);
   if (!languageId) return { total: 0, queue: 0, learning: 0, known: 0, hard: 0 };
 
-  const res = await db.query(
+  const out = { total: 0, queue: 0, learning: 0, known: 0, hard: 0 };
+  const addStatus = (status, cnt) => {
+    const s = String(status || "").trim().toLowerCase();
+    const n = Number(cnt) || 0;
+    if (["queue", "learning", "known", "hard"].includes(s)) {
+      out[s] = (out[s] || 0) + n;
+      out.total += n;
+    }
+  };
+
+  const senseRes = await db.query(
     `
       SELECT us.status, COUNT(*)::int AS cnt
       FROM user_saved_senses us
@@ -312,16 +322,21 @@ export async function getMyWordsSummary(username, langCode, db = pool) {
     `,
     [u, languageId]
   );
+  for (const row of senseRes.rows) addStatus(row.status, row.cnt);
 
-  const out = { total: 0, queue: 0, learning: 0, known: 0, hard: 0 };
-  for (const row of res.rows) {
-    const status = String(row.status || "").trim().toLowerCase();
-    const cnt = Number(row.cnt) || 0;
-    if (["queue", "learning", "known", "hard"].includes(status)) {
-      out[status] = cnt;
-      out.total += cnt;
-    }
-  }
+  const formCardRes = await db.query(
+    `
+      SELECT p.status, COUNT(*)::int AS cnt
+      FROM user_phrase_progress p
+      JOIN dictionary_form_cards fc ON p.item_type = 'form_card' AND p.item_id = fc.id
+      JOIN dictionary_entries e ON e.id = fc.entry_id AND e.language_id = $2
+      WHERE p.username = $1
+      GROUP BY p.status
+    `,
+    [u, languageId]
+  );
+  for (const row of formCardRes.rows) addStatus(row.status, row.cnt);
+
   return out;
 }
 
@@ -972,13 +987,94 @@ export async function getFormCardById(langCode, cardId, db = pool) {
   };
 }
 
+/**
+ * Создаёт запись в dictionary_entry_links (и при необходимости lemma/sense/example) для entry_id,
+ * если запись в dictionary_entries есть, но связи ещё нет (например слово добавлено после миграции 005).
+ * Возвращает { senseId, lemmaId } или null.
+ */
+async function ensureEntryLink(entryId, langCode, db = pool) {
+  const id = Number(entryId);
+  const languageId = await getLanguageId(langCode, db);
+  if (!Number.isFinite(id) || id <= 0 || !languageId) return null;
+  const entryRes = await db.query(
+    `SELECT id, language_id, en, ru, accent, level, frequency_rank, rarity, register, ipa_uk, ipa_us, example, example_ru
+     FROM dictionary_entries WHERE id = $1 AND language_id = $2`,
+    [id, languageId]
+  );
+  const e = entryRes.rows[0];
+  if (!e) return null;
+  const lemmaKey = String((e.en || "").trim()).toLowerCase();
+  const lemma = String(e.en || "").trim();
+  if (!lemmaKey) return null;
+
+  await db.query(
+    `INSERT INTO dictionary_lemmas (language_id, lemma_key, lemma, frequency_rank, rarity, accent, ipa_uk, ipa_us, updated_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
+     ON CONFLICT (language_id, lemma_key) DO UPDATE SET lemma = EXCLUDED.lemma, frequency_rank = EXCLUDED.frequency_rank,
+       rarity = EXCLUDED.rarity, accent = EXCLUDED.accent, ipa_uk = EXCLUDED.ipa_uk, ipa_us = EXCLUDED.ipa_us, updated_at = NOW()`,
+    [
+      languageId,
+      lemmaKey,
+      lemma,
+      Number(e.frequency_rank) || 15000,
+      String(e.rarity || "редкое").trim(),
+      String(e.accent || "both").trim(),
+      String(e.ipa_uk || "").trim(),
+      String(e.ipa_us || "").trim(),
+    ]
+  );
+  const lemmaRow = await db.query(
+    `SELECT id FROM dictionary_lemmas WHERE language_id = $1 AND lemma_key = $2`,
+    [languageId, lemmaKey]
+  );
+  const lemmaId = lemmaRow.rows[0]?.id;
+  if (!lemmaId) return null;
+
+  await db.query(
+    `INSERT INTO dictionary_senses (lemma_id, sense_no, level, register, gloss_ru, updated_at)
+     VALUES ($1, 1, $2, $3, $4, NOW())
+     ON CONFLICT (lemma_id, sense_no) DO UPDATE SET level = EXCLUDED.level, register = EXCLUDED.register, gloss_ru = EXCLUDED.gloss_ru, updated_at = NOW()`,
+    [lemmaId, String(e.level || "A0").trim(), String(e.register || "разговорная").trim(), String(e.ru || "").trim()]
+  );
+  const senseRow = await db.query(
+    `SELECT id FROM dictionary_senses WHERE lemma_id = $1 AND sense_no = 1`,
+    [lemmaId]
+  );
+  const senseId = senseRow.rows[0]?.id;
+  if (!senseId) return null;
+
+  const exEn = String(e.example || "").trim();
+  const exRu = String(e.example_ru || "").trim();
+  if (exEn || exRu) {
+    await db.query(
+      `INSERT INTO dictionary_examples (sense_id, en, ru, is_main, sort_order) VALUES ($1, $2, $3, TRUE, 0)
+       ON CONFLICT (sense_id, en, ru) DO NOTHING`,
+      [senseId, exEn || "", exRu || ""]
+    );
+  }
+
+  await db.query(
+    `INSERT INTO dictionary_entry_links (entry_id, lemma_id, sense_id, created_at)
+     VALUES ($1, $2, $3, NOW())
+     ON CONFLICT (entry_id) DO UPDATE SET lemma_id = EXCLUDED.lemma_id, sense_id = EXCLUDED.sense_id`,
+    [id, lemmaId, senseId]
+  );
+  return { senseId, lemmaId };
+}
+
 export async function addSavedByEntryId(username, langCode, entryId, source = "manual", db = pool) {
   const u = String(username || "").trim();
   const id = Number(entryId);
   if (!u || !Number.isFinite(id) || id <= 0) return null;
-  const map = await getSenseIdsByEntryIds(langCode, [id], db);
-  const link = map.get(id);
-  if (!link) return null;
+  let map = await getSenseIdsByEntryIds(langCode, [id], db);
+  let link = map.get(id);
+  if (!link) {
+    const created = await ensureEntryLink(id, langCode, db);
+    if (!created) return null;
+    map = await getSenseIdsByEntryIds(langCode, [id], db);
+    link = map.get(id);
+    if (!link) return null;
+  }
   await db.query(
     `
       INSERT INTO user_saved_senses (username, sense_id, status, source, added_at, updated_at)
@@ -1770,9 +1866,7 @@ export async function getTodayPack(username, langCode, db = pool) {
  * @returns {Promise<{ items: Array<{ id: number, itemType: string, itemId: number, entryId: number | null, senseId: number | null, en: string, ru: string, level: string, example: string, exampleRu: string, isSaved: boolean }>, total: number }>}
  */
 export async function listAllWords(username, langCode, opts = {}, db = pool) {
-  // #region agent log
   const languageId = await getLanguageId(langCode, db);
-  if (typeof globalThis.fetch === "function") { globalThis.fetch("http://127.0.0.1:7242/ingest/039ed3c9-0fe6-43d1-a385-bc2c487e240a", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ location: "userDictionaryRepo.js:listAllWords-entry", message: "listAllWords entry", data: { languageId, username: String(username).slice(0, 20), langCode, opts }, timestamp: Date.now(), hypothesisId: "H2" }) }).catch(() => {}); }
   if (!languageId) return { items: [], total: 0 };
   const u = String(username || "").trim();
   const offset = clampInt(opts.offset, 0, 100000, 0);
@@ -1945,10 +2039,7 @@ export async function listAllWords(username, langCode, opts = {}, db = pool) {
     )
   `;
 
-  // #region agent log
   const countParams = [...baseParams, ...searchParams];
-  if (typeof globalThis.fetch === "function") { globalThis.fetch("http://127.0.0.1:7242/ingest/039ed3c9-0fe6-43d1-a385-bc2c487e240a", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ location: "userDictionaryRepo.js:before-count", message: "before count query", data: { countParamsLength: countParams.length, hasSearch }, timestamp: Date.now(), hypothesisId: "H3" }) }).catch(() => {}); }
-  // #endregion
   const countRes = await db.query(
     `
       ${commonCte}
@@ -1959,14 +2050,7 @@ export async function listAllWords(username, langCode, opts = {}, db = pool) {
     countParams
   );
   const total = Number(countRes.rows[0]?.c || 0);
-  // #region agent log
-  if (typeof globalThis.fetch === "function") { globalThis.fetch("http://127.0.0.1:7242/ingest/039ed3c9-0fe6-43d1-a385-bc2c487e240a", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ location: "userDictionaryRepo.js:after-count", message: "after count query", data: { total }, timestamp: Date.now(), hypothesisId: "H3" }) }).catch(() => {}); }
-  // #endregion
-
   const listParams = [...baseParams, ...searchParams, limit, offset];
-  // #region agent log
-  if (typeof globalThis.fetch === "function") { globalThis.fetch("http://127.0.0.1:7242/ingest/039ed3c9-0fe6-43d1-a385-bc2c487e240a", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ location: "userDictionaryRepo.js:before-list", message: "before list query", data: { listParamsLength: listParams.length }, timestamp: Date.now(), hypothesisId: "H4" }) }).catch(() => {}); }
-  // #endregion
   const listRes = await db.query(
     `
       ${commonCte}

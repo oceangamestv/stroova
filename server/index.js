@@ -545,25 +545,15 @@ const routes = {
   },
 
   "GET /api/user-dictionary/all-words": async (req, res, body, url) => {
-    // #region agent log
-    try {
-      const auth = await requireAuthUser(req, res);
-      if (!auth) return;
-      fetch("http://127.0.0.1:7242/ingest/039ed3c9-0fe6-43d1-a385-bc2c487e240a", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ location: "server/index.js:all-words-handler", message: "all-words handler entry", data: { hasAuth: true, username: auth?.user?.username }, timestamp: Date.now(), hypothesisId: "H1" }) }).catch(() => {});
-      const lang = url.searchParams.get("lang") || "en";
-      const offset = parseInt(url.searchParams.get("offset") || "0", 10) || 0;
-      const limit = Math.min(100, Math.max(1, parseInt(url.searchParams.get("limit") || "50", 10) || 50));
-      const q = (url.searchParams.get("q") || "").trim();
-      const opts = { offset, limit, q: q || undefined };
-      fetch("http://127.0.0.1:7242/ingest/039ed3c9-0fe6-43d1-a385-bc2c487e240a", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ location: "server/index.js:before-listAllWords", message: "calling listAllWords", data: { username: auth.user.username, lang, opts }, timestamp: Date.now(), hypothesisId: "H1" }) }).catch(() => {});
-      const out = await listAllWords(auth.user.username, lang, opts);
-      fetch("http://127.0.0.1:7242/ingest/039ed3c9-0fe6-43d1-a385-bc2c487e240a", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ location: "server/index.js:after-listAllWords", message: "listAllWords returned", data: { itemsLength: out?.items?.length, total: out?.total }, timestamp: Date.now(), hypothesisId: "H5" }) }).catch(() => {});
-      send(res, 200, out);
-    } catch (err) {
-      fetch("http://127.0.0.1:7242/ingest/039ed3c9-0fe6-43d1-a385-bc2c487e240a", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ location: "server/index.js:all-words-catch", message: "all-words error", data: { errorMessage: String(err?.message), errorName: err?.name, stack: String(err?.stack).slice(0, 500) }, timestamp: Date.now(), hypothesisId: "H1" }) }).catch(() => {});
-      throw err;
-    }
-    // #endregion
+    const auth = await requireAuthUser(req, res);
+    if (!auth) return;
+    const lang = url.searchParams.get("lang") || "en";
+    const offset = parseInt(url.searchParams.get("offset") || "0", 10) || 0;
+    const limit = Math.min(100, Math.max(1, parseInt(url.searchParams.get("limit") || "50", 10) || 50));
+    const q = (url.searchParams.get("q") || "").trim();
+    const opts = { offset, limit, q: q || undefined };
+    const out = await listAllWords(auth.user.username, lang, opts);
+    send(res, 200, out);
   },
 
   "POST /api/user-dictionary/add": async (req, res, body) => {
