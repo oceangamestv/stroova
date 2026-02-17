@@ -1,0 +1,414 @@
+{
+  "langCode": "en",
+  "collection": {
+    "collectionKey": "a0_basics",
+    "title": "A0: База",
+    "description": "Самые нужные слова для старта.",
+    "levelFrom": "A0",
+    "levelTo": "A0",
+    "isPublic": true,
+    "sortOrder": 10
+  },
+  "items": [
+    {
+      "lemmaKey": "hello",
+      "senseNo": 1,
+      "sortOrder": 0
+    },
+    {
+      "lemmaKey": "hi",
+      "senseNo": 1,
+      "sortOrder": 1
+    },
+    {
+      "lemmaKey": "goodbye",
+      "senseNo": 1,
+      "sortOrder": 2
+    },
+    {
+      "lemmaKey": "bye",
+      "senseNo": 1,
+      "sortOrder": 3
+    },
+    {
+      "lemmaKey": "please",
+      "senseNo": 1,
+      "sortOrder": 4
+    },
+    {
+      "lemmaKey": "thank you",
+      "senseNo": 1,
+      "sortOrder": 5
+    },
+    {
+      "lemmaKey": "sorry",
+      "senseNo": 1,
+      "sortOrder": 6
+    },
+    {
+      "lemmaKey": "okay",
+      "senseNo": 1,
+      "sortOrder": 7
+    },
+    {
+      "lemmaKey": "i",
+      "senseNo": 1,
+      "sortOrder": 8
+    },
+    {
+      "lemmaKey": "you",
+      "senseNo": 1,
+      "sortOrder": 9
+    },
+    {
+      "lemmaKey": "he",
+      "senseNo": 1,
+      "sortOrder": 10
+    },
+    {
+      "lemmaKey": "she",
+      "senseNo": 1,
+      "sortOrder": 11
+    },
+    {
+      "lemmaKey": "it",
+      "senseNo": 1,
+      "sortOrder": 12
+    },
+    {
+      "lemmaKey": "we",
+      "senseNo": 1,
+      "sortOrder": 13
+    },
+    {
+      "lemmaKey": "they",
+      "senseNo": 1,
+      "sortOrder": 14
+    },
+    {
+      "lemmaKey": "me",
+      "senseNo": 1,
+      "sortOrder": 15
+    },
+    {
+      "lemmaKey": "my",
+      "senseNo": 1,
+      "sortOrder": 16
+    },
+    {
+      "lemmaKey": "your",
+      "senseNo": 1,
+      "sortOrder": 17
+    },
+    {
+      "lemmaKey": "his",
+      "senseNo": 1,
+      "sortOrder": 18
+    },
+    {
+      "lemmaKey": "her",
+      "senseNo": 1,
+      "sortOrder": 19
+    },
+    {
+      "lemmaKey": "our",
+      "senseNo": 1,
+      "sortOrder": 20
+    },
+    {
+      "lemmaKey": "their",
+      "senseNo": 1,
+      "sortOrder": 21
+    },
+    {
+      "lemmaKey": "this",
+      "senseNo": 1,
+      "sortOrder": 22
+    },
+    {
+      "lemmaKey": "that",
+      "senseNo": 1,
+      "sortOrder": 23
+    },
+    {
+      "lemmaKey": "here",
+      "senseNo": 1,
+      "sortOrder": 24
+    },
+    {
+      "lemmaKey": "there",
+      "senseNo": 1,
+      "sortOrder": 25
+    },
+    {
+      "lemmaKey": "what",
+      "senseNo": 1,
+      "sortOrder": 26
+    },
+    {
+      "lemmaKey": "who",
+      "senseNo": 1,
+      "sortOrder": 27
+    },
+    {
+      "lemmaKey": "where",
+      "senseNo": 1,
+      "sortOrder": 28
+    },
+    {
+      "lemmaKey": "when",
+      "senseNo": 1,
+      "sortOrder": 29
+    },
+    {
+      "lemmaKey": "how",
+      "senseNo": 1,
+      "sortOrder": 30
+    },
+    {
+      "lemmaKey": "be",
+      "senseNo": 1,
+      "sortOrder": 31
+    },
+    {
+      "lemmaKey": "have",
+      "senseNo": 1,
+      "sortOrder": 32
+    },
+    {
+      "lemmaKey": "do",
+      "senseNo": 1,
+      "sortOrder": 33
+    },
+    {
+      "lemmaKey": "go",
+      "senseNo": 1,
+      "sortOrder": 34
+    },
+    {
+      "lemmaKey": "come",
+      "senseNo": 1,
+      "sortOrder": 35
+    },
+    {
+      "lemmaKey": "like",
+      "senseNo": 1,
+      "sortOrder": 36
+    },
+    {
+      "lemmaKey": "want",
+      "senseNo": 1,
+      "sortOrder": 37
+    },
+    {
+      "lemmaKey": "need",
+      "senseNo": 1,
+      "sortOrder": 38
+    },
+    {
+      "lemmaKey": "see",
+      "senseNo": 1,
+      "sortOrder": 39
+    },
+    {
+      "lemmaKey": "hear",
+      "senseNo": 1,
+      "sortOrder": 40
+    },
+    {
+      "lemmaKey": "say",
+      "senseNo": 1,
+      "sortOrder": 41
+    },
+    {
+      "lemmaKey": "know",
+      "senseNo": 1,
+      "sortOrder": 42
+    },
+    {
+      "lemmaKey": "understand",
+      "senseNo": 1,
+      "sortOrder": 43
+    },
+    {
+      "lemmaKey": "help",
+      "senseNo": 1,
+      "sortOrder": 44
+    },
+    {
+      "lemmaKey": "make",
+      "senseNo": 1,
+      "sortOrder": 45
+    },
+    {
+      "lemmaKey": "one",
+      "senseNo": 1,
+      "sortOrder": 46
+    },
+    {
+      "lemmaKey": "two",
+      "senseNo": 1,
+      "sortOrder": 47
+    },
+    {
+      "lemmaKey": "three",
+      "senseNo": 1,
+      "sortOrder": 48
+    },
+    {
+      "lemmaKey": "four",
+      "senseNo": 1,
+      "sortOrder": 49
+    },
+    {
+      "lemmaKey": "five",
+      "senseNo": 1,
+      "sortOrder": 50
+    },
+    {
+      "lemmaKey": "six",
+      "senseNo": 1,
+      "sortOrder": 51
+    },
+    {
+      "lemmaKey": "seven",
+      "senseNo": 1,
+      "sortOrder": 52
+    },
+    {
+      "lemmaKey": "eight",
+      "senseNo": 1,
+      "sortOrder": 53
+    },
+    {
+      "lemmaKey": "nine",
+      "senseNo": 1,
+      "sortOrder": 54
+    },
+    {
+      "lemmaKey": "ten",
+      "senseNo": 1,
+      "sortOrder": 55
+    },
+    {
+      "lemmaKey": "day",
+      "senseNo": 1,
+      "sortOrder": 56
+    },
+    {
+      "lemmaKey": "night",
+      "senseNo": 1,
+      "sortOrder": 57
+    },
+    {
+      "lemmaKey": "morning",
+      "senseNo": 1,
+      "sortOrder": 58
+    },
+    {
+      "lemmaKey": "evening",
+      "senseNo": 1,
+      "sortOrder": 59
+    },
+    {
+      "lemmaKey": "today",
+      "senseNo": 1,
+      "sortOrder": 60
+    },
+    {
+      "lemmaKey": "tomorrow",
+      "senseNo": 1,
+      "sortOrder": 61
+    },
+    {
+      "lemmaKey": "name",
+      "senseNo": 1,
+      "sortOrder": 62
+    },
+    {
+      "lemmaKey": "friend",
+      "senseNo": 1,
+      "sortOrder": 63
+    },
+    {
+      "lemmaKey": "family",
+      "senseNo": 1,
+      "sortOrder": 64
+    },
+    {
+      "lemmaKey": "mother",
+      "senseNo": 1,
+      "sortOrder": 65
+    },
+    {
+      "lemmaKey": "father",
+      "senseNo": 1,
+      "sortOrder": 66
+    },
+    {
+      "lemmaKey": "child",
+      "senseNo": 1,
+      "sortOrder": 67
+    },
+    {
+      "lemmaKey": "man",
+      "senseNo": 1,
+      "sortOrder": 68
+    },
+    {
+      "lemmaKey": "woman",
+      "senseNo": 1,
+      "sortOrder": 69
+    },
+    {
+      "lemmaKey": "home",
+      "senseNo": 1,
+      "sortOrder": 70
+    },
+    {
+      "lemmaKey": "school",
+      "senseNo": 1,
+      "sortOrder": 71
+    },
+    {
+      "lemmaKey": "work",
+      "senseNo": 1,
+      "sortOrder": 72
+    },
+    {
+      "lemmaKey": "city",
+      "senseNo": 1,
+      "sortOrder": 73
+    },
+    {
+      "lemmaKey": "water",
+      "senseNo": 1,
+      "sortOrder": 74
+    },
+    {
+      "lemmaKey": "book",
+      "senseNo": 1,
+      "sortOrder": 75
+    },
+    {
+      "lemmaKey": "good",
+      "senseNo": 1,
+      "sortOrder": 76
+    },
+    {
+      "lemmaKey": "bad",
+      "senseNo": 1,
+      "sortOrder": 77
+    },
+    {
+      "lemmaKey": "big",
+      "senseNo": 1,
+      "sortOrder": 78
+    },
+    {
+      "lemmaKey": "small",
+      "senseNo": 1,
+      "sortOrder": 79
+    }
+  ]
+}

@@ -134,7 +134,6 @@ git pull
 
 ```bash
 git checkout -- node_modules/.package-lock.json
-git checkout -- deploy.sh
 git pull
 ```
 
