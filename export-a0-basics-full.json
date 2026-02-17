@@ -1,0 +1,2167 @@
+{
+  "langCode": "en",
+  "collection": {
+    "collectionKey": "a0_basics",
+    "title": "A0: База",
+    "description": "Самые нужные слова для старта.",
+    "levelFrom": "A0",
+    "levelTo": "A0",
+    "isPublic": true,
+    "sortOrder": 10
+  },
+  "items": [
+    {
+      "lemmaKey": "hello",
+      "senseNo": 1,
+      "sortOrder": 0
+    },
+    {
+      "lemmaKey": "hi",
+      "senseNo": 1,
+      "sortOrder": 1
+    },
+    {
+      "lemmaKey": "goodbye",
+      "senseNo": 1,
+      "sortOrder": 2
+    },
+    {
+      "lemmaKey": "bye",
+      "senseNo": 1,
+      "sortOrder": 3
+    },
+    {
+      "lemmaKey": "please",
+      "senseNo": 1,
+      "sortOrder": 4
+    },
+    {
+      "lemmaKey": "thank you",
+      "senseNo": 1,
+      "sortOrder": 5
+    },
+    {
+      "lemmaKey": "sorry",
+      "senseNo": 1,
+      "sortOrder": 6
+    },
+    {
+      "lemmaKey": "okay",
+      "senseNo": 1,
+      "sortOrder": 7
+    },
+    {
+      "lemmaKey": "i",
+      "senseNo": 1,
+      "sortOrder": 8
+    },
+    {
+      "lemmaKey": "you",
+      "senseNo": 1,
+      "sortOrder": 9
+    },
+    {
+      "lemmaKey": "he",
+      "senseNo": 1,
+      "sortOrder": 10
+    },
+    {
+      "lemmaKey": "she",
+      "senseNo": 1,
+      "sortOrder": 11
+    },
+    {
+      "lemmaKey": "it",
+      "senseNo": 1,
+      "sortOrder": 12
+    },
+    {
+      "lemmaKey": "we",
+      "senseNo": 1,
+      "sortOrder": 13
+    },
+    {
+      "lemmaKey": "they",
+      "senseNo": 1,
+      "sortOrder": 14
+    },
+    {
+      "lemmaKey": "me",
+      "senseNo": 1,
+      "sortOrder": 15
+    },
+    {
+      "lemmaKey": "my",
+      "senseNo": 1,
+      "sortOrder": 16
+    },
+    {
+      "lemmaKey": "your",
+      "senseNo": 1,
+      "sortOrder": 17
+    },
+    {
+      "lemmaKey": "his",
+      "senseNo": 1,
+      "sortOrder": 18
+    },
+    {
+      "lemmaKey": "her",
+      "senseNo": 1,
+      "sortOrder": 19
+    },
+    {
+      "lemmaKey": "our",
+      "senseNo": 1,
+      "sortOrder": 20
+    },
+    {
+      "lemmaKey": "their",
+      "senseNo": 1,
+      "sortOrder": 21
+    },
+    {
+      "lemmaKey": "this",
+      "senseNo": 1,
+      "sortOrder": 22
+    },
+    {
+      "lemmaKey": "that",
+      "senseNo": 1,
+      "sortOrder": 23
+    },
+    {
+      "lemmaKey": "here",
+      "senseNo": 1,
+      "sortOrder": 24
+    },
+    {
+      "lemmaKey": "there",
+      "senseNo": 1,
+      "sortOrder": 25
+    },
+    {
+      "lemmaKey": "what",
+      "senseNo": 1,
+      "sortOrder": 26
+    },
+    {
+      "lemmaKey": "who",
+      "senseNo": 1,
+      "sortOrder": 27
+    },
+    {
+      "lemmaKey": "where",
+      "senseNo": 1,
+      "sortOrder": 28
+    },
+    {
+      "lemmaKey": "when",
+      "senseNo": 1,
+      "sortOrder": 29
+    },
+    {
+      "lemmaKey": "how",
+      "senseNo": 1,
+      "sortOrder": 30
+    },
+    {
+      "lemmaKey": "be",
+      "senseNo": 1,
+      "sortOrder": 31
+    },
+    {
+      "lemmaKey": "have",
+      "senseNo": 1,
+      "sortOrder": 32
+    },
+    {
+      "lemmaKey": "do",
+      "senseNo": 1,
+      "sortOrder": 33
+    },
+    {
+      "lemmaKey": "go",
+      "senseNo": 1,
+      "sortOrder": 34
+    },
+    {
+      "lemmaKey": "come",
+      "senseNo": 1,
+      "sortOrder": 35
+    },
+    {
+      "lemmaKey": "like",
+      "senseNo": 1,
+      "sortOrder": 36
+    },
+    {
+      "lemmaKey": "want",
+      "senseNo": 1,
+      "sortOrder": 37
+    },
+    {
+      "lemmaKey": "need",
+      "senseNo": 1,
+      "sortOrder": 38
+    },
+    {
+      "lemmaKey": "see",
+      "senseNo": 1,
+      "sortOrder": 39
+    },
+    {
+      "lemmaKey": "hear",
+      "senseNo": 1,
+      "sortOrder": 40
+    },
+    {
+      "lemmaKey": "say",
+      "senseNo": 1,
+      "sortOrder": 41
+    },
+    {
+      "lemmaKey": "know",
+      "senseNo": 1,
+      "sortOrder": 42
+    },
+    {
+      "lemmaKey": "understand",
+      "senseNo": 1,
+      "sortOrder": 43
+    },
+    {
+      "lemmaKey": "help",
+      "senseNo": 1,
+      "sortOrder": 44
+    },
+    {
+      "lemmaKey": "make",
+      "senseNo": 1,
+      "sortOrder": 45
+    },
+    {
+      "lemmaKey": "one",
+      "senseNo": 1,
+      "sortOrder": 46
+    },
+    {
+      "lemmaKey": "two",
+      "senseNo": 1,
+      "sortOrder": 47
+    },
+    {
+      "lemmaKey": "three",
+      "senseNo": 1,
+      "sortOrder": 48
+    },
+    {
+      "lemmaKey": "four",
+      "senseNo": 1,
+      "sortOrder": 49
+    },
+    {
+      "lemmaKey": "five",
+      "senseNo": 1,
+      "sortOrder": 50
+    },
+    {
+      "lemmaKey": "six",
+      "senseNo": 1,
+      "sortOrder": 51
+    },
+    {
+      "lemmaKey": "seven",
+      "senseNo": 1,
+      "sortOrder": 52
+    },
+    {
+      "lemmaKey": "eight",
+      "senseNo": 1,
+      "sortOrder": 53
+    },
+    {
+      "lemmaKey": "nine",
+      "senseNo": 1,
+      "sortOrder": 54
+    },
+    {
+      "lemmaKey": "ten",
+      "senseNo": 1,
+      "sortOrder": 55
+    },
+    {
+      "lemmaKey": "day",
+      "senseNo": 1,
+      "sortOrder": 56
+    },
+    {
+      "lemmaKey": "night",
+      "senseNo": 1,
+      "sortOrder": 57
+    },
+    {
+      "lemmaKey": "morning",
+      "senseNo": 1,
+      "sortOrder": 58
+    },
+    {
+      "lemmaKey": "evening",
+      "senseNo": 1,
+      "sortOrder": 59
+    },
+    {
+      "lemmaKey": "today",
+      "senseNo": 1,
+      "sortOrder": 60
+    },
+    {
+      "lemmaKey": "tomorrow",
+      "senseNo": 1,
+      "sortOrder": 61
+    },
+    {
+      "lemmaKey": "name",
+      "senseNo": 1,
+      "sortOrder": 62
+    },
+    {
+      "lemmaKey": "friend",
+      "senseNo": 1,
+      "sortOrder": 63
+    },
+    {
+      "lemmaKey": "family",
+      "senseNo": 1,
+      "sortOrder": 64
+    },
+    {
+      "lemmaKey": "mother",
+      "senseNo": 1,
+      "sortOrder": 65
+    },
+    {
+      "lemmaKey": "father",
+      "senseNo": 1,
+      "sortOrder": 66
+    },
+    {
+      "lemmaKey": "child",
+      "senseNo": 1,
+      "sortOrder": 67
+    },
+    {
+      "lemmaKey": "man",
+      "senseNo": 1,
+      "sortOrder": 68
+    },
+    {
+      "lemmaKey": "woman",
+      "senseNo": 1,
+      "sortOrder": 69
+    },
+    {
+      "lemmaKey": "home",
+      "senseNo": 1,
+      "sortOrder": 70
+    },
+    {
+      "lemmaKey": "school",
+      "senseNo": 1,
+      "sortOrder": 71
+    },
+    {
+      "lemmaKey": "work",
+      "senseNo": 1,
+      "sortOrder": 72
+    },
+    {
+      "lemmaKey": "city",
+      "senseNo": 1,
+      "sortOrder": 73
+    },
+    {
+      "lemmaKey": "water",
+      "senseNo": 1,
+      "sortOrder": 74
+    },
+    {
+      "lemmaKey": "book",
+      "senseNo": 1,
+      "sortOrder": 75
+    },
+    {
+      "lemmaKey": "good",
+      "senseNo": 1,
+      "sortOrder": 76
+    },
+    {
+      "lemmaKey": "bad",
+      "senseNo": 1,
+      "sortOrder": 77
+    },
+    {
+      "lemmaKey": "big",
+      "senseNo": 1,
+      "sortOrder": 78
+    },
+    {
+      "lemmaKey": "small",
+      "senseNo": 1,
+      "sortOrder": 79
+    }
+  ],
+  "dictionary": {
+    "lemmas": [
+      {
+        "lemmaKey": "thank you",
+        "lemma": "thank you",
+        "pos": "",
+        "frequencyRank": 6,
+        "rarity": "не редкое",
+        "accent": "both",
+        "ipaUk": "",
+        "ipaUs": ""
+      },
+      {
+        "lemmaKey": "sorry",
+        "lemma": "sorry",
+        "pos": "",
+        "frequencyRank": 7,
+        "rarity": "не редкое",
+        "accent": "both",
+        "ipaUk": "",
+        "ipaUs": ""
+      },
+      {
+        "lemmaKey": "okay",
+        "lemma": "okay",
+        "pos": "",
+        "frequencyRank": 8,
+        "rarity": "не редкое",
+        "accent": "both",
+        "ipaUk": "",
+        "ipaUs": ""
+      },
+      {
+        "lemmaKey": "i",
+        "lemma": "I",
+        "pos": "",
+        "frequencyRank": 9,
+        "rarity": "не редкое",
+        "accent": "both",
+        "ipaUk": "",
+        "ipaUs": ""
+      },
+      {
+        "lemmaKey": "you",
+        "lemma": "you",
+        "pos": "",
+        "frequencyRank": 10,
+        "rarity": "не редкое",
+        "accent": "both",
+        "ipaUk": "",
+        "ipaUs": ""
+      },
+      {
+        "lemmaKey": "he",
+        "lemma": "he",
+        "pos": "",
+        "frequencyRank": 11,
+        "rarity": "не редкое",
+        "accent": "both",
+        "ipaUk": "",
+        "ipaUs": ""
+      },
+      {
+        "lemmaKey": "she",
+        "lemma": "she",
+        "pos": "",
+        "frequencyRank": 12,
+        "rarity": "не редкое",
+        "accent": "both",
+        "ipaUk": "",
+        "ipaUs": ""
+      },
+      {
+        "lemmaKey": "it",
+        "lemma": "it",
+        "pos": "",
+        "frequencyRank": 13,
+        "rarity": "не редкое",
+        "accent": "both",
+        "ipaUk": "",
+        "ipaUs": ""
+      },
+      {
+        "lemmaKey": "we",
+        "lemma": "we",
+        "pos": "",
+        "frequencyRank": 14,
+        "rarity": "не редкое",
+        "accent": "both",
+        "ipaUk": "",
+        "ipaUs": ""
+      },
+      {
+        "lemmaKey": "they",
+        "lemma": "they",
+        "pos": "",
+        "frequencyRank": 15,
+        "rarity": "не редкое",
+        "accent": "both",
+        "ipaUk": "",
+        "ipaUs": ""
+      },
+      {
+        "lemmaKey": "me",
+        "lemma": "me",
+        "pos": "",
+        "frequencyRank": 16,
+        "rarity": "не редкое",
+        "accent": "both",
+        "ipaUk": "",
+        "ipaUs": ""
+      },
+      {
+        "lemmaKey": "my",
+        "lemma": "my",
+        "pos": "",
+        "frequencyRank": 17,
+        "rarity": "не редкое",
+        "accent": "both",
+        "ipaUk": "",
+        "ipaUs": ""
+      },
+      {
+        "lemmaKey": "your",
+        "lemma": "your",
+        "pos": "",
+        "frequencyRank": 18,
+        "rarity": "не редкое",
+        "accent": "both",
+        "ipaUk": "",
+        "ipaUs": ""
+      },
+      {
+        "lemmaKey": "his",
+        "lemma": "his",
+        "pos": "",
+        "frequencyRank": 19,
+        "rarity": "не редкое",
+        "accent": "both",
+        "ipaUk": "",
+        "ipaUs": ""
+      },
+      {
+        "lemmaKey": "her",
+        "lemma": "her",
+        "pos": "",
+        "frequencyRank": 20,
+        "rarity": "не редкое",
+        "accent": "both",
+        "ipaUk": "",
+        "ipaUs": ""
+      },
+      {
+        "lemmaKey": "our",
+        "lemma": "our",
+        "pos": "",
+        "frequencyRank": 21,
+        "rarity": "не редкое",
+        "accent": "both",
+        "ipaUk": "",
+        "ipaUs": ""
+      },
+      {
+        "lemmaKey": "their",
+        "lemma": "their",
+        "pos": "",
+        "frequencyRank": 22,
+        "rarity": "не редкое",
+        "accent": "both",
+        "ipaUk": "",
+        "ipaUs": ""
+      },
+      {
+        "lemmaKey": "this",
+        "lemma": "this",
+        "pos": "",
+        "frequencyRank": 23,
+        "rarity": "не редкое",
+        "accent": "both",
+        "ipaUk": "",
+        "ipaUs": ""
+      },
+      {
+        "lemmaKey": "that",
+        "lemma": "that",
+        "pos": "",
+        "frequencyRank": 24,
+        "rarity": "не редкое",
+        "accent": "both",
+        "ipaUk": "",
+        "ipaUs": ""
+      },
+      {
+        "lemmaKey": "here",
+        "lemma": "here",
+        "pos": "",
+        "frequencyRank": 25,
+        "rarity": "не редкое",
+        "accent": "both",
+        "ipaUk": "",
+        "ipaUs": ""
+      },
+      {
+        "lemmaKey": "there",
+        "lemma": "there",
+        "pos": "",
+        "frequencyRank": 26,
+        "rarity": "не редкое",
+        "accent": "both",
+        "ipaUk": "",
+        "ipaUs": ""
+      },
+      {
+        "lemmaKey": "what",
+        "lemma": "what",
+        "pos": "",
+        "frequencyRank": 27,
+        "rarity": "не редкое",
+        "accent": "both",
+        "ipaUk": "",
+        "ipaUs": ""
+      },
+      {
+        "lemmaKey": "who",
+        "lemma": "who",
+        "pos": "",
+        "frequencyRank": 28,
+        "rarity": "не редкое",
+        "accent": "both",
+        "ipaUk": "",
+        "ipaUs": ""
+      },
+      {
+        "lemmaKey": "where",
+        "lemma": "where",
+        "pos": "",
+        "frequencyRank": 29,
+        "rarity": "не редкое",
+        "accent": "both",
+        "ipaUk": "",
+        "ipaUs": ""
+      },
+      {
+        "lemmaKey": "when",
+        "lemma": "when",
+        "pos": "",
+        "frequencyRank": 30,
+        "rarity": "не редкое",
+        "accent": "both",
+        "ipaUk": "",
+        "ipaUs": ""
+      },
+      {
+        "lemmaKey": "how",
+        "lemma": "how",
+        "pos": "",
+        "frequencyRank": 31,
+        "rarity": "не редкое",
+        "accent": "both",
+        "ipaUk": "",
+        "ipaUs": ""
+      },
+      {
+        "lemmaKey": "be",
+        "lemma": "be",
+        "pos": "",
+        "frequencyRank": 32,
+        "rarity": "не редкое",
+        "accent": "both",
+        "ipaUk": "",
+        "ipaUs": ""
+      },
+      {
+        "lemmaKey": "have",
+        "lemma": "have",
+        "pos": "",
+        "frequencyRank": 33,
+        "rarity": "не редкое",
+        "accent": "both",
+        "ipaUk": "",
+        "ipaUs": ""
+      },
+      {
+        "lemmaKey": "go",
+        "lemma": "go",
+        "pos": "",
+        "frequencyRank": 35,
+        "rarity": "не редкое",
+        "accent": "both",
+        "ipaUk": "",
+        "ipaUs": ""
+      },
+      {
+        "lemmaKey": "come",
+        "lemma": "come",
+        "pos": "",
+        "frequencyRank": 36,
+        "rarity": "не редкое",
+        "accent": "both",
+        "ipaUk": "",
+        "ipaUs": ""
+      },
+      {
+        "lemmaKey": "like",
+        "lemma": "like",
+        "pos": "",
+        "frequencyRank": 37,
+        "rarity": "не редкое",
+        "accent": "both",
+        "ipaUk": "",
+        "ipaUs": ""
+      },
+      {
+        "lemmaKey": "want",
+        "lemma": "want",
+        "pos": "",
+        "frequencyRank": 38,
+        "rarity": "не редкое",
+        "accent": "both",
+        "ipaUk": "",
+        "ipaUs": ""
+      },
+      {
+        "lemmaKey": "need",
+        "lemma": "need",
+        "pos": "",
+        "frequencyRank": 39,
+        "rarity": "не редкое",
+        "accent": "both",
+        "ipaUk": "",
+        "ipaUs": ""
+      },
+      {
+        "lemmaKey": "see",
+        "lemma": "see",
+        "pos": "",
+        "frequencyRank": 40,
+        "rarity": "не редкое",
+        "accent": "both",
+        "ipaUk": "",
+        "ipaUs": ""
+      },
+      {
+        "lemmaKey": "hear",
+        "lemma": "hear",
+        "pos": "",
+        "frequencyRank": 41,
+        "rarity": "не редкое",
+        "accent": "both",
+        "ipaUk": "",
+        "ipaUs": ""
+      },
+      {
+        "lemmaKey": "say",
+        "lemma": "say",
+        "pos": "",
+        "frequencyRank": 42,
+        "rarity": "не редкое",
+        "accent": "both",
+        "ipaUk": "",
+        "ipaUs": ""
+      },
+      {
+        "lemmaKey": "know",
+        "lemma": "know",
+        "pos": "",
+        "frequencyRank": 43,
+        "rarity": "не редкое",
+        "accent": "both",
+        "ipaUk": "",
+        "ipaUs": ""
+      },
+      {
+        "lemmaKey": "understand",
+        "lemma": "understand",
+        "pos": "",
+        "frequencyRank": 44,
+        "rarity": "не редкое",
+        "accent": "both",
+        "ipaUk": "",
+        "ipaUs": ""
+      },
+      {
+        "lemmaKey": "help",
+        "lemma": "help",
+        "pos": "",
+        "frequencyRank": 45,
+        "rarity": "не редкое",
+        "accent": "both",
+        "ipaUk": "",
+        "ipaUs": ""
+      },
+      {
+        "lemmaKey": "make",
+        "lemma": "make",
+        "pos": "",
+        "frequencyRank": 46,
+        "rarity": "не редкое",
+        "accent": "both",
+        "ipaUk": "",
+        "ipaUs": ""
+      },
+      {
+        "lemmaKey": "one",
+        "lemma": "one",
+        "pos": "",
+        "frequencyRank": 47,
+        "rarity": "не редкое",
+        "accent": "both",
+        "ipaUk": "",
+        "ipaUs": ""
+      },
+      {
+        "lemmaKey": "two",
+        "lemma": "two",
+        "pos": "",
+        "frequencyRank": 48,
+        "rarity": "не редкое",
+        "accent": "both",
+        "ipaUk": "",
+        "ipaUs": ""
+      },
+      {
+        "lemmaKey": "three",
+        "lemma": "three",
+        "pos": "",
+        "frequencyRank": 49,
+        "rarity": "не редкое",
+        "accent": "both",
+        "ipaUk": "",
+        "ipaUs": ""
+      },
+      {
+        "lemmaKey": "four",
+        "lemma": "four",
+        "pos": "",
+        "frequencyRank": 50,
+        "rarity": "не редкое",
+        "accent": "both",
+        "ipaUk": "",
+        "ipaUs": ""
+      },
+      {
+        "lemmaKey": "five",
+        "lemma": "five",
+        "pos": "",
+        "frequencyRank": 51,
+        "rarity": "не редкое",
+        "accent": "both",
+        "ipaUk": "",
+        "ipaUs": ""
+      },
+      {
+        "lemmaKey": "six",
+        "lemma": "six",
+        "pos": "",
+        "frequencyRank": 52,
+        "rarity": "не редкое",
+        "accent": "both",
+        "ipaUk": "",
+        "ipaUs": ""
+      },
+      {
+        "lemmaKey": "seven",
+        "lemma": "seven",
+        "pos": "",
+        "frequencyRank": 53,
+        "rarity": "не редкое",
+        "accent": "both",
+        "ipaUk": "",
+        "ipaUs": ""
+      },
+      {
+        "lemmaKey": "eight",
+        "lemma": "eight",
+        "pos": "",
+        "frequencyRank": 54,
+        "rarity": "не редкое",
+        "accent": "both",
+        "ipaUk": "",
+        "ipaUs": ""
+      },
+      {
+        "lemmaKey": "nine",
+        "lemma": "nine",
+        "pos": "",
+        "frequencyRank": 55,
+        "rarity": "не редкое",
+        "accent": "both",
+        "ipaUk": "",
+        "ipaUs": ""
+      },
+      {
+        "lemmaKey": "ten",
+        "lemma": "ten",
+        "pos": "",
+        "frequencyRank": 56,
+        "rarity": "не редкое",
+        "accent": "both",
+        "ipaUk": "",
+        "ipaUs": ""
+      },
+      {
+        "lemmaKey": "day",
+        "lemma": "day",
+        "pos": "",
+        "frequencyRank": 57,
+        "rarity": "не редкое",
+        "accent": "both",
+        "ipaUk": "",
+        "ipaUs": ""
+      },
+      {
+        "lemmaKey": "night",
+        "lemma": "night",
+        "pos": "",
+        "frequencyRank": 58,
+        "rarity": "не редкое",
+        "accent": "both",
+        "ipaUk": "",
+        "ipaUs": ""
+      },
+      {
+        "lemmaKey": "morning",
+        "lemma": "morning",
+        "pos": "",
+        "frequencyRank": 59,
+        "rarity": "не редкое",
+        "accent": "both",
+        "ipaUk": "",
+        "ipaUs": ""
+      },
+      {
+        "lemmaKey": "evening",
+        "lemma": "evening",
+        "pos": "",
+        "frequencyRank": 60,
+        "rarity": "не редкое",
+        "accent": "both",
+        "ipaUk": "",
+        "ipaUs": ""
+      },
+      {
+        "lemmaKey": "today",
+        "lemma": "today",
+        "pos": "",
+        "frequencyRank": 61,
+        "rarity": "не редкое",
+        "accent": "both",
+        "ipaUk": "",
+        "ipaUs": ""
+      },
+      {
+        "lemmaKey": "tomorrow",
+        "lemma": "tomorrow",
+        "pos": "",
+        "frequencyRank": 62,
+        "rarity": "не редкое",
+        "accent": "both",
+        "ipaUk": "",
+        "ipaUs": ""
+      },
+      {
+        "lemmaKey": "name",
+        "lemma": "name",
+        "pos": "",
+        "frequencyRank": 63,
+        "rarity": "не редкое",
+        "accent": "both",
+        "ipaUk": "",
+        "ipaUs": ""
+      },
+      {
+        "lemmaKey": "friend",
+        "lemma": "friend",
+        "pos": "",
+        "frequencyRank": 64,
+        "rarity": "не редкое",
+        "accent": "both",
+        "ipaUk": "",
+        "ipaUs": ""
+      },
+      {
+        "lemmaKey": "family",
+        "lemma": "family",
+        "pos": "",
+        "frequencyRank": 65,
+        "rarity": "не редкое",
+        "accent": "both",
+        "ipaUk": "",
+        "ipaUs": ""
+      },
+      {
+        "lemmaKey": "mother",
+        "lemma": "mother",
+        "pos": "",
+        "frequencyRank": 66,
+        "rarity": "не редкое",
+        "accent": "both",
+        "ipaUk": "",
+        "ipaUs": ""
+      },
+      {
+        "lemmaKey": "father",
+        "lemma": "father",
+        "pos": "",
+        "frequencyRank": 67,
+        "rarity": "не редкое",
+        "accent": "both",
+        "ipaUk": "",
+        "ipaUs": ""
+      },
+      {
+        "lemmaKey": "child",
+        "lemma": "child",
+        "pos": "",
+        "frequencyRank": 68,
+        "rarity": "не редкое",
+        "accent": "both",
+        "ipaUk": "",
+        "ipaUs": ""
+      },
+      {
+        "lemmaKey": "man",
+        "lemma": "man",
+        "pos": "",
+        "frequencyRank": 69,
+        "rarity": "не редкое",
+        "accent": "both",
+        "ipaUk": "",
+        "ipaUs": ""
+      },
+      {
+        "lemmaKey": "woman",
+        "lemma": "woman",
+        "pos": "",
+        "frequencyRank": 70,
+        "rarity": "не редкое",
+        "accent": "both",
+        "ipaUk": "",
+        "ipaUs": ""
+      },
+      {
+        "lemmaKey": "do",
+        "lemma": "do",
+        "pos": "",
+        "frequencyRank": 34,
+        "rarity": "не редкое",
+        "accent": "both",
+        "ipaUk": "/dˈuː/",
+        "ipaUs": "/dˈuː/"
+      },
+      {
+        "lemmaKey": "hi",
+        "lemma": "hi",
+        "pos": "",
+        "frequencyRank": 2,
+        "rarity": "не редкое",
+        "accent": "both",
+        "ipaUk": "/hˈaɪ/",
+        "ipaUs": "/hˈaɪ/"
+      },
+      {
+        "lemmaKey": "bye",
+        "lemma": "bye",
+        "pos": "",
+        "frequencyRank": 4,
+        "rarity": "не редкое",
+        "accent": "both",
+        "ipaUk": "/bˈaɪ/",
+        "ipaUs": "/bˈaɪ/"
+      },
+      {
+        "lemmaKey": "home",
+        "lemma": "home",
+        "pos": "",
+        "frequencyRank": 71,
+        "rarity": "не редкое",
+        "accent": "both",
+        "ipaUk": "",
+        "ipaUs": ""
+      },
+      {
+        "lemmaKey": "school",
+        "lemma": "school",
+        "pos": "",
+        "frequencyRank": 72,
+        "rarity": "не редкое",
+        "accent": "both",
+        "ipaUk": "",
+        "ipaUs": ""
+      },
+      {
+        "lemmaKey": "work",
+        "lemma": "work",
+        "pos": "",
+        "frequencyRank": 73,
+        "rarity": "не редкое",
+        "accent": "both",
+        "ipaUk": "",
+        "ipaUs": ""
+      },
+      {
+        "lemmaKey": "city",
+        "lemma": "city",
+        "pos": "",
+        "frequencyRank": 74,
+        "rarity": "не редкое",
+        "accent": "both",
+        "ipaUk": "",
+        "ipaUs": ""
+      },
+      {
+        "lemmaKey": "water",
+        "lemma": "water",
+        "pos": "",
+        "frequencyRank": 75,
+        "rarity": "не редкое",
+        "accent": "both",
+        "ipaUk": "",
+        "ipaUs": ""
+      },
+      {
+        "lemmaKey": "book",
+        "lemma": "book",
+        "pos": "",
+        "frequencyRank": 76,
+        "rarity": "не редкое",
+        "accent": "both",
+        "ipaUk": "",
+        "ipaUs": ""
+      },
+      {
+        "lemmaKey": "good",
+        "lemma": "good",
+        "pos": "",
+        "frequencyRank": 77,
+        "rarity": "не редкое",
+        "accent": "both",
+        "ipaUk": "",
+        "ipaUs": ""
+      },
+      {
+        "lemmaKey": "bad",
+        "lemma": "bad",
+        "pos": "",
+        "frequencyRank": 78,
+        "rarity": "не редкое",
+        "accent": "both",
+        "ipaUk": "",
+        "ipaUs": ""
+      },
+      {
+        "lemmaKey": "goodbye",
+        "lemma": "goodbye",
+        "pos": "",
+        "frequencyRank": 3,
+        "rarity": "не редкое",
+        "accent": "both",
+        "ipaUk": "/ɡʊdbˈaɪ/",
+        "ipaUs": "/ɡʊdbˈaɪ/"
+      },
+      {
+        "lemmaKey": "hello",
+        "lemma": "hello",
+        "pos": "",
+        "frequencyRank": 1,
+        "rarity": "не редкое",
+        "accent": "both",
+        "ipaUk": "/həlˈoʊ/",
+        "ipaUs": "/həlˈoʊ/"
+      },
+      {
+        "lemmaKey": "big",
+        "lemma": "big",
+        "pos": "",
+        "frequencyRank": 79,
+        "rarity": "не редкое",
+        "accent": "both",
+        "ipaUk": "/bˈɪɡ/",
+        "ipaUs": "/bˈɪɡ/"
+      },
+      {
+        "lemmaKey": "small",
+        "lemma": "small",
+        "pos": "",
+        "frequencyRank": 80,
+        "rarity": "не редкое",
+        "accent": "both",
+        "ipaUk": "/smˈɔːl/",
+        "ipaUs": "/smˈɔːl/"
+      },
+      {
+        "lemmaKey": "please",
+        "lemma": "please",
+        "pos": "",
+        "frequencyRank": 5,
+        "rarity": "не редкое",
+        "accent": "both",
+        "ipaUk": "/plˈiːz/",
+        "ipaUs": "/plˈiːz/"
+      }
+    ],
+    "senses": [
+      {
+        "lemmaKey": "thank you",
+        "senseNo": 1,
+        "level": "A0",
+        "register": "разговорная",
+        "glossRu": "спасибо",
+        "definitionRu": "",
+        "usageNote": ""
+      },
+      {
+        "lemmaKey": "sorry",
+        "senseNo": 1,
+        "level": "A0",
+        "register": "разговорная",
+        "glossRu": "извините",
+        "definitionRu": "",
+        "usageNote": ""
+      },
+      {
+        "lemmaKey": "okay",
+        "senseNo": 1,
+        "level": "A0",
+        "register": "разговорная",
+        "glossRu": "хорошо",
+        "definitionRu": "",
+        "usageNote": ""
+      },
+      {
+        "lemmaKey": "do",
+        "senseNo": 1,
+        "level": "A0",
+        "register": "разговорная",
+        "glossRu": "делать",
+        "definitionRu": "выполнять какое-либо действие или задачу.",
+        "usageNote": ""
+      },
+      {
+        "lemmaKey": "when",
+        "senseNo": 2,
+        "level": "A1",
+        "register": "разговорная",
+        "glossRu": "когда",
+        "definitionRu": "используется для указания на момент, в который что-то произошло.",
+        "usageNote": ""
+      },
+      {
+        "lemmaKey": "good",
+        "senseNo": 1,
+        "level": "A0",
+        "register": "разговорная",
+        "glossRu": "хороший",
+        "definitionRu": "",
+        "usageNote": ""
+      },
+      {
+        "lemmaKey": "bad",
+        "senseNo": 1,
+        "level": "A0",
+        "register": "разговорная",
+        "glossRu": "плохой",
+        "definitionRu": "",
+        "usageNote": ""
+      },
+      {
+        "lemmaKey": "i",
+        "senseNo": 1,
+        "level": "A0",
+        "register": "разговорная",
+        "glossRu": "я",
+        "definitionRu": "",
+        "usageNote": ""
+      },
+      {
+        "lemmaKey": "you",
+        "senseNo": 1,
+        "level": "A0",
+        "register": "разговорная",
+        "glossRu": "ты",
+        "definitionRu": "",
+        "usageNote": ""
+      },
+      {
+        "lemmaKey": "he",
+        "senseNo": 1,
+        "level": "A0",
+        "register": "разговорная",
+        "glossRu": "он",
+        "definitionRu": "",
+        "usageNote": ""
+      },
+      {
+        "lemmaKey": "she",
+        "senseNo": 1,
+        "level": "A0",
+        "register": "разговорная",
+        "glossRu": "она",
+        "definitionRu": "",
+        "usageNote": ""
+      },
+      {
+        "lemmaKey": "it",
+        "senseNo": 1,
+        "level": "A0",
+        "register": "разговорная",
+        "glossRu": "оно",
+        "definitionRu": "",
+        "usageNote": ""
+      },
+      {
+        "lemmaKey": "we",
+        "senseNo": 1,
+        "level": "A0",
+        "register": "разговорная",
+        "glossRu": "мы",
+        "definitionRu": "",
+        "usageNote": ""
+      },
+      {
+        "lemmaKey": "they",
+        "senseNo": 1,
+        "level": "A0",
+        "register": "разговорная",
+        "glossRu": "они",
+        "definitionRu": "",
+        "usageNote": ""
+      },
+      {
+        "lemmaKey": "me",
+        "senseNo": 1,
+        "level": "A0",
+        "register": "разговорная",
+        "glossRu": "мне",
+        "definitionRu": "",
+        "usageNote": ""
+      },
+      {
+        "lemmaKey": "my",
+        "senseNo": 1,
+        "level": "A0",
+        "register": "разговорная",
+        "glossRu": "мой",
+        "definitionRu": "",
+        "usageNote": ""
+      },
+      {
+        "lemmaKey": "your",
+        "senseNo": 1,
+        "level": "A0",
+        "register": "разговорная",
+        "glossRu": "твой",
+        "definitionRu": "",
+        "usageNote": ""
+      },
+      {
+        "lemmaKey": "his",
+        "senseNo": 1,
+        "level": "A0",
+        "register": "разговорная",
+        "glossRu": "его",
+        "definitionRu": "",
+        "usageNote": ""
+      },
+      {
+        "lemmaKey": "her",
+        "senseNo": 1,
+        "level": "A0",
+        "register": "разговорная",
+        "glossRu": "её",
+        "definitionRu": "",
+        "usageNote": ""
+      },
+      {
+        "lemmaKey": "do",
+        "senseNo": 2,
+        "level": "A1",
+        "register": "разговорная",
+        "glossRu": "исполнять",
+        "definitionRu": "выполнять что-то в соответствии с заданием или планом.",
+        "usageNote": ""
+      },
+      {
+        "lemmaKey": "do",
+        "senseNo": 3,
+        "level": "A2",
+        "register": "разговорная",
+        "glossRu": "совершать",
+        "definitionRu": "совершать какое-либо действие.",
+        "usageNote": ""
+      },
+      {
+        "lemmaKey": "our",
+        "senseNo": 1,
+        "level": "A0",
+        "register": "разговорная",
+        "glossRu": "наш",
+        "definitionRu": "",
+        "usageNote": ""
+      },
+      {
+        "lemmaKey": "hello",
+        "senseNo": 2,
+        "level": "A0",
+        "register": "разговорная",
+        "glossRu": "здравствуй",
+        "definitionRu": "",
+        "usageNote": ""
+      },
+      {
+        "lemmaKey": "their",
+        "senseNo": 1,
+        "level": "A0",
+        "register": "разговорная",
+        "glossRu": "их",
+        "definitionRu": "",
+        "usageNote": ""
+      },
+      {
+        "lemmaKey": "this",
+        "senseNo": 1,
+        "level": "A0",
+        "register": "разговорная",
+        "glossRu": "это",
+        "definitionRu": "",
+        "usageNote": ""
+      },
+      {
+        "lemmaKey": "that",
+        "senseNo": 1,
+        "level": "A0",
+        "register": "разговорная",
+        "glossRu": "то",
+        "definitionRu": "",
+        "usageNote": ""
+      },
+      {
+        "lemmaKey": "here",
+        "senseNo": 1,
+        "level": "A0",
+        "register": "разговорная",
+        "glossRu": "здесь",
+        "definitionRu": "",
+        "usageNote": ""
+      },
+      {
+        "lemmaKey": "there",
+        "senseNo": 1,
+        "level": "A0",
+        "register": "разговорная",
+        "glossRu": "там",
+        "definitionRu": "",
+        "usageNote": ""
+      },
+      {
+        "lemmaKey": "hello",
+        "senseNo": 1,
+        "level": "A0",
+        "register": "разговорная",
+        "glossRu": "привет",
+        "definitionRu": "",
+        "usageNote": ""
+      },
+      {
+        "lemmaKey": "what",
+        "senseNo": 1,
+        "level": "A0",
+        "register": "разговорная",
+        "glossRu": "что",
+        "definitionRu": "",
+        "usageNote": ""
+      },
+      {
+        "lemmaKey": "who",
+        "senseNo": 1,
+        "level": "A0",
+        "register": "разговорная",
+        "glossRu": "кто",
+        "definitionRu": "",
+        "usageNote": ""
+      },
+      {
+        "lemmaKey": "where",
+        "senseNo": 1,
+        "level": "A0",
+        "register": "разговорная",
+        "glossRu": "где",
+        "definitionRu": "",
+        "usageNote": ""
+      },
+      {
+        "lemmaKey": "when",
+        "senseNo": 1,
+        "level": "A0",
+        "register": "разговорная",
+        "glossRu": "когда",
+        "definitionRu": "используется для обозначения времени, в котором происходит действие.",
+        "usageNote": ""
+      },
+      {
+        "lemmaKey": "how",
+        "senseNo": 1,
+        "level": "A0",
+        "register": "разговорная",
+        "glossRu": "как",
+        "definitionRu": "",
+        "usageNote": ""
+      },
+      {
+        "lemmaKey": "be",
+        "senseNo": 1,
+        "level": "A0",
+        "register": "разговорная",
+        "glossRu": "быть",
+        "definitionRu": "",
+        "usageNote": ""
+      },
+      {
+        "lemmaKey": "have",
+        "senseNo": 1,
+        "level": "A0",
+        "register": "разговорная",
+        "glossRu": "иметь",
+        "definitionRu": "",
+        "usageNote": ""
+      },
+      {
+        "lemmaKey": "go",
+        "senseNo": 1,
+        "level": "A0",
+        "register": "разговорная",
+        "glossRu": "идти",
+        "definitionRu": "",
+        "usageNote": ""
+      },
+      {
+        "lemmaKey": "come",
+        "senseNo": 1,
+        "level": "A0",
+        "register": "разговорная",
+        "glossRu": "приходить",
+        "definitionRu": "",
+        "usageNote": ""
+      },
+      {
+        "lemmaKey": "like",
+        "senseNo": 1,
+        "level": "A0",
+        "register": "разговорная",
+        "glossRu": "нравиться",
+        "definitionRu": "",
+        "usageNote": ""
+      },
+      {
+        "lemmaKey": "want",
+        "senseNo": 1,
+        "level": "A0",
+        "register": "разговорная",
+        "glossRu": "хотеть",
+        "definitionRu": "",
+        "usageNote": ""
+      },
+      {
+        "lemmaKey": "need",
+        "senseNo": 1,
+        "level": "A0",
+        "register": "разговорная",
+        "glossRu": "нуждаться",
+        "definitionRu": "",
+        "usageNote": ""
+      },
+      {
+        "lemmaKey": "see",
+        "senseNo": 1,
+        "level": "A0",
+        "register": "разговорная",
+        "glossRu": "видеть",
+        "definitionRu": "",
+        "usageNote": ""
+      },
+      {
+        "lemmaKey": "hear",
+        "senseNo": 1,
+        "level": "A0",
+        "register": "разговорная",
+        "glossRu": "слышать",
+        "definitionRu": "",
+        "usageNote": ""
+      },
+      {
+        "lemmaKey": "say",
+        "senseNo": 1,
+        "level": "A0",
+        "register": "разговорная",
+        "glossRu": "говорить",
+        "definitionRu": "",
+        "usageNote": ""
+      },
+      {
+        "lemmaKey": "know",
+        "senseNo": 1,
+        "level": "A0",
+        "register": "разговорная",
+        "glossRu": "знать",
+        "definitionRu": "",
+        "usageNote": ""
+      },
+      {
+        "lemmaKey": "understand",
+        "senseNo": 1,
+        "level": "A0",
+        "register": "разговорная",
+        "glossRu": "понимать",
+        "definitionRu": "",
+        "usageNote": ""
+      },
+      {
+        "lemmaKey": "help",
+        "senseNo": 1,
+        "level": "A0",
+        "register": "разговорная",
+        "glossRu": "помогать",
+        "definitionRu": "",
+        "usageNote": ""
+      },
+      {
+        "lemmaKey": "make",
+        "senseNo": 1,
+        "level": "A0",
+        "register": "разговорная",
+        "glossRu": "делать",
+        "definitionRu": "",
+        "usageNote": ""
+      },
+      {
+        "lemmaKey": "one",
+        "senseNo": 1,
+        "level": "A0",
+        "register": "разговорная",
+        "glossRu": "один",
+        "definitionRu": "",
+        "usageNote": ""
+      },
+      {
+        "lemmaKey": "two",
+        "senseNo": 1,
+        "level": "A0",
+        "register": "разговорная",
+        "glossRu": "два",
+        "definitionRu": "",
+        "usageNote": ""
+      },
+      {
+        "lemmaKey": "three",
+        "senseNo": 1,
+        "level": "A0",
+        "register": "разговорная",
+        "glossRu": "три",
+        "definitionRu": "",
+        "usageNote": ""
+      },
+      {
+        "lemmaKey": "four",
+        "senseNo": 1,
+        "level": "A0",
+        "register": "разговорная",
+        "glossRu": "четыре",
+        "definitionRu": "",
+        "usageNote": ""
+      },
+      {
+        "lemmaKey": "five",
+        "senseNo": 1,
+        "level": "A0",
+        "register": "разговорная",
+        "glossRu": "пять",
+        "definitionRu": "",
+        "usageNote": ""
+      },
+      {
+        "lemmaKey": "six",
+        "senseNo": 1,
+        "level": "A0",
+        "register": "разговорная",
+        "glossRu": "шесть",
+        "definitionRu": "",
+        "usageNote": ""
+      },
+      {
+        "lemmaKey": "seven",
+        "senseNo": 1,
+        "level": "A0",
+        "register": "разговорная",
+        "glossRu": "семь",
+        "definitionRu": "",
+        "usageNote": ""
+      },
+      {
+        "lemmaKey": "eight",
+        "senseNo": 1,
+        "level": "A0",
+        "register": "разговорная",
+        "glossRu": "восемь",
+        "definitionRu": "",
+        "usageNote": ""
+      },
+      {
+        "lemmaKey": "big",
+        "senseNo": 1,
+        "level": "A0",
+        "register": "разговорная",
+        "glossRu": "большой",
+        "definitionRu": "имеющий значительные размеры или величину.",
+        "usageNote": ""
+      },
+      {
+        "lemmaKey": "small",
+        "senseNo": 1,
+        "level": "A0",
+        "register": "разговорная",
+        "glossRu": "маленький",
+        "definitionRu": "обозначает что-то, имеющее небольшой размер.",
+        "usageNote": ""
+      },
+      {
+        "lemmaKey": "please",
+        "senseNo": 1,
+        "level": "A0",
+        "register": "разговорная",
+        "glossRu": "пожалуйста",
+        "definitionRu": "вежливый способ сделать просьбу или запрос.",
+        "usageNote": ""
+      },
+      {
+        "lemmaKey": "nine",
+        "senseNo": 1,
+        "level": "A0",
+        "register": "разговорная",
+        "glossRu": "девять",
+        "definitionRu": "",
+        "usageNote": ""
+      },
+      {
+        "lemmaKey": "ten",
+        "senseNo": 1,
+        "level": "A0",
+        "register": "разговорная",
+        "glossRu": "десять",
+        "definitionRu": "",
+        "usageNote": ""
+      },
+      {
+        "lemmaKey": "day",
+        "senseNo": 1,
+        "level": "A0",
+        "register": "разговорная",
+        "glossRu": "день",
+        "definitionRu": "",
+        "usageNote": ""
+      },
+      {
+        "lemmaKey": "night",
+        "senseNo": 1,
+        "level": "A0",
+        "register": "разговорная",
+        "glossRu": "ночь",
+        "definitionRu": "",
+        "usageNote": ""
+      },
+      {
+        "lemmaKey": "morning",
+        "senseNo": 1,
+        "level": "A0",
+        "register": "разговорная",
+        "glossRu": "утро",
+        "definitionRu": "",
+        "usageNote": ""
+      },
+      {
+        "lemmaKey": "evening",
+        "senseNo": 1,
+        "level": "A0",
+        "register": "разговорная",
+        "glossRu": "вечер",
+        "definitionRu": "",
+        "usageNote": ""
+      },
+      {
+        "lemmaKey": "today",
+        "senseNo": 1,
+        "level": "A0",
+        "register": "разговорная",
+        "glossRu": "сегодня",
+        "definitionRu": "",
+        "usageNote": ""
+      },
+      {
+        "lemmaKey": "tomorrow",
+        "senseNo": 1,
+        "level": "A0",
+        "register": "разговорная",
+        "glossRu": "завтра",
+        "definitionRu": "",
+        "usageNote": ""
+      },
+      {
+        "lemmaKey": "name",
+        "senseNo": 1,
+        "level": "A0",
+        "register": "разговорная",
+        "glossRu": "имя",
+        "definitionRu": "",
+        "usageNote": ""
+      },
+      {
+        "lemmaKey": "friend",
+        "senseNo": 1,
+        "level": "A0",
+        "register": "разговорная",
+        "glossRu": "друг",
+        "definitionRu": "",
+        "usageNote": ""
+      },
+      {
+        "lemmaKey": "family",
+        "senseNo": 1,
+        "level": "A0",
+        "register": "разговорная",
+        "glossRu": "семья",
+        "definitionRu": "",
+        "usageNote": ""
+      },
+      {
+        "lemmaKey": "mother",
+        "senseNo": 1,
+        "level": "A0",
+        "register": "разговорная",
+        "glossRu": "мама",
+        "definitionRu": "",
+        "usageNote": ""
+      },
+      {
+        "lemmaKey": "father",
+        "senseNo": 1,
+        "level": "A0",
+        "register": "разговорная",
+        "glossRu": "папа",
+        "definitionRu": "",
+        "usageNote": ""
+      },
+      {
+        "lemmaKey": "child",
+        "senseNo": 1,
+        "level": "A0",
+        "register": "разговорная",
+        "glossRu": "ребёнок",
+        "definitionRu": "",
+        "usageNote": ""
+      },
+      {
+        "lemmaKey": "man",
+        "senseNo": 1,
+        "level": "A0",
+        "register": "разговорная",
+        "glossRu": "мужчина",
+        "definitionRu": "",
+        "usageNote": ""
+      },
+      {
+        "lemmaKey": "woman",
+        "senseNo": 1,
+        "level": "A0",
+        "register": "разговорная",
+        "glossRu": "женщина",
+        "definitionRu": "",
+        "usageNote": ""
+      },
+      {
+        "lemmaKey": "hi",
+        "senseNo": 1,
+        "level": "A0",
+        "register": "разговорная",
+        "glossRu": "привет",
+        "definitionRu": "неформальное приветствие.",
+        "usageNote": ""
+      },
+      {
+        "lemmaKey": "bye",
+        "senseNo": 1,
+        "level": "A0",
+        "register": "разговорная",
+        "glossRu": "пока",
+        "definitionRu": "выражение прощания.",
+        "usageNote": ""
+      },
+      {
+        "lemmaKey": "home",
+        "senseNo": 1,
+        "level": "A0",
+        "register": "разговорная",
+        "glossRu": "дом",
+        "definitionRu": "",
+        "usageNote": ""
+      },
+      {
+        "lemmaKey": "school",
+        "senseNo": 1,
+        "level": "A0",
+        "register": "разговорная",
+        "glossRu": "школа",
+        "definitionRu": "",
+        "usageNote": ""
+      },
+      {
+        "lemmaKey": "work",
+        "senseNo": 1,
+        "level": "A0",
+        "register": "разговорная",
+        "glossRu": "работа",
+        "definitionRu": "",
+        "usageNote": ""
+      },
+      {
+        "lemmaKey": "city",
+        "senseNo": 1,
+        "level": "A0",
+        "register": "разговорная",
+        "glossRu": "город",
+        "definitionRu": "",
+        "usageNote": ""
+      },
+      {
+        "lemmaKey": "water",
+        "senseNo": 1,
+        "level": "A0",
+        "register": "разговорная",
+        "glossRu": "вода",
+        "definitionRu": "",
+        "usageNote": ""
+      },
+      {
+        "lemmaKey": "book",
+        "senseNo": 1,
+        "level": "A0",
+        "register": "разговорная",
+        "glossRu": "книга",
+        "definitionRu": "",
+        "usageNote": ""
+      },
+      {
+        "lemmaKey": "goodbye",
+        "senseNo": 1,
+        "level": "A0",
+        "register": "разговорная",
+        "glossRu": "до свидания",
+        "definitionRu": "",
+        "usageNote": ""
+      }
+    ],
+    "examples": [
+      {
+        "lemmaKey": "when",
+        "senseNo": 1,
+        "en": "Do you remember when we met?",
+        "ru": "Ты помнишь, когда мы встретились?",
+        "isMain": false,
+        "sortOrder": 0
+      },
+      {
+        "lemmaKey": "when",
+        "senseNo": 2,
+        "en": "She called me when she arrived.",
+        "ru": "Она позвонила мне, когда приехала.",
+        "isMain": false,
+        "sortOrder": 0
+      },
+      {
+        "lemmaKey": "do",
+        "senseNo": 1,
+        "en": "I need to do the dishes.",
+        "ru": "Мне нужно помыть посуду.",
+        "isMain": false,
+        "sortOrder": 0
+      },
+      {
+        "lemmaKey": "do",
+        "senseNo": 1,
+        "en": "What do you want to do?",
+        "ru": "Что ты хочешь сделать?",
+        "isMain": true,
+        "sortOrder": 0
+      },
+      {
+        "lemmaKey": "hi",
+        "senseNo": 1,
+        "en": "Hi, how are you?",
+        "ru": "Привет, как дела?",
+        "isMain": true,
+        "sortOrder": 0
+      },
+      {
+        "lemmaKey": "bye",
+        "senseNo": 1,
+        "en": "I said bye before leaving.",
+        "ru": "Я сказал пока перед уходом.",
+        "isMain": true,
+        "sortOrder": 0
+      },
+      {
+        "lemmaKey": "goodbye",
+        "senseNo": 1,
+        "en": "I said goodbye to my friends.",
+        "ru": "Я попрощался с друзьями.",
+        "isMain": true,
+        "sortOrder": 0
+      },
+      {
+        "lemmaKey": "hello",
+        "senseNo": 1,
+        "en": "Hello, how are you?",
+        "ru": "Привет, как дела?",
+        "isMain": true,
+        "sortOrder": 0
+      },
+      {
+        "lemmaKey": "hello",
+        "senseNo": 2,
+        "en": "Hello, nice to meet you!",
+        "ru": "Здравствуйте, приятно познакомиться!",
+        "isMain": false,
+        "sortOrder": 0
+      },
+      {
+        "lemmaKey": "big",
+        "senseNo": 1,
+        "en": "The big dog barked loudly.",
+        "ru": "Большая собака громко лаяла.",
+        "isMain": true,
+        "sortOrder": 0
+      },
+      {
+        "lemmaKey": "small",
+        "senseNo": 1,
+        "en": "The cat is small.",
+        "ru": "Кошка маленькая.",
+        "isMain": true,
+        "sortOrder": 0
+      },
+      {
+        "lemmaKey": "please",
+        "senseNo": 1,
+        "en": "Could you please help me?",
+        "ru": "Не могли бы вы мне помочь?",
+        "isMain": true,
+        "sortOrder": 0
+      }
+    ],
+    "forms": [
+      {
+        "lemmaKey": "do",
+        "form": "does",
+        "formType": "third_person_singular",
+        "isIrregular": true,
+        "notes": ""
+      },
+      {
+        "lemmaKey": "do",
+        "form": "done",
+        "formType": "past_participle",
+        "isIrregular": true,
+        "notes": ""
+      },
+      {
+        "lemmaKey": "do",
+        "form": "did",
+        "formType": "past",
+        "isIrregular": true,
+        "notes": ""
+      },
+      {
+        "lemmaKey": "do",
+        "form": "doing",
+        "formType": "ing",
+        "isIrregular": false,
+        "notes": ""
+      },
+      {
+        "lemmaKey": "big",
+        "form": "biggest",
+        "formType": "superlative",
+        "isIrregular": true,
+        "notes": ""
+      },
+      {
+        "lemmaKey": "big",
+        "form": "bigger",
+        "formType": "comparative",
+        "isIrregular": true,
+        "notes": ""
+      },
+      {
+        "lemmaKey": "small",
+        "form": "smalls",
+        "formType": "plural",
+        "isIrregular": false,
+        "notes": ""
+      },
+      {
+        "lemmaKey": "small",
+        "form": "smallest",
+        "formType": "superlative",
+        "isIrregular": false,
+        "notes": ""
+      },
+      {
+        "lemmaKey": "small",
+        "form": "smaller",
+        "formType": "comparative",
+        "isIrregular": false,
+        "notes": ""
+      },
+      {
+        "lemmaKey": "please",
+        "form": "pleased",
+        "formType": "past_participle",
+        "isIrregular": false,
+        "notes": ""
+      },
+      {
+        "lemmaKey": "please",
+        "form": "pleased",
+        "formType": "past",
+        "isIrregular": false,
+        "notes": ""
+      },
+      {
+        "lemmaKey": "please",
+        "form": "pleasing",
+        "formType": "ing",
+        "isIrregular": false,
+        "notes": ""
+      },
+      {
+        "lemmaKey": "please",
+        "form": "pleases",
+        "formType": "third_person_singular",
+        "isIrregular": false,
+        "notes": ""
+      }
+    ]
+  }
+}
