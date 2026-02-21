@@ -36,6 +36,7 @@ MIGRATIONS=(
   "server/migrations/005_dictionary_normalized_v2.sql"
   "server/migrations/006_dictionary_review_and_admin_v2.sql"
   "server/migrations/007_dictionary_audit_log.sql"
+  "server/migrations/008_internal_dictionary_sync_queue.sql"
 )
 
 for f in "${MIGRATIONS[@]}"; do

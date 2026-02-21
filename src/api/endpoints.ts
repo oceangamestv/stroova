@@ -36,6 +36,10 @@ import type {
   DictionaryUnifiedItemType,
   AdminDictionaryCollectionsListResponse,
   AdminDictionaryCollectionItemsResponse,
+  AdminDictionaryCreateEntryRequest,
+  AdminDictionaryCreateEntryResponse,
+  AdminDictionaryBulkAddCollectionItemsRequest,
+  AdminDictionaryBulkAddCollectionItemsResponse,
 } from "./types";
 import { api } from "./client";
 
@@ -254,6 +258,8 @@ export const adminDictionaryApi = {
   },
   patchEntry: (body: { lang?: string; id: number; patch: Partial<Word> }) =>
     api.patch<{ entry: Word }>(`/admin/dictionary/entry`, body),
+  createEntry: (body: AdminDictionaryCreateEntryRequest) =>
+    api.post<AdminDictionaryCreateEntryResponse>(`/admin/dictionary/entry/create`, body),
   getEntryV2: (params: { lang?: string; id: number }) => {
     const search = new URLSearchParams();
     if (params?.lang) search.set("lang", params.lang);
@@ -382,6 +388,8 @@ export const adminDictionaryApi = {
     itemId?: number;
     sortOrder?: number;
   }) => api.post<{ ok: boolean; item?: { id: number; collectionId: number; senseId: number; sortOrder: number } }>(`/admin/collections/item/add`, body),
+  addCollectionItemsBulk: (body: AdminDictionaryBulkAddCollectionItemsRequest) =>
+    api.post<AdminDictionaryBulkAddCollectionItemsResponse>(`/admin/collections/items/add-bulk`, body),
   removeCollectionItem: (body: {
     lang?: string;
     collectionId: number;

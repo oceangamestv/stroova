@@ -66,3 +66,21 @@ psql -U stroova -d stroova -f server/migrations/001_dictionary_frequency_rarity_
 - `dictionary_entry_links` — связка старых `dictionary_entries.id` с (lemma,sense)
 
 Миграция делает первичную синхронизацию из `dictionary_entries` в новые таблицы (идемпотентно).
+
+---
+
+## 008_internal_dictionary_sync_queue.sql
+
+**Назначение:** добавить очередь внутренних задач синхронизации словаря для RF/DE схемы.
+
+Добавляется таблица:
+
+- `internal_dictionary_sync_jobs` — входящие задачи от DE-сервиса с идемпотентностью по `request_id`, статусами обработки и результатом.
+
+Статусы:
+- `pending`
+- `processing`
+- `success`
+- `failed`
+
+Миграция идемпотентна (`IF NOT EXISTS`), повторный запуск безопасен.

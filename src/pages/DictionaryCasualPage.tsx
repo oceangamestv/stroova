@@ -1067,7 +1067,7 @@ const DictionaryCasualPage: React.FC = () => {
             )}
           </div>
 
-          {!!user && tab !== "collections" && (
+          {!!user && (
             <div className="dict-progress-block dict-progress-block--top">
               <div className="dict-progress-block__head">
                 <h3 className="dict-progress-block__title">Твой прогресс</h3>
@@ -1124,29 +1124,25 @@ const DictionaryCasualPage: React.FC = () => {
             </div>
           )}
 
-          <div className="dict-casual-tabs dict-casual-tabs--inline">
-            <button type="button" className={`dictionary-tab ${tab === "today" ? "active" : ""}`} onClick={() => setTab("today")}>
-              Сегодня
-            </button>
-            <button type="button" className={`dictionary-tab ${tab === "my" ? "active" : ""}`} onClick={() => setTab("my")}>
-              Мои слова
-            </button>
-            <button type="button" className={`dictionary-tab ${tab === "collections" ? "active" : ""}`} onClick={() => setTab("collections")}>
-              Коллекции
-            </button>
-          </div>
-
-          {tab === "today" && (
-            <section className="dict-casual-section">
-              {todayError && <div className="dictionary-error-banner" style={{ padding: "10px 12px" }}>{todayError}</div>}
-              <div className="dict-today-toolbar">
-                <button type="button" className={`dictionary-tab ${todayContentMode === "words" ? "active" : ""}`} onClick={() => setTodayContentMode("words")}>
-                  Слова
+          <div className="dict-casual-desktop-layout">
+            <aside className="dict-casual-sidebar" aria-label="Разделы словаря">
+              <div className="dict-casual-tabs dict-casual-tabs--inline">
+                <button type="button" className={`dictionary-tab ${tab === "today" ? "active" : ""}`} onClick={() => setTab("today")}>
+                  Сегодня
                 </button>
-                <button type="button" className={`dictionary-tab ${todayContentMode === "phrases" ? "active" : ""}`} onClick={() => setTodayContentMode("phrases")}>
-                  Фразы
+                <button type="button" className={`dictionary-tab ${tab === "my" ? "active" : ""}`} onClick={() => setTab("my")}>
+                  Мои слова
+                </button>
+                <button type="button" className={`dictionary-tab ${tab === "collections" ? "active" : ""}`} onClick={() => setTab("collections")}>
+                  Коллекции
                 </button>
               </div>
+            </aside>
+
+            <div className="dict-casual-desktop-content">
+              {tab === "today" && (
+            <section className="dict-casual-section">
+              {todayError && <div className="dictionary-error-banner" style={{ padding: "10px 12px" }}>{todayError}</div>}
 
               {todayContentMode === "phrases" && (
                 <>
@@ -1184,106 +1180,155 @@ const DictionaryCasualPage: React.FC = () => {
               {todayContentMode === "words" && todaySubView === "home" && (
                 <>
                   <div className="dict-hero dict-hero-carousel">
-                    {/* Мобильная шапка: для «Новые слова» — огонь с двух сторон; для «Повторение» — иконка повторения с двух сторон */}
-                    <div className={`dict-hero-carousel__mobile-header ${heroCarouselSlide === 1 ? "dict-hero-carousel__mobile-header--repeat" : ""}`}>
-                      <div className="dict-hero-carousel__mobile-header-inner">
-                        {heroCarouselSlide === 0 ? (
-                          <span className="dict-hero-carousel__fire" aria-hidden>🔥</span>
-                        ) : (
-                          <span className="dict-hero-carousel__repeat-emoji" aria-hidden>♻️</span>
-                        )}
-                        <span className="dict-hero-carousel__slide-title">
-                          {heroCarouselSlide === 0 ? "Новые слова" : "Повторение"}
-                        </span>
-                        {heroCarouselSlide === 0 ? (
-                          <span className="dict-hero-carousel__fire" aria-hidden>🔥</span>
-                        ) : (
-                          <span className="dict-hero-carousel__repeat-emoji" aria-hidden>♻️</span>
-                        )}
-                      </div>
-                    </div>
-                    {/* Полоска таймера (мобильная версия): 15 сек, по окончании — переворот */}
-                    {isMobile && todayState !== "loading" && (
-                      <div className="dict-hero-carousel__timer-wrap">
-                        <div
-                          key={heroTimerKey}
-                          className="dict-hero-carousel__timer-bar"
-                          onAnimationEnd={() => {
-                            setHeroCarouselSlide((s) => (s === 0 ? 1 : 0));
-                            setHeroTimerKey((k) => k + 1);
-                          }}
-                        />
-                      </div>
-                    )}
-                    {todayState === "loading" && (
-                      <div className="dict-hero-carousel__loading">Загрузка…</div>
-                    )}
-                    {todayState !== "loading" && (
-                      <div className="dict-hero-carousel__panel-wrap" key={heroCarouselSlide}>
-                        <div className="dict-hero-carousel__panel" role="tabpanel">
-                          {heroCarouselSlide === 0 ? (
-                            todayNew.length === 0 ? (
-                              <p className="dict-hero-carousel__empty">Нет новых слов на сегодня. Загляните завтра или откройте коллекции.</p>
-                            ) : (
-                              <ul className="dict-hero-words dict-hero-words--new">
-                                {todayNew.slice(0, 5).map((it) => (
-                                  <li key={it.entryId ?? it.senseId}>
-                                    <button
-                                      type="button"
-                                      className="dict-hero-word"
-                                      onClick={() => navigate(`/dictionary/word/${Number(it.senseId)}`)}
-                                    >
-                                      <span className="dict-hero-word__split">
-                                        <span className="dict-hero-word__part dict-hero-word__part--en">
-                                          <span className="dict-hero-word__en">{it.en}</span>
-                                        </span>
-                                        <span className="dict-hero-word__part dict-hero-word__part--ru">
-                                          <span className="dict-hero-word__ru">{it.ru ?? "—"}</span>
-                                        </span>
-                                      </span>
-                                      <span className="dict-hero-word__right">
-                                        {it.level && <span className={`dict-hero-word__level dict-hero-word__level--${it.level}`}>{it.level}</span>}
-                                        <span className="dict-hero-word__chev" aria-hidden>→</span>
-                                      </span>
-                                    </button>
-                                  </li>
-                                ))}
-                              </ul>
-                            )
-                          ) : todayDue.length === 0 ? (
-                            <p className="dict-hero-carousel__empty">Нет слов на повтор. Возьмите новые слова или загляните завтра.</p>
-                          ) : (
-                            <ul className="dict-hero-words dict-hero-words--repeat">
-                              {(todayDue.slice(0, 5) as Array<{ senseId?: number; en?: string; ru?: string; level?: string }>).map((it, idx) => (
-                                <li key={it.senseId ?? idx}>
-                                  <button
-                                    type="button"
-                                    className="dict-hero-word"
-                                    onClick={() => navigate(`/dictionary/word/${Number(it.senseId)}`)}
-                                  >
-                                    <span className="dict-hero-word__split">
-                                      <span className="dict-hero-word__part dict-hero-word__part--en">
-                                        <span className="dict-hero-word__en">{it.en ?? ""}</span>
-                                      </span>
-                                      <span className="dict-hero-word__part dict-hero-word__part--ru">
-                                        <span className="dict-hero-word__ru">{it.ru ?? "—"}</span>
-                                      </span>
-                                    </span>
-                                    <span className="dict-hero-word__right">
-                                      {it.level && <span className={`dict-hero-word__level dict-hero-word__level--${it.level}`}>{it.level}</span>}
-                                      <span className="dict-hero-word__chev" aria-hidden>→</span>
-                                    </span>
-                                  </button>
-                                </li>
-                              ))}
-                            </ul>
-                          )}
+                    {/* Если нет новых слов — показываем только блок «Повторение» (без карсели и таймера) */}
+                    {todayNew.length === 0 ? (
+                      <>
+                        <div className="dict-hero-carousel__mobile-header dict-hero-carousel__mobile-header--repeat">
+                          <div className="dict-hero-carousel__mobile-header-inner">
+                            <span className="dict-hero-carousel__repeat-emoji" aria-hidden>♻️</span>
+                            <span className="dict-hero-carousel__slide-title">Повторение</span>
+                            <span className="dict-hero-carousel__repeat-emoji" aria-hidden>♻️</span>
+                          </div>
                         </div>
-                      </div>
+                        {todayState === "loading" && (
+                          <div className="dict-hero-carousel__loading">Загрузка…</div>
+                        )}
+                        {todayState !== "loading" && (
+                          <div className="dict-hero-carousel__panel-wrap">
+                            <div className="dict-hero-carousel__panel" role="tabpanel">
+                              {todayDue.length === 0 ? (
+                                <p className="dict-hero-carousel__empty">Нет слов на повтор. Возьмите новые слова или загляните завтра.</p>
+                              ) : (
+                                <ul className="dict-hero-words dict-hero-words--repeat">
+                                  {(todayDue.slice(0, 5) as Array<{ senseId?: number; en?: string; ru?: string; level?: string }>).map((it, idx) => (
+                                    <li key={it.senseId ?? idx}>
+                                      <button
+                                        type="button"
+                                        className="dict-hero-word"
+                                        onClick={() => navigate(`/dictionary/word/${Number(it.senseId)}`)}
+                                      >
+                                        <span className="dict-hero-word__split">
+                                          <span className="dict-hero-word__part dict-hero-word__part--en">
+                                            <span className="dict-hero-word__en">{it.en ?? ""}</span>
+                                          </span>
+                                          <span className="dict-hero-word__part dict-hero-word__part--ru">
+                                            <span className="dict-hero-word__ru">{it.ru ?? "—"}</span>
+                                          </span>
+                                        </span>
+                                        <span className="dict-hero-word__right">
+                                          {it.level && <span className={`dict-hero-word__level dict-hero-word__level--${it.level}`}>{it.level}</span>}
+                                          <span className="dict-hero-word__chev" aria-hidden>→</span>
+                                        </span>
+                                      </button>
+                                    </li>
+                                  ))}
+                                </ul>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <>
+                        {/* Мобильная шапка: для «Новые слова» — огонь; для «Повторение» — иконка повторения */}
+                        <div className={`dict-hero-carousel__mobile-header ${heroCarouselSlide === 1 ? "dict-hero-carousel__mobile-header--repeat" : ""}`}>
+                          <div className="dict-hero-carousel__mobile-header-inner">
+                            {heroCarouselSlide === 0 ? (
+                              <span className="dict-hero-carousel__fire" aria-hidden>🔥</span>
+                            ) : (
+                              <span className="dict-hero-carousel__repeat-emoji" aria-hidden>♻️</span>
+                            )}
+                            <span className="dict-hero-carousel__slide-title">
+                              {heroCarouselSlide === 0 ? "Новые слова" : "Повторение"}
+                            </span>
+                            {heroCarouselSlide === 0 ? (
+                              <span className="dict-hero-carousel__fire" aria-hidden>🔥</span>
+                            ) : (
+                              <span className="dict-hero-carousel__repeat-emoji" aria-hidden>♻️</span>
+                            )}
+                          </div>
+                        </div>
+                        {/* Полоска таймера: 15 сек, по окончании — переворот */}
+                        {todayState !== "loading" && (
+                          <div className="dict-hero-carousel__timer-wrap">
+                            <div
+                              key={heroTimerKey}
+                              className="dict-hero-carousel__timer-bar"
+                              onAnimationEnd={() => {
+                                setHeroCarouselSlide((s) => (s === 0 ? 1 : 0));
+                                setHeroTimerKey((k) => k + 1);
+                              }}
+                            />
+                          </div>
+                        )}
+                        {todayState === "loading" && (
+                          <div className="dict-hero-carousel__loading">Загрузка…</div>
+                        )}
+                        {todayState !== "loading" && (
+                          <div className="dict-hero-carousel__panel-wrap" key={heroCarouselSlide}>
+                            <div className="dict-hero-carousel__panel" role="tabpanel">
+                              {heroCarouselSlide === 0 ? (
+                                <ul className="dict-hero-words dict-hero-words--new">
+                                  {todayNew.slice(0, 5).map((it) => (
+                                    <li key={it.entryId ?? it.senseId}>
+                                      <button
+                                        type="button"
+                                        className="dict-hero-word"
+                                        onClick={() => navigate(`/dictionary/word/${Number(it.senseId)}`)}
+                                      >
+                                        <span className="dict-hero-word__split">
+                                          <span className="dict-hero-word__part dict-hero-word__part--en">
+                                            <span className="dict-hero-word__en">{it.en}</span>
+                                          </span>
+                                          <span className="dict-hero-word__part dict-hero-word__part--ru">
+                                            <span className="dict-hero-word__ru">{it.ru ?? "—"}</span>
+                                          </span>
+                                        </span>
+                                        <span className="dict-hero-word__right">
+                                          {it.level && <span className={`dict-hero-word__level dict-hero-word__level--${it.level}`}>{it.level}</span>}
+                                          <span className="dict-hero-word__chev" aria-hidden>→</span>
+                                        </span>
+                                      </button>
+                                    </li>
+                                  ))}
+                                </ul>
+                              ) : todayDue.length === 0 ? (
+                                <p className="dict-hero-carousel__empty">Нет слов на повтор. Возьмите новые слова или загляните завтра.</p>
+                              ) : (
+                                <ul className="dict-hero-words dict-hero-words--repeat">
+                                  {(todayDue.slice(0, 5) as Array<{ senseId?: number; en?: string; ru?: string; level?: string }>).map((it, idx) => (
+                                    <li key={it.senseId ?? idx}>
+                                      <button
+                                        type="button"
+                                        className="dict-hero-word"
+                                        onClick={() => navigate(`/dictionary/word/${Number(it.senseId)}`)}
+                                      >
+                                        <span className="dict-hero-word__split">
+                                          <span className="dict-hero-word__part dict-hero-word__part--en">
+                                            <span className="dict-hero-word__en">{it.en ?? ""}</span>
+                                          </span>
+                                          <span className="dict-hero-word__part dict-hero-word__part--ru">
+                                            <span className="dict-hero-word__ru">{it.ru ?? "—"}</span>
+                                          </span>
+                                        </span>
+                                        <span className="dict-hero-word__right">
+                                          {it.level && <span className={`dict-hero-word__level dict-hero-word__level--${it.level}`}>{it.level}</span>}
+                                          <span className="dict-hero-word__chev" aria-hidden>→</span>
+                                        </span>
+                                      </button>
+                                    </li>
+                                  ))}
+                                </ul>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </>
                     )}
                   </div>
 
-                  {/* Блок «Сложное слово дня» — 1 слово из top-2000, зафиксированное на день сервером */}
+                  {/* Блок «Сложное слово дня» — показываем только если есть слово */}
+                  {hardOfDay && (
                   <div className="dict-hero dict-hard-block">
                     <div className="dict-hard-block__header">
                       <div className="dict-hard-block__header-inner">
@@ -1293,12 +1338,7 @@ const DictionaryCasualPage: React.FC = () => {
                       </div>
                     </div>
                     <div className="dict-hard-block__panel">
-                      {!hardOfDay ? (
-                        <div className="dict-hard-block__empty-wrap">
-                          <p className="dict-hero-carousel__empty">Сегодня сложное слово не найдено.</p>
-                          <p className="dict-hard-block__empty-sub">Проверь позже — подберём из top-2000.</p>
-                        </div>
-                      ) : (() => {
+                      {(() => {
                         const difficultyType = String(hardOfDay?.difficultyType || "");
                         const reasonClass =
                           difficultyType === "pronunciation"
@@ -1342,6 +1382,7 @@ const DictionaryCasualPage: React.FC = () => {
                       })()}
                     </div>
                   </div>
+                  )}
                 </>
               )}
 
@@ -1435,17 +1476,9 @@ const DictionaryCasualPage: React.FC = () => {
             </section>
           )}
 
-          {tab === "my" && (
-            <section className="dict-casual-section">
+              {tab === "my" && (
+            <section className="dict-casual-section dict-casual-section--my">
               {myError && <div className="dictionary-error-banner" style={{ padding: "10px 12px" }}>{myError}</div>}
-              <div className="dict-today-toolbar">
-                <button type="button" className={`dictionary-tab ${myContentMode === "words" ? "active" : ""}`} onClick={() => setMyContentMode("words")}>
-                  Слова
-                </button>
-                <button type="button" className={`dictionary-tab ${myContentMode === "phrases" ? "active" : ""}`} onClick={() => setMyContentMode("phrases")}>
-                  Фразы
-                </button>
-              </div>
 
               {/* Desktop: full toolbar; mobile: hidden, use icon bar + sheet instead */}
               <div className="dict-my-toolbar dict-my-toolbar--desktop">
@@ -1628,7 +1661,7 @@ const DictionaryCasualPage: React.FC = () => {
             </section>
           )}
 
-          {tab === "collections" && (
+              {tab === "collections" && (
             <section className="dict-casual-section">
               {collectionsError && <div className="dictionary-error-banner" style={{ padding: "10px 12px" }}>{collectionsError}</div>}
               <div className="dict-collections">
@@ -1671,6 +1704,9 @@ const DictionaryCasualPage: React.FC = () => {
               {collectionsState === "loading" && <div className="dict-empty">Загрузка…</div>}
             </section>
           )}
+            </div>
+          </div>
+
           {!!user && startProfileModalOpen && (
             <div className="dict-modal dict-modal--in-card" role="dialog" aria-modal="true">
               <div className="dict-modal__backdrop" />

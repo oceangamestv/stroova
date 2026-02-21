@@ -1015,6 +1015,85 @@ export async function deleteSenseAdmin(langCode, senseId, actorUsername) {
 }
 
 /**
+ * Batch upsert dictionary entries by EN key for internal service-to-service sync.
+ * Uses (language_id, en) uniqueness and updates mutable fields on conflict.
+ */
+export async function upsertDictionaryEntriesBatch(langCode, entries, actorUsername = null, db = pool) {
+  const lang = String(langCode || "en").trim() || "en";
+  const langResult = await db.query("SELECT id FROM languages WHERE code = $1", [lang]);
+  if (langResult.rows.length === 0) {
+    throw new Error(`Unknown language: ${lang}`);
+  }
+  const languageId = langResult.rows[0].id;
+
+  const list = Array.isArray(entries) ? entries : [];
+  let inserted = 0;
+  let updated = 0;
+  let skipped = 0;
+
+  for (const item of list) {
+    const en = String(item?.en || "").trim();
+    if (!en) {
+      skipped++;
+      continue;
+    }
+    const ru = String(item?.ru || "").trim();
+    const accent = normalizeAccent(item?.accent);
+    const level = normalizeLevel(item?.level);
+    const frequencyRank = Number.isFinite(Number(item?.frequencyRank)) ? Number(item.frequencyRank) : 15000;
+    const rarity = normalizeRarity(item?.rarity);
+    const register = normalizeRegister(item?.register);
+    const ipaUk = String(item?.ipaUk || "").trim();
+    const ipaUs = String(item?.ipaUs || "").trim();
+    const example = String(item?.example || "");
+    const exampleRu = String(item?.exampleRu || "");
+
+    const res = await db.query(
+      `
+        INSERT INTO dictionary_entries
+          (language_id, en, ru, accent, level, frequency_rank, rarity, register, ipa_uk, ipa_us, example, example_ru)
+        VALUES
+          ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+        ON CONFLICT (language_id, en) DO UPDATE SET
+          ru = EXCLUDED.ru,
+          accent = EXCLUDED.accent,
+          level = EXCLUDED.level,
+          frequency_rank = EXCLUDED.frequency_rank,
+          rarity = EXCLUDED.rarity,
+          register = EXCLUDED.register,
+          ipa_uk = EXCLUDED.ipa_uk,
+          ipa_us = EXCLUDED.ipa_us,
+          example = EXCLUDED.example,
+          example_ru = EXCLUDED.example_ru
+        RETURNING
+          id, en, ru, accent, level,
+          frequency_rank AS "frequencyRank",
+          rarity, register,
+          ipa_uk AS "ipaUk", ipa_us AS "ipaUs",
+          example, example_ru AS "exampleRu",
+          (xmax = 0) AS inserted
+      `,
+      [languageId, en, ru, accent, level, frequencyRank, rarity, register, ipaUk, ipaUs, example, exampleRu]
+    );
+
+    const row = res.rows[0];
+    if (!row) continue;
+    if (row.inserted) inserted++;
+    else updated++;
+
+    try {
+      await ensureLemmaSenseLink(languageId, row, db);
+    } catch (e) {
+      console.warn("internal sync v2 link failed:", e);
+    }
+
+    await insertAudit(actorUsername, row.inserted ? "create" : "update", "entry", row.id, {}, row, { langCode: lang, source: "internal_sync" }, db);
+  }
+
+  return { inserted, updated, skipped, total: inserted + updated + skipped };
+}
+
+/**
  * Обновить версию словаря для данного языка.
  * Версия вычисляется как MAX(id) + COUNT(*) для быстрого определения изменений.
  * @param {string} langCode — код языка (например 'en')

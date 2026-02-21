@@ -261,6 +261,47 @@ export type AdminDictionaryApplyDraftResponse = {
   entry: AdminDictionaryEntryV2Response | null;
 };
 
+export type AdminDictionaryCreateEntryRequest = {
+  lang?: string;
+  entry: {
+    en: string;
+    ru: string;
+    level?: string;
+    accent?: string;
+    frequencyRank?: number;
+    rarity?: string;
+    register?: string;
+    ipaUk?: string;
+    ipaUs?: string;
+    example?: string;
+    exampleRu?: string;
+  };
+  senses?: Array<{
+    level?: string;
+    register?: string;
+    glossRu: string;
+    definitionRu?: string;
+    usageNote?: string;
+    examples?: Array<{
+      en: string;
+      ru?: string;
+    }>;
+  }>;
+  forms?: Array<{
+    form: string;
+    formType?: string;
+    isIrregular?: boolean;
+    notes?: string;
+  }>;
+};
+
+export type AdminDictionaryCreateEntryResponse = {
+  ok: true;
+  entryId: number;
+  entry: Word | null;
+  v2: AdminDictionaryEntryV2Response | null;
+};
+
 export type DictionaryFormCard = {
   id: number;
   entryId: number;
@@ -352,4 +393,26 @@ export type AdminDictionaryCollectionItemsResponse = {
   collection: Omit<AdminDictionaryCollection, "total"> | null;
   items: AdminDictionaryCollectionItem[];
   total: number;
+};
+
+export type AdminDictionaryBulkAddCollectionItemsRequest = {
+  lang?: string;
+  collectionId: number;
+  entryIds: number[];
+};
+
+export type AdminDictionaryBulkAddCollectionItemsResponse = {
+  ok: true;
+  totals: {
+    requested: number;
+    added: number;
+    skipped: number;
+    errors: number;
+  };
+  report: Array<{
+    entryId: number;
+    senseId?: number;
+    status: "added" | "skipped" | "error";
+    reason?: string;
+  }>;
 };

@@ -28,6 +28,24 @@ type AiImportItem = {
   exists: boolean;
 };
 
+type AdminView = "words" | "collections" | "ai_bulk";
+
+type CreateSenseDraft = {
+  glossRu: string;
+  level: string;
+  register: string;
+  definitionRu: string;
+  usageNote: string;
+  examples: Array<{ en: string; ru: string }>;
+};
+
+type CreateFormDraft = {
+  form: string;
+  formType: string;
+  isIrregular: boolean;
+  notes: string;
+};
+
 const LEVELS: Word["level"][] = ["A0", "A1", "A2", "B1", "B2", "C1", "C2"];
 const ACCENTS: Word["accent"][] = ["both", "UK", "US"];
 const RARITIES: NonNullable<Word["rarity"]>[] = ["не редкое", "редкое", "очень редкое"];
@@ -148,36 +166,36 @@ const HelpText: React.FC<{ children: React.ReactNode }> = ({ children }) => (
   <div className="admin-dict-help">{children}</div>
 );
 
+const IconAdminWords: React.FC<{ className?: string }> = ({ className }) => (
+  <svg className={className} viewBox="0 0 48 48" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+    <rect x="7" y="8" width="34" height="32" rx="6" />
+    <path d="M15 18h18M15 24h18M15 30h10" />
+  </svg>
+);
+
+const IconAdminCollections: React.FC<{ className?: string }> = ({ className }) => (
+  <svg className={className} viewBox="0 0 48 48" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+    <rect x="8" y="12" width="14" height="24" rx="2" />
+    <rect x="18" y="8" width="14" height="28" rx="2" />
+    <rect x="28" y="14" width="12" height="22" rx="2" />
+  </svg>
+);
+
+const IconAdminAiBulk: React.FC<{ className?: string }> = ({ className }) => (
+  <svg className={className} viewBox="0 0 48 48" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+    <circle cx="17" cy="16" r="5" />
+    <circle cx="31" cy="16" r="5" />
+    <circle cx="24" cy="31" r="5" />
+    <path d="M21 19l3 7M27 19l-3 7M22 31h4" />
+  </svg>
+);
+
 function csvEscape(value: unknown): string {
   const s = String(value ?? "");
   if (/[",\n\r]/.test(s)) {
     return `"${s.replace(/"/g, '""')}"`;
   }
   return s;
-}
-
-function parseCsvLine(line: string): string[] {
-  const out: string[] = [];
-  let field = "";
-  let inQuotes = false;
-  for (let i = 0; i < line.length; i++) {
-    const c = line[i];
-    if (c === '"') {
-      if (inQuotes && line[i + 1] === '"') {
-        field += '"';
-        i++;
-      } else {
-        inQuotes = !inQuotes;
-      }
-    } else if (c === "," && !inQuotes) {
-      out.push(field);
-      field = "";
-    } else {
-      field += c;
-    }
-  }
-  out.push(field);
-  return out.map((v) => v.trim());
 }
 
 function downloadText(filename: string, text: string, mime = "text/plain;charset=utf-8") {
@@ -283,10 +301,6 @@ const AdminDictionaryPage: React.FC = () => {
   const [applyDraftReplaceExamples, setApplyDraftReplaceExamples] = useState(false);
   const [applyDraftSense1Core, setApplyDraftSense1Core] = useState(false);
 
-  const [importText, setImportText] = useState("");
-  const [importState, setImportState] = useState<LoadState>("idle");
-  const [importLog, setImportLog] = useState<string>("");
-
   const [aiImportOpen, setAiImportOpen] = useState(false);
   const [aiImportLevel, setAiImportLevel] = useState<string>("A0");
   const [aiImportRegister, setAiImportRegister] = useState<NonNullable<Word["register"]>>("разговорная");
@@ -305,7 +319,66 @@ const AdminDictionaryPage: React.FC = () => {
   const [batchReport, setBatchReport] = useState<Array<{ id: number; en: string; status: "ok" | "error"; formsCount: number; warnings: string[]; error?: string }>>([]);
   const [batchDelayMs, setBatchDelayMs] = useState(350);
   const [batchRetryCount, setBatchRetryCount] = useState(1);
-  const [adminView, setAdminView] = useState<"words" | "collections">("words");
+  const [adminView, setAdminView] = useState<AdminView>("words");
+  const [batchMode, setBatchMode] = useState<"forms_only" | "full_apply">("full_apply");
+  const [batchApplyEntryPatch, setBatchApplyEntryPatch] = useState(true);
+  const [batchApplySenses, setBatchApplySenses] = useState(true);
+  const [batchApplyForms, setBatchApplyForms] = useState(true);
+  const [batchApplyReplaceExamples, setBatchApplyReplaceExamples] = useState(false);
+  const [batchApplySense1Core, setBatchApplySense1Core] = useState(false);
+  const [batchCollectionId, setBatchCollectionId] = useState<number | null>(null);
+  const [batchCollectionState, setBatchCollectionState] = useState<LoadState>("idle");
+  const [batchCollectionResult, setBatchCollectionResult] = useState<{ added: number; skipped: number; errors: number; requested: number } | null>(null);
+  const [batchCollectionError, setBatchCollectionError] = useState<string | null>(null);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [createState, setCreateState] = useState<LoadState>("idle");
+  const [createError, setCreateError] = useState<string | null>(null);
+  const [createResult, setCreateResult] = useState<string>("");
+  const [createEntryDraft, setCreateEntryDraft] = useState<Partial<Word>>({
+    en: "",
+    ru: "",
+    level: "A0",
+    accent: "both",
+    frequencyRank: 15000,
+    rarity: "не редкое",
+    register: "разговорная",
+    ipaUk: "",
+    ipaUs: "",
+    example: "",
+    exampleRu: "",
+  });
+  const [createSenses, setCreateSenses] = useState<CreateSenseDraft[]>([
+    {
+      glossRu: "",
+      level: "A0",
+      register: "разговорная",
+      definitionRu: "",
+      usageNote: "",
+      examples: [{ en: "", ru: "" }],
+    },
+  ]);
+  const [createForms, setCreateForms] = useState<CreateFormDraft[]>([{ form: "", formType: "", isIrregular: false, notes: "" }]);
+
+  const sectionCards: Array<{ key: AdminView; title: string; description: string; Icon: React.FC<{ className?: string }> }> = [
+    {
+      key: "words",
+      title: "Слова",
+      description: "Поиск, фильтры, редактирование и ручное создание слов.",
+      Icon: IconAdminWords,
+    },
+    {
+      key: "collections",
+      title: "Коллекции",
+      description: "Управляйте коллекциями и их составом.",
+      Icon: IconAdminCollections,
+    },
+    {
+      key: "ai_bulk",
+      title: "AI + массовые",
+      description: "AI-импорт, пакетная обработка и массовое добавление в коллекции.",
+      Icon: IconAdminAiBulk,
+    },
+  ];
   const [collectionsList, setCollectionsList] = useState<AdminDictionaryCollection[]>([]);
   const [collectionsTotal, setCollectionsTotal] = useState(0);
   const [collectionsState, setCollectionsState] = useState<LoadState>("idle");
@@ -366,6 +439,7 @@ const AdminDictionaryPage: React.FC = () => {
     () => IMPORTANT_EMPTY_FIELDS.filter((field) => isFieldEmpty(field)),
     [editedDraft]
   );
+  const aiSuggestedFieldsSafe = aiSuggestedFields ?? [];
   const loadList = async (reset = true) => {
     setSearchState("loading");
     setSearchError(null);
@@ -475,7 +549,7 @@ const AdminDictionaryPage: React.FC = () => {
 
   useEffect(() => {
     if (!canAccess) return;
-    if (adminView !== "collections") return;
+    if (adminView !== "collections" && adminView !== "ai_bulk") return;
     void loadCollectionsAdmin(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [canAccess, adminView]);
@@ -979,132 +1053,6 @@ const AdminDictionaryPage: React.FC = () => {
     }
   };
 
-  const exportCsv = async () => {
-    setSearchError(null);
-    try {
-      const all: AdminDictionaryListItem[] = [];
-      let off = 0;
-      let totalLocal = 0;
-      while (true) {
-        const { items, total } = await adminDictionaryApi.list({
-          lang,
-          q: query.trim() || undefined,
-          level: filterLevel,
-          register: filterRegister,
-          rarity: filterRarity,
-          reviewed: filterReviewed,
-          missingExample: qcMissingExample,
-          missingIpa: qcMissingIpa,
-          missingRu: qcMissingRu,
-          offset: off,
-          limit: 500,
-          order,
-        });
-        totalLocal = total;
-        all.push(...items);
-        off += items.length;
-        if (items.length === 0 || all.length >= total) break;
-        if (off > 100000) break;
-      }
-      const header = [
-        "id",
-        "en",
-        "ru",
-        "level",
-        "register",
-        "rarity",
-        "frequencyRank",
-        "reviewedAt",
-        "reviewedBy",
-        "hasExample",
-        "hasIpa",
-      ];
-      const lines = [header.join(",")];
-      for (const w of all) {
-        const row = [
-          w.id,
-          w.en,
-          w.ru,
-          w.level,
-          w.register,
-          w.rarity,
-          w.frequencyRank ?? "",
-          w.reviewedAt ?? "",
-          w.reviewedBy ?? "",
-          w.hasExample ? "1" : "0",
-          w.hasIpa ? "1" : "0",
-        ].map(csvEscape);
-        lines.push(row.join(","));
-      }
-      const filename = `dictionary_export_${lang}_${new Date().toISOString().slice(0, 10)}_${all.length}-of-${totalLocal}.csv`;
-      downloadText(filename, lines.join("\n"), "text/csv;charset=utf-8");
-    } catch (e) {
-      setSearchError(formatApiError(e, "Не удалось экспортировать CSV"));
-    }
-  };
-
-  const importCsv = async () => {
-    const text = importText.trim();
-    if (!text) return;
-    setImportState("loading");
-    setImportLog("");
-    try {
-      const rawLines = text.split(/\r?\n/).filter((l) => l.trim());
-      if (rawLines.length < 2) throw new Error("CSV должен содержать заголовок и хотя бы одну строку");
-      const header = parseCsvLine(rawLines[0]).map((h) => h.replace(/^\uFEFF/, "").trim());
-      const idx = (name: string) => header.findIndex((h) => h.toLowerCase() === name.toLowerCase());
-      const idIdx = idx("id");
-      if (idIdx < 0) throw new Error("В CSV нет колонки id");
-
-      const enIdx = idx("en");
-      const ruIdx = idx("ru");
-      const levelIdx = idx("level");
-      const registerIdx = idx("register");
-      const rarityIdx = idx("rarity");
-      const reviewedIdx = idx("reviewed"); // optional: yes/no/1/0
-
-      let ok = 0;
-      let fail = 0;
-      for (let i = 1; i < rawLines.length; i++) {
-        const cols = parseCsvLine(rawLines[i]);
-        const id = parseInt(cols[idIdx] || "", 10);
-        if (!Number.isFinite(id)) continue;
-
-        const patch: Partial<Word> = {};
-        if (enIdx >= 0) patch.en = cols[enIdx];
-        if (ruIdx >= 0) patch.ru = cols[ruIdx];
-        if (levelIdx >= 0 && cols[levelIdx]) patch.level = cols[levelIdx] as any;
-        if (registerIdx >= 0 && cols[registerIdx]) patch.register = cols[registerIdx] as any;
-        if (rarityIdx >= 0 && cols[rarityIdx]) patch.rarity = cols[rarityIdx] as any;
-
-        try {
-          if (Object.keys(patch).length > 0) {
-            await adminDictionaryApi.patchEntry({ lang, id, patch });
-          }
-          if (reviewedIdx >= 0) {
-            const v = String(cols[reviewedIdx] || "").trim().toLowerCase();
-            if (v === "yes" || v === "1" || v === "true") {
-              await adminDictionaryApi.setReviewed({ lang, entryId: id, reviewed: true });
-            } else if (v === "no" || v === "0" || v === "false") {
-              await adminDictionaryApi.setReviewed({ lang, entryId: id, reviewed: false });
-            }
-          }
-          ok++;
-        } catch (rowErr) {
-          fail++;
-          setImportLog((prev) => prev + `\n#${i} id=${id}: ${formatApiError(rowErr, "ошибка")}`);
-        }
-      }
-
-      setImportLog((prev) => `Готово. OK=${ok}, FAIL=${fail}` + prev);
-      await loadList(true);
-      setImportState("idle");
-    } catch (e) {
-      setImportState("error");
-      setImportLog(formatApiError(e, "Не удалось импортировать CSV"));
-    }
-  };
-
   const checkOpenAiKey = async () => {
     setOpenaiCheckResult(null);
     setOpenaiCheckError(null);
@@ -1143,11 +1091,33 @@ const AdminDictionaryPage: React.FC = () => {
       while (!success && attempt <= batchRetryCount) {
         attempt++;
         try {
+          const isFormsOnly = batchMode === "forms_only";
           const { draft: out } = await adminDictionaryApi.aiDraft({
             lang,
             entryId: Number(w.id),
-            mode: "forms_only",
+            mode: isFormsOnly ? "forms_only" : "full",
           });
+          if (!isFormsOnly) {
+            const senses = Array.isArray(out?.senses) ? out.senses : [];
+            const forms = Array.isArray(out?.forms) ? out.forms : [];
+            const selectedSenseNos = batchApplySenses
+              ? senses.map((s) => Number(s?.senseNo)).filter((n) => Number.isFinite(n) && n > 0)
+              : [];
+            const selectedFormIndexes = batchApplyForms ? forms.map((_, idx) => idx) : [];
+            await adminDictionaryApi.applyDraft({
+              lang,
+              entryId: Number(w.id),
+              draft: out,
+              apply: {
+                entryPatch: batchApplyEntryPatch,
+                lemmaPatch: batchApplyEntryPatch,
+                selectedSenseNos,
+                selectedFormIndexes,
+                replaceExamples: batchApplyReplaceExamples,
+                applySense1Core: batchApplySense1Core,
+              },
+            });
+          }
           report.push({
             id: Number(w.id),
             en: String(w.en || ""),
@@ -1157,7 +1127,7 @@ const AdminDictionaryPage: React.FC = () => {
           });
           success = true;
         } catch (e) {
-          lastErr = formatApiError(e, "Ошибка генерации forms-only");
+          lastErr = formatApiError(e, "Ошибка пакетного AI-применения");
           if (attempt > batchRetryCount) {
             report.push({
               id: Number(w.id),
@@ -1192,7 +1162,192 @@ const AdminDictionaryPage: React.FC = () => {
         ].map(csvEscape).join(",")
       );
     }
-    downloadText(`forms_batch_report_${new Date().toISOString().slice(0, 10)}.csv`, lines.join("\n"), "text/csv;charset=utf-8");
+    downloadText(`ai_batch_report_${new Date().toISOString().slice(0, 10)}.csv`, lines.join("\n"), "text/csv;charset=utf-8");
+  };
+
+  const updateCreateEntryField = (field: WordEditField, value: unknown) => {
+    setCreateEntryDraft((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const updateCreateSense = (idx: number, patch: Partial<CreateSenseDraft>) => {
+    setCreateSenses((prev) => prev.map((s, i) => (i === idx ? { ...s, ...patch } : s)));
+  };
+
+  const updateCreateExample = (senseIdx: number, exIdx: number, patch: Partial<{ en: string; ru: string }>) => {
+    setCreateSenses((prev) =>
+      prev.map((s, i) => {
+        if (i !== senseIdx) return s;
+        const nextExamples = s.examples.map((ex, eIdx) => (eIdx === exIdx ? { ...ex, ...patch } : ex));
+        return { ...s, examples: nextExamples };
+      })
+    );
+  };
+
+  const addCreateSense = () => {
+    setCreateSenses((prev) => [
+      ...prev,
+      {
+        glossRu: "",
+        level: String(createEntryDraft.level || "A0"),
+        register: String(createEntryDraft.register || "разговорная"),
+        definitionRu: "",
+        usageNote: "",
+        examples: [{ en: "", ru: "" }],
+      },
+    ]);
+  };
+
+  const removeCreateSense = (idx: number) => {
+    setCreateSenses((prev) => (prev.length <= 1 ? prev : prev.filter((_, i) => i !== idx)));
+  };
+
+  const addCreateExample = (senseIdx: number) => {
+    setCreateSenses((prev) =>
+      prev.map((s, i) => (i === senseIdx ? { ...s, examples: [...s.examples, { en: "", ru: "" }] } : s))
+    );
+  };
+
+  const removeCreateExample = (senseIdx: number, exIdx: number) => {
+    setCreateSenses((prev) =>
+      prev.map((s, i) => {
+        if (i !== senseIdx) return s;
+        if (s.examples.length <= 1) return s;
+        return { ...s, examples: s.examples.filter((_, eIdx) => eIdx !== exIdx) };
+      })
+    );
+  };
+
+  const updateCreateForm = (idx: number, patch: Partial<CreateFormDraft>) => {
+    setCreateForms((prev) => prev.map((f, i) => (i === idx ? { ...f, ...patch } : f)));
+  };
+
+  const addCreateForm = () => {
+    setCreateForms((prev) => [...prev, { form: "", formType: "", isIrregular: false, notes: "" }]);
+  };
+
+  const removeCreateForm = (idx: number) => {
+    setCreateForms((prev) => (prev.length <= 1 ? prev : prev.filter((_, i) => i !== idx)));
+  };
+
+  const resetCreateForm = () => {
+    setCreateEntryDraft({
+      en: "",
+      ru: "",
+      level: "A0",
+      accent: "both",
+      frequencyRank: 15000,
+      rarity: "не редкое",
+      register: "разговорная",
+      ipaUk: "",
+      ipaUs: "",
+      example: "",
+      exampleRu: "",
+    });
+    setCreateSenses([
+      {
+        glossRu: "",
+        level: "A0",
+        register: "разговорная",
+        definitionRu: "",
+        usageNote: "",
+        examples: [{ en: "", ru: "" }],
+      },
+    ]);
+    setCreateForms([{ form: "", formType: "", isIrregular: false, notes: "" }]);
+  };
+
+  const runCreateEntry = async () => {
+    const en = String(createEntryDraft.en || "").trim();
+    const ru = String(createEntryDraft.ru || "").trim();
+    if (!en || !ru) {
+      setCreateError("Для создания слова обязательны EN и RU.");
+      return;
+    }
+    setCreateState("loading");
+    setCreateError(null);
+    setCreateResult("");
+    try {
+      const payloadSenses = createSenses
+        .map((s) => ({
+          glossRu: String(s.glossRu || "").trim(),
+          level: String(s.level || "A0"),
+          register: String(s.register || "разговорная"),
+          definitionRu: String(s.definitionRu || ""),
+          usageNote: String(s.usageNote || ""),
+          examples: (Array.isArray(s.examples) ? s.examples : [])
+            .map((ex) => ({ en: String(ex.en || "").trim(), ru: String(ex.ru || "").trim() }))
+            .filter((ex) => ex.en),
+        }))
+        .filter((s) => s.glossRu);
+      if (!payloadSenses.length) {
+        setCreateError("Добавьте минимум один смысл (gloss RU).");
+        setCreateState("error");
+        return;
+      }
+      const payloadForms = createForms
+        .map((f) => ({
+          form: String(f.form || "").trim(),
+          formType: String(f.formType || "").trim(),
+          isIrregular: !!f.isIrregular,
+          notes: String(f.notes || ""),
+        }))
+        .filter((f) => f.form);
+      const out = await adminDictionaryApi.createEntry({
+        lang,
+        entry: {
+          en,
+          ru,
+          level: String(createEntryDraft.level || "A0"),
+          accent: String(createEntryDraft.accent || "both"),
+          frequencyRank: toNumber(createEntryDraft.frequencyRank, 15000),
+          rarity: String(createEntryDraft.rarity || "не редкое"),
+          register: String(createEntryDraft.register || "разговорная"),
+          ipaUk: String(createEntryDraft.ipaUk || "").trim(),
+          ipaUs: String(createEntryDraft.ipaUs || "").trim(),
+          example: String(createEntryDraft.example || "").trim(),
+          exampleRu: String(createEntryDraft.exampleRu || "").trim(),
+        },
+        senses: payloadSenses,
+        forms: payloadForms,
+      });
+      setCreateResult(`Слово создано: #${out.entryId}`);
+      setCreateState("idle");
+      resetCreateForm();
+      await loadList(true);
+      if (out.entryId) {
+        navigate(`/admin/dictionary/word/${out.entryId}`);
+      }
+    } catch (e) {
+      setCreateState("error");
+      setCreateError(formatApiError(e, "Не удалось создать слово"));
+    }
+  };
+
+  const runBulkAddSelectedToCollection = async () => {
+    if (!batchSelectedIds.length || !batchCollectionId) return;
+    setBatchCollectionState("loading");
+    setBatchCollectionError(null);
+    setBatchCollectionResult(null);
+    try {
+      const out = await adminDictionaryApi.addCollectionItemsBulk({
+        lang,
+        collectionId: Number(batchCollectionId),
+        entryIds: batchSelectedIds,
+      });
+      setBatchCollectionResult({
+        requested: Number(out?.totals?.requested || 0),
+        added: Number(out?.totals?.added || 0),
+        skipped: Number(out?.totals?.skipped || 0),
+        errors: Number(out?.totals?.errors || 0),
+      });
+      setBatchCollectionState("idle");
+      if (selectedCollectionId && Number(selectedCollectionId) === Number(batchCollectionId)) {
+        await loadCollectionItemsAdmin(Number(selectedCollectionId));
+      }
+    } catch (e) {
+      setBatchCollectionState("error");
+      setBatchCollectionError(formatApiError(e, "Не удалось массово добавить слова в коллекцию"));
+    }
   };
 
   const askAi = async () => {
@@ -1577,6 +1732,39 @@ const AdminDictionaryPage: React.FC = () => {
             Справочник слов (леммы/значения/примеры/формы) + фильтры качества + отметка «проверено лингвистом».
           </p>
 
+          <section className="admin-dict-hub" aria-label="Разделы админки словаря">
+            <div className="admin-dict-hub__header">
+              <h2 className="admin-dict-hub__title">Разделы</h2>
+              <p className="admin-dict-hub__subtitle">Выберите нужный сценарий работы.</p>
+            </div>
+            <ul className="admin-dict-hub__list" role="list">
+              {sectionCards.map((section, index) => (
+                <li key={section.key} className="admin-dict-hub__item" style={{ animationDelay: `${index * 70}ms` }}>
+                  <button
+                    type="button"
+                    className={`admin-dict-hub__card ${adminView === section.key ? "active" : ""}`}
+                    onClick={() => {
+                      setAdminView(section.key);
+                      if (section.key !== "words") {
+                        void loadCollectionsAdmin(true);
+                      }
+                    }}
+                  >
+                    <span className="admin-dict-hub__card-icon" aria-hidden>
+                      <section.Icon className="admin-dict-hub__card-icon-svg" />
+                    </span>
+                    <div className="admin-dict-hub__card-body">
+                      <h3 className="admin-dict-hub__card-title">{section.title}</h3>
+                      <p className="admin-dict-hub__card-desc">{section.description}</p>
+                      <span className="admin-dict-hub__card-cta">Открыть →</span>
+                    </div>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </section>
+
+          {adminView === "words" && (
           <div className="admin-dict-toolbar">
             <div className="admin-dict-search-row">
               <input
@@ -1666,10 +1854,11 @@ const AdminDictionaryPage: React.FC = () => {
               </button>
             </div>
           </div>
+          )}
 
-          {adminView === "words" && !editingEntryId && (
-            <div className="admin-dict-section" style={{ marginTop: 12 }}>
-              <div className="admin-dict-section-title" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+          {adminView === "ai_bulk" && !editingEntryId && (
+            <div className="admin-dict-section admin-dict-section--spaced">
+              <div className="admin-dict-section-title admin-dict-section-title--with-actions">
                 <span>AI‑импорт слов</span>
                 <button
                   type="button"
@@ -1682,7 +1871,7 @@ const AdminDictionaryPage: React.FC = () => {
               </div>
 
               {aiImportOpen && (
-                <div className="admin-dict-form" style={{ marginTop: 8 }}>
+                <div className="admin-dict-form admin-dict-form--spaced">
                   <label className="admin-dict-field">
                     <span className="admin-dict-label">Уровень</span>
                     <select value={aiImportLevel} onChange={(e) => setAiImportLevel(e.target.value)}>
@@ -1726,7 +1915,7 @@ const AdminDictionaryPage: React.FC = () => {
                     <HelpText>Сначала генерируется предпросмотр. Дубликаты уже в словаре будут пропущены автоматически.</HelpText>
                   </label>
 
-                  <div className="admin-dict-actions" style={{ marginTop: 0 }}>
+                  <div className="admin-dict-actions admin-dict-actions--no-top">
                     <button
                       type="button"
                       className="admin-dict-btn admin-dict-btn--primary"
@@ -1760,7 +1949,7 @@ const AdminDictionaryPage: React.FC = () => {
                   )}
 
                   {(aiImportStats || aiImportPreview.length > 0) && (
-                    <div style={{ marginTop: 10 }}>
+                    <div className="admin-dict-block admin-dict-block--spaced">
                       {aiImportStatus && !aiImportStatus.ok && (
                         <div className="dictionary-warning-banner" style={{ padding: "8px 12px", marginTop: 8 }}>
                           {aiImportStatus.message}
@@ -1773,7 +1962,7 @@ const AdminDictionaryPage: React.FC = () => {
                       )}
 
                       {aiImportPreview.length > 0 && (
-                        <ul className="admin-dict-results-list" style={{ marginTop: 8 }}>
+                        <ul className="admin-dict-results-list admin-dict-results-list--spaced">
                           {aiImportPreview.map((it) => (
                             <li key={it.lemmaKey}>
                               <div
@@ -1810,74 +1999,115 @@ const AdminDictionaryPage: React.FC = () => {
             </div>
           )}
 
+          {adminView === "ai_bulk" && !editingEntryId && (
+            <div className="admin-dict-section admin-dict-section--spaced">
+              <div className="admin-dict-section-title">Массовые действия по отмеченным словам</div>
+              <div className="admin-dict-help">
+                Отмечайте слова в категории «Слова», затем возвращайтесь сюда для пакетной обработки.
+              </div>
+              <div className="admin-dict-inline-meta">
+                <span>Отмечено слов: <b>{batchSelectedIds.length}</b></span>
+                <button type="button" className="admin-dict-btn admin-dict-btn--secondary" onClick={() => setAdminView("words")}>
+                  Перейти к выбору слов
+                </button>
+              </div>
+
+              <div className="admin-dict-form admin-dict-form--spaced">
+                <label className="admin-dict-field">
+                  <span className="admin-dict-label">Режим batch AI</span>
+                  <select value={batchMode} onChange={(e) => setBatchMode(e.target.value as "forms_only" | "full_apply")}>
+                    <option value="full_apply">Полный draft + применение</option>
+                    <option value="forms_only">Только forms-only draft (без применения)</option>
+                  </select>
+                </label>
+                <label className="admin-dict-field" style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                  <input type="checkbox" checked={batchApplyEntryPatch} onChange={(e) => setBatchApplyEntryPatch(e.target.checked)} disabled={batchMode === "forms_only"} />
+                  <span className="admin-dict-label" style={{ margin: 0 }}>Применять карточку/lemma patch</span>
+                </label>
+                <label className="admin-dict-field" style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                  <input type="checkbox" checked={batchApplySenses} onChange={(e) => setBatchApplySenses(e.target.checked)} disabled={batchMode === "forms_only"} />
+                  <span className="admin-dict-label" style={{ margin: 0 }}>Применять смыслы и примеры</span>
+                </label>
+                <label className="admin-dict-field" style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                  <input type="checkbox" checked={batchApplyForms} onChange={(e) => setBatchApplyForms(e.target.checked)} />
+                  <span className="admin-dict-label" style={{ margin: 0 }}>Применять формы</span>
+                </label>
+                <label className="admin-dict-field" style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                  <input type="checkbox" checked={batchApplyReplaceExamples} onChange={(e) => setBatchApplyReplaceExamples(e.target.checked)} disabled={batchMode === "forms_only"} />
+                  <span className="admin-dict-label" style={{ margin: 0 }}>Replace examples</span>
+                </label>
+                <label className="admin-dict-field" style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                  <input type="checkbox" checked={batchApplySense1Core} onChange={(e) => setBatchApplySense1Core(e.target.checked)} disabled={batchMode === "forms_only"} />
+                  <span className="admin-dict-label" style={{ margin: 0 }}>Разрешить core-поля для sense #1</span>
+                </label>
+                <div className="admin-dict-row">
+                  <label className="admin-dict-field">
+                    <span className="admin-dict-label">Пауза между запросами, мс</span>
+                    <input type="number" value={batchDelayMs} onChange={(e) => setBatchDelayMs(Math.max(0, Number(e.target.value) || 0))} />
+                  </label>
+                  <label className="admin-dict-field">
+                    <span className="admin-dict-label">Retry</span>
+                    <input type="number" value={batchRetryCount} onChange={(e) => setBatchRetryCount(Math.max(0, Math.min(5, Number(e.target.value) || 0)))} />
+                  </label>
+                </div>
+                <div className="admin-dict-actions">
+                  <button type="button" className="admin-dict-btn admin-dict-btn--primary" onClick={() => void runBatchFormsDraft()} disabled={batchState === "loading" || batchSelectedIds.length === 0}>
+                    {batchState === "loading" ? "Batch..." : "Запустить batch AI"}
+                  </button>
+                  <button type="button" className="admin-dict-btn admin-dict-btn--secondary" onClick={exportBatchReport} disabled={batchReport.length === 0}>
+                    Экспорт отчёта batch
+                  </button>
+                </div>
+                {batchReport.length > 0 && (
+                  <div className="admin-dict-help">
+                    Готово: {batchReport.filter((x) => x.status === "ok").length} ok / {batchReport.filter((x) => x.status === "error").length} error.
+                  </div>
+                )}
+              </div>
+
+              <div className="admin-dict-block admin-dict-block--spaced-lg">
+                <div className="admin-dict-section-title">Массово добавить отмеченные слова в коллекцию</div>
+                <div className="admin-dict-row admin-dict-row--spaced">
+                  <label className="admin-dict-field">
+                    <span className="admin-dict-label">Коллекция</span>
+                    <select value={String(batchCollectionId || "")} onChange={(e) => setBatchCollectionId(e.target.value ? Number(e.target.value) : null)}>
+                      <option value="">Выберите коллекцию</option>
+                      {collectionsList.map((c) => (
+                        <option key={`bulk-col-${c.id}`} value={c.id}>
+                          {c.title} ({c.collectionKey})
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <div className="admin-dict-actions admin-dict-actions--end">
+                    <button
+                      type="button"
+                      className="admin-dict-btn admin-dict-btn--primary"
+                      onClick={() => void runBulkAddSelectedToCollection()}
+                      disabled={batchCollectionState === "loading" || !batchCollectionId || batchSelectedIds.length === 0}
+                    >
+                      {batchCollectionState === "loading" ? "Добавление..." : "Добавить выбранные"}
+                    </button>
+                  </div>
+                </div>
+                {batchCollectionError && <div className="dictionary-error-banner" style={{ padding: "8px 12px", marginTop: 8 }}>{batchCollectionError}</div>}
+                {batchCollectionResult && (
+                  <div className="dictionary-success-banner" style={{ padding: "8px 12px", marginTop: 8 }}>
+                    Запрошено: {batchCollectionResult.requested}. Добавлено: {batchCollectionResult.added}. Пропущено: {batchCollectionResult.skipped}. Ошибок: {batchCollectionResult.errors}.
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {searchError && (
             <div className="dictionary-error-banner" style={{ padding: "8px 12px", marginTop: 8 }}>
               {searchError}
             </div>
           )}
 
-          <div className="admin-dict-nav-row">
-            <button
-              type="button"
-              className={`admin-dict-btn ${adminView === "words" ? "admin-dict-btn--primary" : "admin-dict-btn--secondary"}`}
-              onClick={() => setAdminView("words")}
-            >
-              Слова
-            </button>
-            <button
-              type="button"
-              className={`admin-dict-btn ${adminView === "collections" ? "admin-dict-btn--primary" : "admin-dict-btn--secondary"}`}
-              onClick={() => {
-                setAdminView("collections");
-                void loadCollectionsAdmin(true);
-              }}
-            >
-              Коллекции
-            </button>
-          </div>
-
-          {adminView === "words" && editingEntryId && (
-            <div className="admin-dict-nav-row">
-              <button type="button" className="admin-dict-btn admin-dict-btn--secondary" onClick={() => navigate("/admin/dictionary")}>
-                ← К списку слов
-              </button>
-            </div>
-          )}
-
-          {false && <div className="admin-dict-section" style={{ marginTop: 12 }}>
-            <div className="admin-dict-section-title">Инструменты</div>
-            <div className="admin-dict-actions" style={{ marginTop: 0 }}>
-              <button type="button" className="admin-dict-btn admin-dict-btn--secondary" onClick={exportCsv}>
-                Экспорт CSV (по текущим фильтрам)
-              </button>
-            </div>
-            <div className="admin-dict-form">
-              <label className="admin-dict-field">
-                <span className="admin-dict-label">Импорт CSV (патчи)</span>
-                <HelpText>
-                  Минимум колонка <b>id</b>. Дополнительно можно указать <b>en, ru, level, register, rarity</b> и{" "}
-                  <b>reviewed</b> (yes/no).
-                </HelpText>
-                <textarea
-                  value={importText}
-                  onChange={(e) => setImportText(e.target.value)}
-                  rows={6}
-                  placeholder="Колонки минимум: id. Опционально: en,ru,level,register,rarity,reviewed(yes/no)"
-                />
-              </label>
-              <button type="button" className="admin-dict-btn admin-dict-btn--secondary" onClick={importCsv} disabled={importState === "loading"}>
-                {importState === "loading" ? "Импорт…" : "Импортировать"}
-              </button>
-              {importLog && (
-                <pre style={{ whiteSpace: "pre-wrap", margin: 0, padding: 10, border: "1px solid var(--border-subtle)", background: "var(--card)" }}>
-                  {importLog}
-                </pre>
-              )}
-            </div>
-          </div>}
-
           {adminView === "collections" && (
-            <div className="admin-dict-section" style={{ marginTop: 12 }}>
+            <div className="admin-dict-section admin-dict-section--spaced">
               {collectionsError && <div className="dictionary-error-banner" style={{ padding: "8px 12px", marginBottom: 8 }}>{collectionsError}</div>}
 
               <div className="admin-dict-section-title">Управление коллекциями</div>
@@ -1886,7 +2116,7 @@ const AdminDictionaryPage: React.FC = () => {
                 В состав коллекции сохраняется соответствующий смысл (`sense`), поэтому дубликаты автоматически схлопываются.
               </div>
 
-              <div className="admin-dict-row" style={{ marginTop: 10 }}>
+              <div className="admin-dict-row admin-dict-row--spaced-md">
                 <label className="admin-dict-field">
                   <span className="admin-dict-label">Поиск коллекций</span>
                   <input
@@ -1898,7 +2128,7 @@ const AdminDictionaryPage: React.FC = () => {
                     }}
                   />
                 </label>
-                <div className="admin-dict-actions" style={{ alignSelf: "end" }}>
+                <div className="admin-dict-actions admin-dict-actions--end">
                   <button type="button" className="admin-dict-btn admin-dict-btn--secondary" onClick={() => void loadCollectionsAdmin(true)}>
                     Обновить список
                   </button>
@@ -1917,7 +2147,7 @@ const AdminDictionaryPage: React.FC = () => {
                 </div>
               </div>
 
-              <div className="admin-dict-layout" style={{ marginTop: 12 }}>
+              <div className="admin-dict-layout admin-dict-layout--spaced">
                 <div className="admin-dict-results">
                   <div className="admin-dict-results-title">
                     Коллекции ({collectionsList.length}/{collectionsTotal})
@@ -2108,6 +2338,181 @@ const AdminDictionaryPage: React.FC = () => {
             </div>
           )}
 
+          {adminView === "words" && !editingEntryId && (
+            <div className="admin-dict-section" style={{ marginTop: 12 }}>
+              <div className="admin-dict-section-title" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+                <span>Ручное создание слова</span>
+                <button type="button" className="admin-dict-btn admin-dict-btn--secondary" onClick={() => setCreateOpen((v) => !v)}>
+                  {createOpen ? "Скрыть" : "Показать"}
+                </button>
+              </div>
+              {createOpen && (
+                <div className="admin-dict-form" style={{ marginTop: 8 }}>
+                  <div className="admin-dict-row">
+                    <label className="admin-dict-field">
+                      <span className="admin-dict-label">EN *</span>
+                      <input value={String(createEntryDraft.en || "")} onChange={(e) => updateCreateEntryField("en", e.target.value)} placeholder="word" />
+                    </label>
+                    <label className="admin-dict-field">
+                      <span className="admin-dict-label">RU *</span>
+                      <input value={String(createEntryDraft.ru || "")} onChange={(e) => updateCreateEntryField("ru", e.target.value)} placeholder="перевод" />
+                    </label>
+                    <label className="admin-dict-field">
+                      <span className="admin-dict-label">Level</span>
+                      <select value={String(createEntryDraft.level || "A0")} onChange={(e) => updateCreateEntryField("level", e.target.value)}>
+                        {LEVELS.map((l) => <option key={`create-level-${l}`} value={l}>{l}</option>)}
+                      </select>
+                    </label>
+                  </div>
+                  <div className="admin-dict-row">
+                    <label className="admin-dict-field">
+                      <span className="admin-dict-label">Accent</span>
+                      <select value={String(createEntryDraft.accent || "both")} onChange={(e) => updateCreateEntryField("accent", e.target.value)}>
+                        {ACCENTS.map((a) => <option key={`create-acc-${a}`} value={a}>{a}</option>)}
+                      </select>
+                    </label>
+                    <label className="admin-dict-field">
+                      <span className="admin-dict-label">Frequency rank</span>
+                      <input type="number" value={String(createEntryDraft.frequencyRank ?? 15000)} onChange={(e) => updateCreateEntryField("frequencyRank", toNumber(e.target.value, 15000))} />
+                    </label>
+                    <label className="admin-dict-field">
+                      <span className="admin-dict-label">Rarity</span>
+                      <select value={String(createEntryDraft.rarity || "не редкое")} onChange={(e) => updateCreateEntryField("rarity", e.target.value)}>
+                        {RARITIES.map((r) => <option key={`create-rarity-${r}`} value={r}>{r}</option>)}
+                      </select>
+                    </label>
+                    <label className="admin-dict-field">
+                      <span className="admin-dict-label">Register</span>
+                      <select value={String(createEntryDraft.register || "разговорная")} onChange={(e) => updateCreateEntryField("register", e.target.value)}>
+                        {REGISTERS.map((r) => <option key={`create-reg-${r}`} value={r}>{r}</option>)}
+                      </select>
+                    </label>
+                  </div>
+                  <div className="admin-dict-row">
+                    <label className="admin-dict-field">
+                      <span className="admin-dict-label">IPA UK</span>
+                      <input value={String(createEntryDraft.ipaUk || "")} onChange={(e) => updateCreateEntryField("ipaUk", e.target.value)} />
+                    </label>
+                    <label className="admin-dict-field">
+                      <span className="admin-dict-label">IPA US</span>
+                      <input value={String(createEntryDraft.ipaUs || "")} onChange={(e) => updateCreateEntryField("ipaUs", e.target.value)} />
+                    </label>
+                  </div>
+                  <div className="admin-dict-row">
+                    <label className="admin-dict-field">
+                      <span className="admin-dict-label">Main example EN</span>
+                      <textarea rows={2} value={String(createEntryDraft.example || "")} onChange={(e) => updateCreateEntryField("example", e.target.value)} />
+                    </label>
+                    <label className="admin-dict-field">
+                      <span className="admin-dict-label">Main example RU</span>
+                      <textarea rows={2} value={String(createEntryDraft.exampleRu || "")} onChange={(e) => updateCreateEntryField("exampleRu", e.target.value)} />
+                    </label>
+                  </div>
+
+                  <div style={{ marginTop: 8 }}>
+                    <div className="admin-dict-section-title">Смыслы и примеры</div>
+                    {createSenses.map((sense, senseIdx) => (
+                      <div key={`create-sense-${senseIdx}`} style={{ border: "1px solid var(--border-subtle)", borderRadius: 10, padding: 10, marginTop: 8, background: "var(--card)" }}>
+                        <div className="admin-dict-row">
+                          <label className="admin-dict-field">
+                            <span className="admin-dict-label">Gloss RU *</span>
+                            <input value={sense.glossRu} onChange={(e) => updateCreateSense(senseIdx, { glossRu: e.target.value })} />
+                          </label>
+                          <label className="admin-dict-field">
+                            <span className="admin-dict-label">Level</span>
+                            <select value={sense.level} onChange={(e) => updateCreateSense(senseIdx, { level: e.target.value })}>
+                              {LEVELS.map((l) => <option key={`create-sense-level-${senseIdx}-${l}`} value={l}>{l}</option>)}
+                            </select>
+                          </label>
+                          <label className="admin-dict-field">
+                            <span className="admin-dict-label">Register</span>
+                            <select value={sense.register} onChange={(e) => updateCreateSense(senseIdx, { register: e.target.value })}>
+                              {REGISTERS.map((r) => <option key={`create-sense-reg-${senseIdx}-${r}`} value={r}>{r}</option>)}
+                            </select>
+                          </label>
+                        </div>
+                        <div className="admin-dict-row">
+                          <label className="admin-dict-field">
+                            <span className="admin-dict-label">Definition RU</span>
+                            <textarea rows={2} value={sense.definitionRu} onChange={(e) => updateCreateSense(senseIdx, { definitionRu: e.target.value })} />
+                          </label>
+                          <label className="admin-dict-field">
+                            <span className="admin-dict-label">Usage note</span>
+                            <textarea rows={2} value={sense.usageNote} onChange={(e) => updateCreateSense(senseIdx, { usageNote: e.target.value })} />
+                          </label>
+                        </div>
+                        <div className="admin-dict-help">Примеры для смысла</div>
+                        {sense.examples.map((ex, exIdx) => (
+                          <div key={`create-ex-${senseIdx}-${exIdx}`} className="admin-dict-row" style={{ marginTop: 6 }}>
+                            <label className="admin-dict-field">
+                              <span className="admin-dict-label">EN</span>
+                              <input value={ex.en} onChange={(e) => updateCreateExample(senseIdx, exIdx, { en: e.target.value })} />
+                            </label>
+                            <label className="admin-dict-field">
+                              <span className="admin-dict-label">RU</span>
+                              <input value={ex.ru} onChange={(e) => updateCreateExample(senseIdx, exIdx, { ru: e.target.value })} />
+                            </label>
+                            <div className="admin-dict-actions" style={{ alignSelf: "end" }}>
+                              <button type="button" className="admin-dict-btn admin-dict-btn--ghost" onClick={() => removeCreateExample(senseIdx, exIdx)} disabled={sense.examples.length <= 1}>Удалить пример</button>
+                            </div>
+                          </div>
+                        ))}
+                        <div className="admin-dict-actions" style={{ marginTop: 6 }}>
+                          <button type="button" className="admin-dict-btn admin-dict-btn--secondary" onClick={() => addCreateExample(senseIdx)}>Добавить пример</button>
+                          <button type="button" className="admin-dict-btn admin-dict-btn--ghost" onClick={() => removeCreateSense(senseIdx)} disabled={createSenses.length <= 1}>Удалить смысл</button>
+                        </div>
+                      </div>
+                    ))}
+                    <div className="admin-dict-actions" style={{ marginTop: 8 }}>
+                      <button type="button" className="admin-dict-btn admin-dict-btn--secondary" onClick={addCreateSense}>Добавить смысл</button>
+                    </div>
+                  </div>
+
+                  <div style={{ marginTop: 12 }}>
+                    <div className="admin-dict-section-title">Формы</div>
+                    {createForms.map((form, formIdx) => (
+                      <div key={`create-form-${formIdx}`} className="admin-dict-row" style={{ marginTop: 8 }}>
+                        <label className="admin-dict-field">
+                          <span className="admin-dict-label">Form</span>
+                          <input value={form.form} onChange={(e) => updateCreateForm(formIdx, { form: e.target.value })} />
+                        </label>
+                        <label className="admin-dict-field">
+                          <span className="admin-dict-label">Form type</span>
+                          <input value={form.formType} onChange={(e) => updateCreateForm(formIdx, { formType: e.target.value })} />
+                        </label>
+                        <label className="admin-dict-field">
+                          <span className="admin-dict-label">Notes</span>
+                          <input value={form.notes} onChange={(e) => updateCreateForm(formIdx, { notes: e.target.value })} />
+                        </label>
+                        <label className="admin-dict-field" style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                          <input type="checkbox" checked={form.isIrregular} onChange={(e) => updateCreateForm(formIdx, { isIrregular: e.target.checked })} />
+                          <span className="admin-dict-label" style={{ margin: 0 }}>Irregular</span>
+                        </label>
+                        <div className="admin-dict-actions" style={{ alignSelf: "end" }}>
+                          <button type="button" className="admin-dict-btn admin-dict-btn--ghost" onClick={() => removeCreateForm(formIdx)} disabled={createForms.length <= 1}>Удалить форму</button>
+                        </div>
+                      </div>
+                    ))}
+                    <div className="admin-dict-actions" style={{ marginTop: 8 }}>
+                      <button type="button" className="admin-dict-btn admin-dict-btn--secondary" onClick={addCreateForm}>Добавить форму</button>
+                    </div>
+                  </div>
+
+                  <div className="admin-dict-actions" style={{ marginTop: 12 }}>
+                    <button type="button" className="admin-dict-btn admin-dict-btn--primary" onClick={() => void runCreateEntry()} disabled={createState === "loading"}>
+                      {createState === "loading" ? "Создание..." : "Создать слово"}
+                    </button>
+                    <button type="button" className="admin-dict-btn admin-dict-btn--secondary" onClick={resetCreateForm} disabled={createState === "loading"}>
+                      Очистить форму
+                    </button>
+                  </div>
+                  {createError && <div className="dictionary-error-banner" style={{ padding: "8px 12px", marginTop: 8 }}>{createError}</div>}
+                  {createResult && <div className="dictionary-success-banner" style={{ padding: "8px 12px", marginTop: 8 }}>{createResult}</div>}
+                </div>
+              )}
+            </div>
+          )}
+
           {adminView === "words" && (
           <div className="admin-dict-layout admin-dict-layout--single">
             <div className="admin-dict-results" style={editingEntryId ? { display: "none" } : undefined}>
@@ -2119,44 +2524,13 @@ const AdminDictionaryPage: React.FC = () => {
                   <button type="button" className="admin-dict-btn admin-dict-btn--secondary" onClick={selectAllVisibleForBatch}>
                     {items.length > 0 && items.every((w) => batchSelectedIds.includes(Number(w.id))) ? "Снять выбор с видимых" : "Выбрать видимые"}
                   </button>
-                  <button
-                    type="button"
-                    className="admin-dict-btn admin-dict-btn--secondary"
-                    onClick={() => void runBatchFormsDraft()}
-                    disabled={batchState === "loading" || batchSelectedIds.length === 0}
-                  >
-                    {batchState === "loading" ? "Batch…" : "Batch forms-draft"}
-                  </button>
-                  <button type="button" className="admin-dict-btn admin-dict-btn--secondary" onClick={exportBatchReport} disabled={batchReport.length === 0}>
-                    Экспорт отчёта batch
+                  <button type="button" className="admin-dict-btn admin-dict-btn--secondary" onClick={() => setAdminView("ai_bulk")} disabled={batchSelectedIds.length === 0}>
+                    Открыть AI + массовые
                   </button>
                 </div>
                 <div style={{ display: "flex", gap: 10, alignItems: "center", marginTop: 8, flexWrap: "wrap" }}>
                   <span>Выбрано: <b>{batchSelectedIds.length}</b></span>
-                  <label style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
-                    Пауза, мс:
-                    <input
-                      style={{ width: 90 }}
-                      type="number"
-                      value={batchDelayMs}
-                      onChange={(e) => setBatchDelayMs(Math.max(0, Number(e.target.value) || 0))}
-                    />
-                  </label>
-                  <label style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
-                    Retry:
-                    <input
-                      style={{ width: 70 }}
-                      type="number"
-                      value={batchRetryCount}
-                      onChange={(e) => setBatchRetryCount(Math.max(0, Math.min(5, Number(e.target.value) || 0)))}
-                    />
-                  </label>
                 </div>
-                {batchReport.length > 0 && (
-                  <div style={{ marginTop: 8 }}>
-                    Готово: {batchReport.filter((x) => x.status === "ok").length} ok / {batchReport.filter((x) => x.status === "error").length} error
-                  </div>
-                )}
               </div>
               <ul className="admin-dict-results-list" role="list">
                 {items.map((w) => (
@@ -2375,10 +2749,10 @@ const AdminDictionaryPage: React.FC = () => {
                             {ipaStatusText && <div><strong>Статус IPA:</strong> {ipaStatusText}</div>}
                           </div>
                         )}
-                        {(aiSuggestedFields?.length > 0 || aiAppliedSensesCount != null) && (
+                        {(aiSuggestedFieldsSafe.length > 0 || aiAppliedSensesCount != null) && (
                           <div className="admin-dict-help admin-dict-ai-changed">
-                            {aiSuggestedFields && aiSuggestedFields.length > 0 && (
-                              <div><strong>Карточка (поля изменены):</strong> {aiSuggestedFields.map((f) => fieldLabel[f]).join(", ")}</div>
+                            {aiSuggestedFieldsSafe.length > 0 && (
+                              <div><strong>Карточка (поля изменены):</strong> {aiSuggestedFieldsSafe.map((f) => fieldLabel[f]).join(", ")}</div>
                             )}
                             {aiAppliedSensesCount != null && aiAppliedSensesCount > 0 && (
                               <div><strong>Смыслы и примеры:</strong> применено в БД — {aiAppliedSensesCount} смысл(ов) с примерами</div>

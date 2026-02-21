@@ -20,6 +20,8 @@
 
 - **Первый раз** (чистая Ubuntu): [DEPLOY-УБУНТУ-ПОШАГОВО.md](DEPLOY-УБУНТУ-ПОШАГОВО.md)
 - **Обновление:** [DEPLOY-ОБНОВЛЕНИЕ.md](DEPLOY-ОБНОВЛЕНИЕ.md). Сервер: https://stroova.ru — см. [docs/SERVER.md](docs/SERVER.md)
+- **RF/DE internal sync словаря:** [docs/RF-DE-DICTIONARY-SYNC.md](docs/RF-DE-DICTIONARY-SYNC.md)
+- **Полный перенос DE прод -> RF прод + DE worker:** [docs/RF-DE-MIGRATION-RUNBOOK.md](docs/RF-DE-MIGRATION-RUNBOOK.md)
 
 ## Технологии
 

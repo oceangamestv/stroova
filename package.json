@@ -14,6 +14,7 @@
     "seed:a0": "node server/seed-a0-only.mjs",
     "dictionary:health": "node server/check-dictionary-health.mjs",
     "seed:house": "node server/seed-house-branch.mjs",
+    "de-sync:send": "node server/de-dictionary-sync-client.mjs",
     "update-ipa": "node server/update-ipa-from-dictionary.mjs",
     "generate-audio": "node server/generate-audio.mjs",
     "telegram-bot": "node server/telegram-bot.js",

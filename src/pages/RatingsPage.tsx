@@ -123,7 +123,7 @@ const RatingsPage: React.FC = () => {
     <div className="app-shell">
       <Header />
       <main className="main main--top">
-        <div className={isMobile ? undefined : "page-card"}>
+        <div className={isMobile ? "rating-page-wrap" : "page-card"}>
           <div className="rating-page">
             <h1 className="rating-page-title">Рейтинг</h1>
 

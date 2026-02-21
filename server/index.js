@@ -88,6 +88,14 @@ import {
   getPersonalEntryIdsFromSavedSenses,
 } from "./userDictionaryRepo.js";
 import { getIpaBoth } from "./lib/ipaGenerator.js";
+import {
+  enqueueInternalDictionarySyncJob,
+  getInternalDictionarySyncJobByRequestId,
+  getInternalDictionarySyncStats,
+  getInternalDictionarySyncWorkerHealth,
+  runInternalDictionarySyncWorkerTick,
+  startInternalDictionarySyncWorker,
+} from "./internalDictionarySync.js";
 
 const PORT = Number(process.env.PORT) || 3000;
 const CORS_ORIGIN = process.env.CORS_ORIGIN || "http://localhost:5173";
@@ -95,6 +103,15 @@ const CORS_ORIGIN = process.env.CORS_ORIGIN || "http://localhost:5173";
 const CORS_ORIGINS = CORS_ORIGIN.split(",")
   .map((s) => s.trim().replace(/^["']|["']$/g, "").trim())
   .filter(Boolean);
+const INTERNAL_SYNC_SOURCE = (process.env.INTERNAL_SYNC_SOURCE || "de-ai-worker").trim();
+const INTERNAL_SYNC_SHARED_SECRET = String(process.env.INTERNAL_SYNC_SHARED_SECRET || "");
+const INTERNAL_SYNC_REQUIRE_SIGNATURE = String(process.env.INTERNAL_SYNC_REQUIRE_SIGNATURE || "true").toLowerCase() !== "false";
+const INTERNAL_SYNC_ALLOWED_IPS = String(process.env.INTERNAL_SYNC_ALLOWED_IPS || "")
+  .split(",")
+  .map((s) => s.trim())
+  .filter(Boolean);
+const INTERNAL_SYNC_REQUIRE_MTLS = String(process.env.INTERNAL_SYNC_REQUIRE_MTLS || "false").toLowerCase() === "true";
+const INTERNAL_SYNC_ALLOWED_SKEW_SECONDS = Math.max(30, Number(process.env.INTERNAL_SYNC_ALLOWED_SKEW_SECONDS || 300));
 
 function getAllowedOrigin(req) {
   const origin = req?.headers?.origin;
@@ -248,6 +265,125 @@ async function requireAdmin(req, res) {
     return null;
   }
   return auth;
+}
+
+function getClientIp(req) {
+  const xff = String(req?.headers?.["x-forwarded-for"] || "").trim();
+  const fromForwarded = xff ? xff.split(",")[0].trim() : "";
+  const raw = fromForwarded || String(req?.socket?.remoteAddress || "").trim();
+  return raw.startsWith("::ffff:") ? raw.slice(7) : raw;
+}
+
+function buildInternalBodyHash(payload) {
+  return crypto.createHash("sha256").update(JSON.stringify(payload || {}), "utf8").digest("hex");
+}
+
+function buildInternalSignature(timestamp, requestId, payload, secret) {
+  const bodyHash = buildInternalBodyHash(payload);
+  return crypto.createHmac("sha256", secret).update(`${timestamp}.${requestId}.${bodyHash}`, "utf8").digest("hex");
+}
+
+function safeEqualHex(a, b) {
+  try {
+    const ab = Buffer.from(String(a || ""), "hex");
+    const bb = Buffer.from(String(b || ""), "hex");
+    if (ab.length === 0 || bb.length === 0 || ab.length !== bb.length) return false;
+    return crypto.timingSafeEqual(ab, bb);
+  } catch {
+    return false;
+  }
+}
+
+function validateInternalSyncPayload(payload) {
+  const requestId = String(payload?.requestId || "").trim();
+  const source = String(payload?.source || "").trim();
+  const payloadVersion = String(payload?.payloadVersion || "").trim();
+  const lang = String(payload?.lang || "en").trim() || "en";
+  const actorUsername = String(payload?.actorUsername || "").trim();
+  const entries = Array.isArray(payload?.entries) ? payload.entries : [];
+
+  if (!requestId) return { ok: false, error: "requestId is required" };
+  if (!source) return { ok: false, error: "source is required" };
+  if (!payloadVersion) return { ok: false, error: "payloadVersion is required" };
+  if (source !== INTERNAL_SYNC_SOURCE) {
+    return { ok: false, error: `source must be '${INTERNAL_SYNC_SOURCE}'` };
+  }
+  if (entries.length === 0) return { ok: false, error: "entries must be a non-empty array" };
+  if (entries.length > 200) return { ok: false, error: "entries limit exceeded (max 200)" };
+
+  const normalized = [];
+  for (const item of entries) {
+    const en = String(item?.en || "").trim();
+    if (!en) continue;
+    normalized.push({
+      en,
+      ru: String(item?.ru || "").trim(),
+      accent: item?.accent,
+      level: item?.level,
+      frequencyRank: item?.frequencyRank,
+      rarity: item?.rarity,
+      register: item?.register,
+      ipaUk: item?.ipaUk,
+      ipaUs: item?.ipaUs,
+      example: item?.example,
+      exampleRu: item?.exampleRu,
+    });
+  }
+  if (normalized.length === 0) return { ok: false, error: "entries contain no valid records with en field" };
+
+  return {
+    ok: true,
+    normalized: {
+      requestId,
+      source,
+      payloadVersion,
+      lang,
+      actorUsername: actorUsername || null,
+      entries: normalized,
+    },
+  };
+}
+
+function authorizeInternalSync(req, payload) {
+  const ip = getClientIp(req);
+  if (INTERNAL_SYNC_ALLOWED_IPS.length > 0 && !INTERNAL_SYNC_ALLOWED_IPS.includes(ip)) {
+    return { ok: false, status: 403, error: "IP is not allowlisted", ip };
+  }
+  if (INTERNAL_SYNC_REQUIRE_MTLS) {
+    const mtlsHeader = String(req.headers["x-internal-mtls-verified"] || "");
+    if (mtlsHeader !== "1") {
+      return { ok: false, status: 403, error: "mTLS verification header is required", ip };
+    }
+  }
+
+  if (!INTERNAL_SYNC_REQUIRE_SIGNATURE) return { ok: true, ip };
+  if (!INTERNAL_SYNC_SHARED_SECRET) {
+    return { ok: false, status: 500, error: "INTERNAL_SYNC_SHARED_SECRET is not configured", ip };
+  }
+
+  const tsRaw = String(req.headers["x-sync-timestamp"] || "").trim();
+  const requestIdHeader = String(req.headers["x-sync-request-id"] || "").trim();
+  const signatureHeader = String(req.headers["x-sync-signature"] || "").trim();
+  const ts = Number(tsRaw);
+  if (!tsRaw || !Number.isFinite(ts)) return { ok: false, status: 401, error: "Invalid x-sync-timestamp", ip };
+  if (!requestIdHeader) return { ok: false, status: 401, error: "Missing x-sync-request-id", ip };
+  if (!signatureHeader) return { ok: false, status: 401, error: "Missing x-sync-signature", ip };
+
+  const nowSec = Math.floor(Date.now() / 1000);
+  const skew = Math.abs(nowSec - ts);
+  if (skew > INTERNAL_SYNC_ALLOWED_SKEW_SECONDS) {
+    return { ok: false, status: 401, error: "Signature timestamp outside allowed skew window", ip };
+  }
+  if (requestIdHeader !== String(payload?.requestId || "")) {
+    return { ok: false, status: 401, error: "requestId mismatch between header and body", ip };
+  }
+
+  const expected = buildInternalSignature(tsRaw, requestIdHeader, payload, INTERNAL_SYNC_SHARED_SECRET);
+  const provided = signatureHeader.startsWith("sha256=") ? signatureHeader.slice(7) : signatureHeader;
+  if (!safeEqualHex(provided, expected)) {
+    return { ok: false, status: 401, error: "Invalid signature", ip };
+  }
+  return { ok: true, ip };
 }
 
 const START_PROFILE_TO_COLLECTION = {
@@ -811,6 +947,80 @@ const routes = {
     send(res, 200, { version });
   },
 
+  /**
+   * Internal RF endpoint for DE->RF dictionary sync jobs.
+   * Requires service signature and (optionally) IP allowlist / mTLS marker.
+   */
+  "POST /api/internal/dictionary-upserts": async (req, res, body) => {
+    const validated = validateInternalSyncPayload(body);
+    if (!validated.ok) {
+      send(res, 400, { error: validated.error });
+      return;
+    }
+
+    const authz = authorizeInternalSync(req, validated.normalized);
+    if (!authz.ok) {
+      send(res, authz.status || 401, { error: authz.error });
+      return;
+    }
+
+    const { requestId, source, ...payload } = validated.normalized;
+    const enq = await enqueueInternalDictionarySyncJob({
+      requestId,
+      source,
+      payload: { ...payload, source },
+    });
+    // Trigger worker immediately (queue is still persisted in DB).
+    void runInternalDictionarySyncWorkerTick();
+
+    const status = enq.created ? 202 : 200;
+    send(res, status, {
+      ok: true,
+      accepted: true,
+      idempotentReplay: !enq.created,
+      requestId,
+      job: enq.job,
+      statusEndpoint: `/api/internal/dictionary-upserts/status?requestId=${encodeURIComponent(requestId)}`,
+    });
+  },
+
+  "GET /api/internal/dictionary-upserts/status": async (req, res, body, url) => {
+    const requestId = String(url.searchParams.get("requestId") || "").trim();
+    if (!requestId) {
+      send(res, 400, { error: "requestId is required" });
+      return;
+    }
+
+    // Sign-only check for status endpoint is enough for backend-to-backend polling.
+    const payload = { requestId };
+    const authz = authorizeInternalSync(req, payload);
+    if (!authz.ok) {
+      send(res, authz.status || 401, { error: authz.error });
+      return;
+    }
+
+    const job = await getInternalDictionarySyncJobByRequestId(requestId);
+    if (!job) {
+      send(res, 404, { error: "Job not found" });
+      return;
+    }
+
+    send(res, 200, {
+      ok: true,
+      requestId,
+      status: job.status,
+      job,
+      worker: getInternalDictionarySyncWorkerHealth(),
+    });
+  },
+
+  "GET /api/admin/dictionary/internal-sync/stats": async (req, res) => {
+    const auth = await requireAdmin(req, res);
+    if (!auth) return;
+    const stats = await getInternalDictionarySyncStats();
+    send(res, 200, stats);
+  },
+
   /** Отладка: как сервер видит OPENAI_API_KEY (без показа самого ключа). Только для админа. */
   "GET /api/admin/openai-check": async (req, res) => {
     const auth = await requireAdmin(req, res);
@@ -952,6 +1162,82 @@ const routes = {
     send(res, 200, out);
   },
 
+  "POST /api/admin/collections/items/add-bulk": async (req, res, body) => {
+    const auth = await requireAdmin(req, res);
+    if (!auth) return;
+    const lang = String(body?.lang || "en").trim() || "en";
+    const collectionId = Number(body?.collectionId || 0);
+    const entryIdsRaw = Array.isArray(body?.entryIds) ? body.entryIds : [];
+    const entryIds = Array.from(
+      new Set(
+        entryIdsRaw
+          .map((x) => Number(x))
+          .filter((x) => Number.isFinite(x) && x > 0)
+      )
+    ).slice(0, 500);
+    if (!collectionId) {
+      send(res, 400, { error: "Поле collectionId обязательно" });
+      return;
+    }
+    if (entryIds.length === 0) {
+      send(res, 400, { error: "Поле entryIds обязательно (непустой массив)" });
+      return;
+    }
+
+    const linksRes = await pool.query(
+      `
+        SELECT entry_id AS "entryId", sense_id AS "senseId"
+        FROM dictionary_entry_links
+        WHERE entry_id = ANY($1::int[])
+      `,
+      [entryIds]
+    );
+    const senseByEntryId = new Map();
+    for (const row of linksRes.rows || []) {
+      const entryId = Number(row?.entryId || 0);
+      const senseId = Number(row?.senseId || 0);
+      if (entryId > 0 && senseId > 0) senseByEntryId.set(entryId, senseId);
+    }
+
+    const report = [];
+    let added = 0;
+    let skipped = 0;
+    let errors = 0;
+    for (const entryId of entryIds) {
+      const senseId = senseByEntryId.get(entryId) || null;
+      if (!senseId) {
+        skipped++;
+        report.push({ entryId, status: "skipped", reason: "sense link not found" });
+        continue;
+      }
+      try {
+        const out = await addCollectionItemAdmin(lang, collectionId, { senseId });
+        if (out?.ok) {
+          added++;
+          report.push({ entryId, senseId, status: "added" });
+        } else {
+          skipped++;
+          report.push({ entryId, senseId, status: "skipped", reason: String(out?.reason || "duplicate or invalid") });
+        }
+      } catch (e) {
+        errors++;
+        const msg = e instanceof Error ? e.message : String(e);
+        report.push({ entryId, senseId, status: "error", reason: msg });
+      }
+    }
+
+    send(res, 200, {
+      ok: true,
+      totals: {
+        requested: entryIds.length,
+        added,
+        skipped,
+        errors,
+      },
+      report,
+    });
+  },
+
   "POST /api/admin/collections/item/remove": async (req, res, body) => {
     const auth = await requireAdmin(req, res);
     if (!auth) return;
@@ -1017,6 +1303,208 @@ const routes = {
       return;
     }
     send(res, 200, { entry });
+  },
+
+  "POST /api/admin/dictionary/entry/create": async (req, res, body) => {
+    const auth = await requireAdmin(req, res);
+    if (!auth) return;
+    const lang = String(body?.lang || "en").trim() || "en";
+    const entry = body?.entry && typeof body.entry === "object" ? body.entry : {};
+    const sensesRaw = Array.isArray(body?.senses) ? body.senses : [];
+    const formsRaw = Array.isArray(body?.forms) ? body.forms : [];
+
+    const en = String(entry?.en || "").trim();
+    const ru = String(entry?.ru || "").trim();
+    const level = normalizeImportLevel(entry?.level) || "A0";
+    if (!en) {
+      send(res, 400, { error: "Поле entry.en обязательно" });
+      return;
+    }
+    if (!ru) {
+      send(res, 400, { error: "Поле entry.ru обязательно" });
+      return;
+    }
+    if (!/^[A-Za-z][A-Za-z'-]*$/.test(en)) {
+      send(res, 400, { error: "entry.en должен быть одним английским словом" });
+      return;
+    }
+
+    const normalizeAccent = (v) => {
+      const s = String(v || "").trim().toUpperCase();
+      if (s === "UK") return "UK";
+      if (s === "US") return "US";
+      return "both";
+    };
+    const normalizeRarity = (v) => {
+      const s = String(v || "").trim();
+      if (s === "редкое" || s === "очень редкое" || s === "не редкое") return s;
+      return "не редкое";
+    };
+    const normalizeRegister = (v) => normalizeImportRegister(v) || "разговорная";
+    const toInt = (v, fallback) => {
+      const n = parseInt(String(v ?? ""), 10);
+      return Number.isFinite(n) ? n : fallback;
+    };
+    const entryPatch = {
+      en,
+      ru,
+      level,
+      accent: normalizeAccent(entry?.accent),
+      frequencyRank: Math.max(1, toInt(entry?.frequencyRank, 15000)),
+      rarity: normalizeRarity(entry?.rarity),
+      register: normalizeRegister(entry?.register),
+      ipaUk: String(entry?.ipaUk || "").trim(),
+      ipaUs: String(entry?.ipaUs || "").trim(),
+      example: String(entry?.example || "").trim(),
+      exampleRu: String(entry?.exampleRu || "").trim(),
+    };
+
+    const langRes = await pool.query("SELECT id FROM languages WHERE code = $1", [lang]);
+    if (langRes.rows.length === 0) {
+      send(res, 400, { error: "Неизвестный язык", details: `lang=${lang}` });
+      return;
+    }
+    const languageId = Number(langRes.rows[0].id);
+
+    const client = await pool.connect();
+    let entryId = 0;
+    try {
+      await client.query("BEGIN");
+      const insRes = await client.query(
+        `
+          INSERT INTO dictionary_entries
+            (language_id, en, ru, accent, level, frequency_rank, rarity, register, ipa_uk, ipa_us, example, example_ru)
+          VALUES
+            ($1, $2, $3, 'both', 'A0', 15000, 'не редкое', 'разговорная', '', '', '', '')
+          RETURNING id
+        `,
+        [languageId, en, ru]
+      );
+      entryId = Number(insRes.rows[0]?.id || 0);
+      if (!entryId) throw new Error("Не удалось создать запись");
+
+      const patched = await patchDictionaryEntry(lang, entryId, entryPatch, auth.user.username, client);
+      if (!patched?.id) throw new Error("Не удалось сохранить поля карточки");
+
+      const linkRes = await client.query(
+        `SELECT lemma_id AS "lemmaId", sense_id AS "senseId" FROM dictionary_entry_links WHERE entry_id = $1 LIMIT 1`,
+        [entryId]
+      );
+      const lemmaId = Number(linkRes.rows[0]?.lemmaId || 0);
+      const sense1Id = Number(linkRes.rows[0]?.senseId || 0);
+      if (!lemmaId || !sense1Id) throw new Error("Не удалось создать v2-связку");
+
+      const sensesNormalized = sensesRaw
+        .map((s) => ({
+          level: normalizeImportLevel(s?.level) || level,
+          register: normalizeRegister(s?.register),
+          glossRu: String(s?.glossRu || "").trim(),
+          definitionRu: String(s?.definitionRu || ""),
+          usageNote: String(s?.usageNote || ""),
+          examples: Array.isArray(s?.examples) ? s.examples : [],
+        }))
+        .filter((s) => s.glossRu);
+
+      if (sensesNormalized[0]) {
+        const first = sensesNormalized[0];
+        await client.query(
+          `
+            UPDATE dictionary_senses
+            SET definition_ru = $1, usage_note = $2, updated_at = NOW()
+            WHERE id = $3
+          `,
+          [first.definitionRu, first.usageNote, sense1Id]
+        );
+        if (Array.isArray(first.examples) && first.examples.length > 0) {
+          let idx = 0;
+          for (const ex of first.examples.slice(0, 20)) {
+            const exEn = String(ex?.en || "").trim();
+            const exRu = String(ex?.ru || "").trim();
+            if (!exEn) continue;
+            await client.query(
+              `
+                INSERT INTO dictionary_examples (sense_id, en, ru, is_main, sort_order)
+                VALUES ($1, $2, $3, $4, $5)
+                ON CONFLICT (sense_id, en, ru) DO NOTHING
+              `,
+              [sense1Id, exEn, exRu, idx === 0, idx]
+            );
+            idx++;
+          }
+        }
+      }
+
+      for (let i = 1; i < sensesNormalized.length; i++) {
+        const s = sensesNormalized[i];
+        const nextNoRes = await client.query(
+          `SELECT COALESCE(MAX(sense_no), 0)::int + 1 AS "nextNo" FROM dictionary_senses WHERE lemma_id = $1`,
+          [lemmaId]
+        );
+        const nextNo = Number(nextNoRes.rows[0]?.nextNo || 2);
+        const insSense = await client.query(
+          `
+            INSERT INTO dictionary_senses (lemma_id, sense_no, level, register, gloss_ru, definition_ru, usage_note, updated_at)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+            RETURNING id
+          `,
+          [lemmaId, nextNo, s.level, s.register, s.glossRu, s.definitionRu, s.usageNote]
+        );
+        const senseId = Number(insSense.rows[0]?.id || 0);
+        if (!senseId) continue;
+        let idx = 0;
+        for (const ex of s.examples.slice(0, 20)) {
+          const exEn = String(ex?.en || "").trim();
+          const exRu = String(ex?.ru || "").trim();
+          if (!exEn) continue;
+          await client.query(
+            `
+              INSERT INTO dictionary_examples (sense_id, en, ru, is_main, sort_order)
+              VALUES ($1, $2, $3, $4, $5)
+              ON CONFLICT (sense_id, en, ru) DO NOTHING
+            `,
+            [senseId, exEn, exRu, idx === 0, idx]
+          );
+          idx++;
+        }
+      }
+
+      const forms = formsRaw
+        .map((f) => ({
+          form: String(f?.form || "").trim(),
+          formType: String(f?.formType || "").trim(),
+          isIrregular: !!f?.isIrregular,
+          notes: String(f?.notes || ""),
+        }))
+        .filter((f) => f.form)
+        .slice(0, 200);
+      for (const f of forms) {
+        await client.query(
+          `
+            INSERT INTO dictionary_forms (lemma_id, form, form_type, is_irregular, notes)
+            VALUES ($1, $2, $3, $4, $5)
+            ON CONFLICT DO NOTHING
+          `,
+          [lemmaId, f.form, f.formType, f.isIrregular, f.notes]
+        );
+      }
+
+      await client.query("COMMIT");
+    } catch (e) {
+      try {
+        await client.query("ROLLBACK");
+      } catch {}
+      const msg = e instanceof Error ? e.message : String(e);
+      send(res, 500, { error: "Не удалось создать запись словаря", details: msg });
+      return;
+    } finally {
+      client.release();
+    }
+
+    try {
+      await updateDictionaryVersion(lang);
+    } catch {}
+    const v2 = await getEntryV2Admin(lang, entryId);
+    send(res, 200, { ok: true, entryId, entry: v2?.entry || null, v2 });
   },
 
   "PATCH /api/admin/dictionary/entry": async (req, res, body) => {
@@ -3078,6 +3566,7 @@ async function runPersonalDictionaryMigration() {
 
 async function start() {
   await initDb();
+  startInternalDictionarySyncWorker({ pollMs: Number(process.env.INTERNAL_SYNC_WORKER_POLL_MS || 3000) });
   try {
     await runPersonalDictionaryMigration();
   } catch (e) {
