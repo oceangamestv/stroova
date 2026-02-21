@@ -7,6 +7,7 @@ import type { DictionarySource } from "../../services/dictionaryService";
 export type GameSlug =
   | "pairs"
   | "puzzle"
+  | "word-search"
   | "danetka"
   | "one-of-three"
   | "gates-of-knowledge";
@@ -31,6 +32,16 @@ const GAME_INTRO: Record<
       "Вверху показан перевод. Ниже — буквы. Расставьте их по слотам в правильном порядке.",
       "Лёгкий режим: буквы даны, выбирайте по одной. Сложный: вводите слово с клавиатуры по буквам.",
       "За каждое верное слово начисляется опыт.",
+    ],
+  },
+  "word-search": {
+    title: "🔤 Word Search",
+    description: "Найдите слова на поле, ведя пальцем или мышью от буквы к букве.",
+    rules: [
+      "Выберите размер поля и словарь в настройках ниже и нажмите «Начать».",
+      "Зажмите на букве и ведите змейкой по соседним клеткам только по вертикали и горизонтали (без диагоналей).",
+      "Каждую клетку можно использовать только один раз за игру, а слово засчитывается только по правильному маршруту.",
+      "Лишние клетки скрыты: все видимые буквы относятся к словам на поле.",
     ],
   },
   danetka: {
@@ -80,6 +91,9 @@ const GameIntroScreen: React.FC<GameIntroScreenProps> = ({ gameSlug, onStart }) 
   const dictionarySource: DictionarySource =
     user?.gameSettings?.dictionarySource ?? (user ? "personal" : "general");
   const puzzleDifficulty = user?.gameSettings?.puzzleDifficulty ?? "easy";
+  const wordSearchGridSize = user?.gameSettings?.wordSearchGridSize ?? "small";
+  const wordSearchDictionaryMode = user?.gameSettings?.wordSearchDictionaryMode ?? "mixed";
+  const wordSearchAllowEmptyCells = user?.gameSettings?.wordSearchAllowEmptyCells ?? true;
 
   const setDictionarySource = (source: DictionarySource) => {
     authService.updateGameSettings({ dictionarySource: source });
@@ -91,6 +105,20 @@ const GameIntroScreen: React.FC<GameIntroScreenProps> = ({ gameSlug, onStart }) 
 
   const setPuzzleDifficulty = (value: "easy" | "hard") => {
     authService.updateGameSettings({ puzzleDifficulty: value });
+    refreshUser();
+  };
+
+  const setWordSearchGridSize = (value: "small" | "medium" | "large") => {
+    authService.updateGameSettings({ wordSearchGridSize: value });
+    refreshUser();
+  };
+  const setWordSearchDictionaryMode = (value: "global" | "user" | "mixed") => {
+    authService.updateGameSettings({ wordSearchDictionaryMode: value });
+    refreshUser();
+    if (value === "user") void hydrateUser().then(() => refreshUser());
+  };
+  const setWordSearchAllowEmptyCells = (value: boolean) => {
+    authService.updateGameSettings({ wordSearchAllowEmptyCells: value });
     refreshUser();
   };
 
@@ -129,7 +157,7 @@ const GameIntroScreen: React.FC<GameIntroScreenProps> = ({ gameSlug, onStart }) 
           <span className="game-intro__zone-icon" aria-hidden="true">⚙️</span>
           Настройки
         </h2>
-        {gameSlug !== "gates-of-knowledge" ? (
+        {gameSlug !== "gates-of-knowledge" && gameSlug !== "word-search" ? (
           <div className="game-intro__setting">
             <div className="game-dictionary-source-btns">
               <button
@@ -148,6 +176,71 @@ const GameIntroScreen: React.FC<GameIntroScreenProps> = ({ gameSlug, onStart }) 
               </button>
             </div>
           </div>
+        ) : gameSlug === "word-search" ? (
+          <>
+            <div className="game-intro__setting">
+              <span className="game-intro__setting-label">Размер поля:</span>
+              <div className="game-dictionary-source-btns">
+                <button
+                  type="button"
+                  className={`game-dictionary-source-btn ${wordSearchGridSize === "small" ? "active" : ""}`}
+                  onClick={() => setWordSearchGridSize("small")}
+                >
+                  6×6
+                </button>
+                <button
+                  type="button"
+                  className={`game-dictionary-source-btn ${wordSearchGridSize === "medium" ? "active" : ""}`}
+                  onClick={() => setWordSearchGridSize("medium")}
+                >
+                  8×8
+                </button>
+                <button
+                  type="button"
+                  className={`game-dictionary-source-btn ${wordSearchGridSize === "large" ? "active" : ""}`}
+                  onClick={() => setWordSearchGridSize("large")}
+                >
+                  10×10
+                </button>
+              </div>
+            </div>
+            <div className="game-intro__setting">
+              <span className="game-intro__setting-label">Словарь:</span>
+              <div className="game-dictionary-source-btns">
+                <button
+                  type="button"
+                  className={`game-dictionary-source-btn ${wordSearchDictionaryMode === "global" ? "active" : ""}`}
+                  onClick={() => setWordSearchDictionaryMode("global")}
+                >
+                  Общий
+                </button>
+                <button
+                  type="button"
+                  className={`game-dictionary-source-btn ${wordSearchDictionaryMode === "user" ? "active" : ""}`}
+                  onClick={() => setWordSearchDictionaryMode("user")}
+                >
+                  Мой
+                </button>
+                <button
+                  type="button"
+                  className={`game-dictionary-source-btn ${wordSearchDictionaryMode === "mixed" ? "active" : ""}`}
+                  onClick={() => setWordSearchDictionaryMode("mixed")}
+                >
+                  Оба
+                </button>
+              </div>
+            </div>
+            <div className="game-intro__setting">
+              <label className="game-intro__setting-label">
+                <input
+                  type="checkbox"
+                  checked={wordSearchAllowEmptyCells}
+                  onChange={(e) => setWordSearchAllowEmptyCells(e.target.checked)}
+                />
+                {" "}Разрешить пустые клетки
+              </label>
+            </div>
+          </>
         ) : (
           <p className="game-intro__setting-label">
             В MVP для этого режима используется только общий словарь A0.

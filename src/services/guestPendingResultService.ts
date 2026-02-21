@@ -89,7 +89,7 @@ export const guestPendingResultService = {
    * Добавить результат одной игры (гость). Можно вызывать несколько раз до входа — результаты суммируются.
    */
   addGameResult(
-    gameType: "pairs" | "puzzle" | "danetka" | "one-of-three" | "gates-of-knowledge",
+    gameType: "pairs" | "puzzle" | "danetka" | "one-of-three" | "gates-of-knowledge" | "word-search",
     earnedXp: number,
     wordUpdates: PendingWordUpdate[]
   ): void {

@@ -20,6 +20,15 @@ const IconPuzzle: React.FC<{ className?: string }> = ({ className }) => (
   </svg>
 );
 
+/** Иконка: буквенная сетка (поиск слов) */
+const IconWordSearch: React.FC<{ className?: string }> = ({ className }) => (
+  <svg className={className} viewBox="0 0 48 48" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+    <rect x="8" y="8" width="32" height="32" rx="4" />
+    <path d="M19 8v32M29 8v32M8 19h32M8 29h32" />
+    <path d="M12 14h4M22 14h4M32 14h4M12 24h4M22 24h4M32 24h4M12 34h4M22 34h4M32 34h4" />
+  </svg>
+);
+
 /** Иконка: викторина (галочка — выбор ответа) */
 const IconDanetka: React.FC<{ className?: string }> = ({ className }) => (
   <svg className={className} viewBox="0 0 48 48" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
@@ -58,6 +67,12 @@ const GAMES = [
     title: "Puzzle Words",
     description: "Соберите слово из букв по переводу. Удобно для запоминания написания и перевода.",
     Icon: IconPuzzle,
+  },
+  {
+    to: "/word-search",
+    title: "Word Search",
+    description: "Ищите английские слова на поле, выделяя их только вправо или вниз.",
+    Icon: IconWordSearch,
   },
   {
     to: "/danetka",

@@ -71,6 +71,7 @@ const routeConfig = [
   { path: "/", element: <HomeOrHub /> },
   { path: "/pairs", element: <GameRoute /> },
   { path: "/puzzle", element: <GameRoute /> },
+  { path: "/word-search", element: <GameRoute /> },
   { path: "/danetka", element: <GameRoute /> },
   { path: "/one-of-three", element: <GameRoute /> },
   { path: "/gates-of-knowledge", element: <GameRoute /> },

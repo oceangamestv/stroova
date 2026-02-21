@@ -64,6 +64,12 @@ export type UserGameSettings = {
   dictionaryAddMode?: "ask" | "instant" | "onboarding";
   /** Сложность в Puzzle Words: лёгкий (подсказки) или сложный. */
   puzzleDifficulty?: "easy" | "hard";
+  /** Word Search: размер поля. */
+  wordSearchGridSize?: "small" | "medium" | "large";
+  /** Word Search: режим словаря. */
+  wordSearchDictionaryMode?: "global" | "user" | "mixed";
+  /** Word Search: разрешать пустые клетки на поле. */
+  wordSearchAllowEmptyCells?: boolean;
 };
 
 /** Активные дни: серия дней подряд с выполнением хотя бы одного задания (по серверной дате). */
