@@ -52,6 +52,7 @@ export const GameRoute: React.FC = () => {
     words.map((word) => ({
       id: String(word.id),
       value: word.en.trim().toLowerCase(),
+      level: word.level,
     }));
 
   useEffect(() => {

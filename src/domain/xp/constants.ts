@@ -33,6 +33,7 @@ export const GAME_MULTIPLIERS: Record<GameType, number> = {
   DANETKA: 1.2,
   ONE_OF_THREE: 1.2,
   GATES_OF_KNOWLEDGE: 1.35,
+  WORD_SEARCH: 1.2,
 };
 
 /** Множители за сложность пазлов (k_game для PUZZLE). */

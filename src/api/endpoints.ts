@@ -401,6 +401,28 @@ export const adminDictionaryApi = {
     api.post<{ ok: boolean; updated?: number }>(`/admin/collections/items/reorder`, body),
 };
 
+export const adminAudioApi = {
+  checkFull: (body?: { lang?: string }) =>
+    api.post<{ updated: number; missingCount: number; missing: Array<{ id: number; en: string; slug: string }> }>(
+      "/admin/audio/check-full",
+      body ?? {}
+    ),
+  checkNew: (body?: { lang?: string }) =>
+    api.post<{ updated: number; missingCount: number; missing: Array<{ id: number; en: string; slug: string }> }>(
+      "/admin/audio/check-new",
+      body ?? {}
+    ),
+  getMissing: (params?: { lang?: string }) => {
+    const search = new URLSearchParams();
+    if (params?.lang) search.set("lang", params.lang);
+    const q = search.toString();
+    return api.get<{
+      missing: Array<{ id: number; en: string; slug: string; hasFemale: boolean; hasMale: boolean }>;
+      total: number;
+    }>(`/admin/audio/missing${q ? `?${q}` : ""}`);
+  },
+};
+
 export const ratingApi = {
   participate: () => api.post<{ ok: boolean }>("/rating/participate", {}),
   getLeaderboard: () => api.get<LeaderboardResponse>("/rating/leaderboard"),

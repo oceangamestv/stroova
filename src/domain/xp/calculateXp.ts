@@ -32,6 +32,9 @@ function getGameMultiplier(
   if (gameType === "GATES_OF_KNOWLEDGE") {
     return GAME_MULTIPLIERS.GATES_OF_KNOWLEDGE;
   }
+  if (gameType === "WORD_SEARCH") {
+    return GAME_MULTIPLIERS.WORD_SEARCH;
+  }
   return 1.0;
 }
 

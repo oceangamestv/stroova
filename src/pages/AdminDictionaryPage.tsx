@@ -4,7 +4,9 @@ import { useIsMobile } from "../hooks/useIsMobile";
 import { useAuth } from "../features/auth/AuthContext";
 import { useNavigate, useParams } from "react-router-dom";
 import type { Word } from "../data/contracts/types";
-import { adminDictionaryApi } from "../api/endpoints";
+import { adminDictionaryApi, adminAudioApi } from "../api/endpoints";
+import { getStoredToken } from "../api/client";
+import { API_BASE_URL } from "../api/config";
 import type {
   AdminDictionaryAiDraft,
   AdminDictionaryCollection,
@@ -28,7 +30,7 @@ type AiImportItem = {
   exists: boolean;
 };
 
-type AdminView = "words" | "collections" | "ai_bulk";
+type AdminView = "words" | "collections" | "ai_bulk" | "audio";
 
 type CreateSenseDraft = {
   glossRu: string;
@@ -187,6 +189,13 @@ const IconAdminAiBulk: React.FC<{ className?: string }> = ({ className }) => (
     <circle cx="31" cy="16" r="5" />
     <circle cx="24" cy="31" r="5" />
     <path d="M21 19l3 7M27 19l-3 7M22 31h4" />
+  </svg>
+);
+
+const IconAdminAudio: React.FC<{ className?: string }> = ({ className }) => (
+  <svg className={className} viewBox="0 0 48 48" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+    <path d="M24 6v36M14 16v16M34 16v16M9 26v-4h6v4H9zm24 0v-4h6v4h-6z" />
+    <path d="M18 12l6 6 6-6" />
   </svg>
 );
 
@@ -378,6 +387,12 @@ const AdminDictionaryPage: React.FC = () => {
       description: "AI-импорт, пакетная обработка и массовое добавление в коллекции.",
       Icon: IconAdminAiBulk,
     },
+    {
+      key: "audio",
+      title: "Аудио файлы",
+      description: "Проверка наличия озвучки по каталогам, список слов без озвучки и выгрузка файла для локальной генерации.",
+      Icon: IconAdminAudio,
+    },
   ];
   const [collectionsList, setCollectionsList] = useState<AdminDictionaryCollection[]>([]);
   const [collectionsTotal, setCollectionsTotal] = useState(0);
@@ -415,6 +430,17 @@ const AdminDictionaryPage: React.FC = () => {
     isPublic: true,
     sortOrder: 0,
   });
+
+  const [audioCheckState, setAudioCheckState] = useState<LoadState>("idle");
+  const [audioCheckError, setAudioCheckError] = useState<string | null>(null);
+  const [audioCheckResult, setAudioCheckResult] = useState<{
+    updated: number;
+    missingCount: number;
+    missing: Array<{ id: number; en: string; slug: string }>;
+  } | null>(null);
+  const [audioMissingList, setAudioMissingList] = useState<Array<{ id: number; en: string; slug: string; hasFemale: boolean; hasMale: boolean }>>([]);
+  const [audioMissingTotal, setAudioMissingTotal] = useState(0);
+  const [audioMissingState, setAudioMissingState] = useState<LoadState>("idle");
 
   const canAccess = !!user?.isAdmin && !isMobile;
 
@@ -553,6 +579,78 @@ const AdminDictionaryPage: React.FC = () => {
     void loadCollectionsAdmin(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [canAccess, adminView]);
+
+  const loadAudioMissing = async () => {
+    setAudioMissingState("loading");
+    try {
+      const out = await adminAudioApi.getMissing({ lang });
+      setAudioMissingList(Array.isArray(out?.missing) ? out.missing : []);
+      setAudioMissingTotal(Number(out?.total ?? 0));
+      setAudioMissingState("idle");
+    } catch (e) {
+      setAudioMissingState("error");
+      setAudioMissingList([]);
+      setAudioMissingTotal(0);
+    }
+  };
+
+  useEffect(() => {
+    if (!canAccess || adminView !== "audio") return;
+    void loadAudioMissing();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canAccess, adminView, lang]);
+
+  const runAudioCheckFull = async () => {
+    setAudioCheckState("loading");
+    setAudioCheckError(null);
+    setAudioCheckResult(null);
+    setAudioMissingList([]);
+    setAudioMissingTotal(0);
+    setAudioMissingState("loading");
+    try {
+      const result = await adminAudioApi.checkFull({ lang });
+      setAudioCheckResult(result);
+      setAudioCheckState("idle");
+      void loadAudioMissing();
+    } catch (e) {
+      setAudioCheckError(e instanceof ApiError ? e.message : String(e));
+      setAudioCheckState("error");
+    }
+  };
+
+  const runAudioCheckNew = async () => {
+    setAudioCheckState("loading");
+    setAudioCheckError(null);
+    setAudioCheckResult(null);
+    setAudioMissingList([]);
+    setAudioMissingTotal(0);
+    setAudioMissingState("loading");
+    try {
+      const result = await adminAudioApi.checkNew({ lang });
+      setAudioCheckResult(result);
+      setAudioCheckState("idle");
+      void loadAudioMissing();
+    } catch (e) {
+      setAudioCheckError(e instanceof ApiError ? e.message : String(e));
+      setAudioCheckState("error");
+    }
+  };
+
+  const downloadMissingAudioJson = async () => {
+    const base = (API_BASE_URL || "").trim() || "/api";
+    const url = `${base.replace(/\/$/, "")}/admin/audio/missing-export?lang=${encodeURIComponent(lang)}`;
+    const token = getStoredToken();
+    const res = await fetch(url, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!res.ok) throw new Error("Ошибка загрузки");
+    const blob = await res.blob();
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "missing-audio.json";
+    a.click();
+    URL.revokeObjectURL(a.href);
+  };
 
   const resetCollectionForm = () => {
     setCollectionForm({
@@ -2334,6 +2432,76 @@ const AdminDictionaryPage: React.FC = () => {
                     </div>
                   )}
                 </div>
+              </div>
+            </div>
+          )}
+
+          {adminView === "audio" && (
+            <div className="admin-dict-section admin-dict-section--spaced">
+              <div className="admin-dict-section-title">Озвучка слов (female / male)</div>
+              <div className="admin-dict-help">
+                Проверка сканирует каталоги <code>public/audio/female</code> и <code>public/audio/male</code> на сервере и обновляет флаги в БД.
+                «Только новые слова» — только те, у которых флаги ещё не проставлены. После проверки можно скачать JSON для локальной генерации.
+              </div>
+              <div className="admin-dict-row admin-dict-row--spaced-md">
+                <button
+                  type="button"
+                  className="admin-dict-btn admin-dict-btn--primary"
+                  onClick={() => void runAudioCheckFull()}
+                  disabled={audioCheckState === "loading"}
+                >
+                  {audioCheckState === "loading" ? "Проверка…" : "Полная проверка"}
+                </button>
+                <button
+                  type="button"
+                  className="admin-dict-btn admin-dict-btn--secondary"
+                  onClick={() => void runAudioCheckNew()}
+                  disabled={audioCheckState === "loading"}
+                >
+                  Только новые слова
+                </button>
+              </div>
+              {audioCheckError && (
+                <div className="dictionary-error-banner" style={{ padding: "8px 12px", marginTop: 8 }}>{audioCheckError}</div>
+              )}
+              {audioCheckResult && (
+                <div className="dictionary-success-banner" style={{ padding: "8px 12px", marginTop: 8 }}>
+                  Обновлено записей: {audioCheckResult.updated}. Слов без озвучки: {audioCheckResult.missingCount}.
+                </div>
+              )}
+              <div style={{ marginTop: 14 }}>
+                <div className="admin-dict-section-title">Слова без озвучки: {audioMissingTotal}</div>
+                {audioMissingState === "loading" && <div className="admin-dict-muted">Загрузка списка…</div>}
+                {audioMissingState === "idle" && audioMissingList.length > 0 && (
+                  <>
+                    <ul className="admin-dict-results-list" style={{ maxHeight: 300, overflow: "auto" }} role="list">
+                      {audioMissingList.slice(0, 100).map((m) => (
+                        <li key={`am-${m.id}`}>
+                          {m.en} <span className="admin-dict-muted">({m.slug})</span>
+                          {!m.hasFemale && <span style={{ marginLeft: 6, color: "var(--muted)" }}>нет ♀</span>}
+                          {!m.hasMale && <span style={{ marginLeft: 4, color: "var(--muted)" }}>нет ♂</span>}
+                        </li>
+                      ))}
+                    </ul>
+                    {audioMissingList.length > 100 && (
+                      <div className="admin-dict-muted" style={{ marginTop: 6 }}>Показаны первые 100 из {audioMissingList.length}.</div>
+                    )}
+                  </>
+                )}
+                {audioMissingState === "idle" && audioMissingList.length === 0 && audioMissingTotal === 0 && (
+                  <div className="admin-dict-muted">Нет слов без озвучки. Выполните полную проверку или «Только новые слова».</div>
+                )}
+                {audioMissingState === "idle" && (
+                  <div style={{ marginTop: 10 }}>
+                    <button
+                      type="button"
+                      className="admin-dict-btn admin-dict-btn--primary"
+                      onClick={() => void downloadMissingAudioJson()}
+                    >
+                      Скачать список для генерации (missing-audio.json)
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           )}

@@ -44,6 +44,12 @@ import {
   patchFormAdmin,
   deleteSenseAdmin,
 } from "./dictionaryRepo.js";
+import {
+  runFullCheck,
+  runNewWordsCheck,
+  getMissing,
+  getMissingExport,
+} from "./audioAdminRepo.js";
 import { getActiveDays, recordActivity } from "./activeDays.js";
 import { optIn, getLeaderboard } from "./rating.js";
 import { pool } from "./db.js";
@@ -2291,6 +2297,66 @@ const routes = {
       return;
     }
     send(res, 200, { ok: true });
+  },
+
+  // ===== Admin: аудио (озвучка слов) =====
+  "POST /api/admin/audio/check-full": async (req, res, body) => {
+    const auth = await requireAdmin(req, res);
+    if (!auth) return;
+    const lang = String(body?.lang || "en").trim() || "en";
+    try {
+      const result = await runFullCheck(lang);
+      send(res, 200, result);
+    } catch (err) {
+      console.error("admin/audio/check-full:", err);
+      send(res, 500, { error: err.message || "Ошибка проверки" });
+    }
+  },
+  "POST /api/admin/audio/check-new": async (req, res, body) => {
+    const auth = await requireAdmin(req, res);
+    if (!auth) return;
+    const lang = String(body?.lang || "en").trim() || "en";
+    try {
+      const result = await runNewWordsCheck(lang);
+      send(res, 200, result);
+    } catch (err) {
+      console.error("admin/audio/check-new:", err);
+      send(res, 500, { error: err.message || "Ошибка проверки" });
+    }
+  },
+  "GET /api/admin/audio/missing": async (req, res, body, url) => {
+    const auth = await requireAdmin(req, res);
+    if (!auth) return;
+    const lang = url.searchParams.get("lang") || "en";
+    try {
+      const result = await getMissing(lang);
+      send(res, 200, result);
+    } catch (err) {
+      console.error("admin/audio/missing:", err);
+      send(res, 500, { error: err.message || "Ошибка" });
+    }
+  },
+  "GET /api/admin/audio/missing-export": async (req, res, body, url) => {
+    const auth = await requireAdmin(req, res);
+    if (!auth) return;
+    const lang = url.searchParams.get("lang") || "en";
+    try {
+      const data = await getMissingExport(lang);
+      const allowOrigin = getAllowedOrigin(req);
+      res.setHeader("Access-Control-Allow-Origin", allowOrigin);
+      res.setHeader("Access-Control-Allow-Methods", "GET, POST, PATCH, OPTIONS");
+      res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+      res.setHeader("Content-Type", "application/json; charset=utf-8");
+      res.setHeader(
+        "Content-Disposition",
+        'attachment; filename="missing-audio.json"'
+      );
+      res.statusCode = 200;
+      res.end(JSON.stringify(data, null, 2));
+    } catch (err) {
+      console.error("admin/audio/missing-export:", err);
+      send(res, 500, { error: err.message || "Ошибка" });
+    }
   },
 
   /**

@@ -26,7 +26,8 @@ export type GameType =
   | "PUZZLE"
   | "DANETKA"
   | "ONE_OF_THREE"
-  | "GATES_OF_KNOWLEDGE";
+  | "GATES_OF_KNOWLEDGE"
+  | "WORD_SEARCH";
 
 /** Сложность игры «пазлы»: лёгкий (варианты видны) или сложный (ввод с клавиатуры). */
 export type PuzzleDifficulty = "EASY" | "HARD";

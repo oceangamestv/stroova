@@ -481,6 +481,10 @@ export async function initDb() {
     await client.query("CREATE INDEX IF NOT EXISTS idx_dictionary_senses_reviewed_at ON dictionary_senses (reviewed_at DESC)");
     await client.query("CREATE INDEX IF NOT EXISTS idx_dictionary_senses_unreviewed ON dictionary_senses (id) WHERE reviewed_at IS NULL");
 
+    // dictionary_entries: флаги наличия озвучки (female/male)
+    await client.query("ALTER TABLE dictionary_entries ADD COLUMN IF NOT EXISTS audio_has_female BOOLEAN DEFAULT NULL");
+    await client.query("ALTER TABLE dictionary_entries ADD COLUMN IF NOT EXISTS audio_has_male BOOLEAN DEFAULT NULL");
+
     // Логи AI-подсказок для админки словаря
     await client.query(`
       CREATE TABLE IF NOT EXISTS dictionary_ai_suggestions (

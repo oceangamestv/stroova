@@ -16,14 +16,7 @@ import { progressService } from "../../services/progressService";
 import { authService } from "../../services/authService";
 import { guestPendingResultService } from "../../services/guestPendingResultService";
 import { useAuth } from "../../features/auth/AuthContext";
-import { formatXp } from "../../domain/xp";
-
-/** XP за раунд по размеру поля: 5×5, 6×6, 7×7. */
-const WORD_SEARCH_XP: Record<WordSearchGridSize, number> = {
-  small: 20,
-  medium: 28,
-  large: 38,
-};
+import { calculateXp, formatXp, type WordLevel } from "../../domain/xp";
 
 /** Палитра фонов для найденных слов: насыщенные, но не ядовитые, с хорошей читаемостью чёрного. */
 const WORD_SEARCH_COLORS = [
@@ -58,6 +51,8 @@ type FoundWordEntry = {
   /** id из словаря для прогресса (number); может отсутствовать, если слово не найдено в словаре. */
   dictionaryWordId?: number;
   wordValue: string;
+  /** Уровень слова (A0–C2) для расчёта XP. */
+  level?: WordLevel;
 };
 
 function getPlacedWordId(word: GeneratedGridResult["words"][number]): string {
@@ -242,7 +237,17 @@ const WordSearchGame: React.FC<WordSearchProps> = ({
       const endTime = Date.now();
       const startTime = firstWordFoundAtRef.current ?? endTime;
       const durationMs = Math.max(0, endTime - startTime);
-      const xp = WORD_SEARCH_XP[gridSize];
+      const xp = foundList.reduce(
+        (acc, entry) =>
+          acc +
+          calculateXp({
+            level: entry.level ?? "A1",
+            exerciseType: "BEGINNER",
+            gameType: "WORD_SEARCH",
+            isCorrect: true,
+          }),
+        0
+      );
 
       const wordsWithProgress: WordSearchResultStats["words"] = [];
       for (const entry of foundList) {
@@ -290,7 +295,7 @@ const WordSearchGame: React.FC<WordSearchProps> = ({
       setResultStats({ xp, durationMs, words: wordsWithProgress });
       setShowResult(true);
     },
-    [gridResult, gridSize, user]
+    [gridResult, user]
   );
 
   const applyCheckResult = useCallback(
@@ -340,11 +345,14 @@ const WordSearchGame: React.FC<WordSearchProps> = ({
 
       if (foundWords.length === 0) firstWordFoundAtRef.current = Date.now();
 
+      const level =
+        (dictWord && "level" in dictWord ? (dictWord.level as WordLevel) : undefined) ?? "A1";
       const newEntry: FoundWordEntry = {
         wordId,
         cellKeys,
         colorIndex,
         wordValue,
+        level,
         ...(dictionaryWordId != null ? { dictionaryWordId } : {}),
       };
       const newFoundWords = [...foundWords, newEntry];

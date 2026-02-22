@@ -4,7 +4,8 @@
  * Привязка по английскому слову (slug), не по id.
  *
  * Запуск: npm run generate-audio
- * Требует: DATABASE_URL в .env, словарь заполнен (npm run seed).
+ * Или с файлом списка: node server/generate-audio.mjs missing-audio.json
+ * Требует: DATABASE_URL в .env при работе без файла; словарь заполнен (npm run seed).
  */
 
 import "dotenv/config";
@@ -13,6 +14,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { initDb } from "./db.js";
 import { getWordsByLanguage } from "./dictionaryRepo.js";
+import { wordToSlug } from "./audioSlug.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = path.resolve(__dirname, "..");
@@ -24,25 +26,54 @@ const VOICES = [
   { id: "am_michael", folder: "male", name: "Michael" },
 ];
 
-/** Слово → безопасное имя файла (совпадает с логикой в sounds.ts) */
-function wordToSlug(en) {
-  return String(en)
-    .toLowerCase()
-    .trim()
-    .replace(/\s+/g, "_")
-    .replace(/[^a-z0-9_]/g, "");
-}
-
 function ensureDir(dir) {
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 }
 
+/**
+ * Загружает список слов из JSON-файла (формат из админки missing-export).
+ * @param {string} filePath
+ * @returns {Promise<Array<{ en: string }>>}
+ */
+async function loadWordsFromFile(filePath) {
+  const raw = await fs.promises.readFile(filePath, "utf-8");
+  const data = JSON.parse(raw);
+  const list = data?.words;
+  if (!Array.isArray(list) || list.length === 0) {
+    return [];
+  }
+  return list.map((item) => {
+    if (typeof item === "string") return { en: item };
+    const en = String(item?.en ?? "").trim();
+    return { en: en || String(item?.slug ?? "") };
+  }).filter((w) => w.en);
+}
+
 async function main() {
-  await initDb();
-  const words = await getWordsByLanguage("en");
-  if (words.length === 0) {
-    console.error("Словарь пуст. Запустите: npm run seed");
-    process.exit(1);
+  const jsonPath = process.argv[2];
+  let words;
+
+  if (jsonPath) {
+    const resolved = path.isAbsolute(jsonPath)
+      ? jsonPath
+      : path.resolve(process.cwd(), jsonPath);
+    if (!fs.existsSync(resolved)) {
+      console.error("Файл не найден:", resolved);
+      process.exit(1);
+    }
+    words = await loadWordsFromFile(resolved);
+    if (words.length === 0) {
+      console.error("В файле нет слов (ожидается { \"words\": [ ... ] })");
+      process.exit(1);
+    }
+    console.log("Слов из файла:", words.length);
+  } else {
+    await initDb();
+    words = await getWordsByLanguage("en");
+    if (words.length === 0) {
+      console.error("Словарь пуст. Запустите: npm run seed");
+      process.exit(1);
+    }
   }
 
   const { KokoroTTS } = await import("kokoro-js");
