@@ -1,6 +1,7 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { useAuth } from "../../features/auth/AuthContext";
 import { authService } from "../../services/authService";
+import { storyTrainerApi } from "../../api/endpoints";
 
 export type GameSlug =
   | "pairs"
@@ -8,7 +9,8 @@ export type GameSlug =
   | "word-search"
   | "danetka"
   | "one-of-three"
-  | "gates-of-knowledge";
+  | "gates-of-knowledge"
+  | "story-trainer";
 
 const GAME_INTRO: Record<
   GameSlug,
@@ -76,6 +78,17 @@ const GAME_INTRO: Record<
       "Победа — открыть все 5 врат до истечения времени.",
     ],
   },
+  "story-trainer": {
+    title: "📖 AI Story Trainer",
+    description: "Читайте историю по словам из вашего словаря и пишите пересказ. AI проверит смысл и начислит опыт.",
+    rules: [
+      "Вам выдаётся короткая история на английском, составленная из слов вашего словаря.",
+      "Прочитайте историю и напишите пересказ своими словами (не менее 10 слов).",
+      "Отправить на проверку можно только один раз за сессию.",
+      "Отвечать можно на русском или английском; за ответ на английском даётся больше опыта.",
+      "Обычные пользователи могут играть один раз в день; администраторы — без ограничений.",
+    ],
+  },
 };
 
 interface GameIntroScreenProps {
@@ -83,11 +96,52 @@ interface GameIntroScreenProps {
   onStart: () => void;
 }
 
+function formatResetTime(iso: string): string {
+  const d = new Date(iso);
+  const day = d.getUTCDate();
+  const month = d.toLocaleDateString("ru-RU", { month: "long" });
+  const isTomorrow =
+    d.getUTCDate() !== new Date().getUTCDate() ||
+    d.getUTCMonth() !== new Date().getUTCMonth();
+  return isTomorrow ? `завтра, ${day} ${month} в 00:00 UTC` : `сегодня в 00:00 UTC`;
+}
+
+function timeUntilReset(iso: string): string {
+  const end = new Date(iso).getTime();
+  const now = Date.now();
+  if (end <= now) return "сброс произошёл";
+  const ms = end - now;
+  const h = Math.floor(ms / (60 * 60 * 1000));
+  const m = Math.floor((ms % (60 * 60 * 1000)) / (60 * 1000));
+  if (h > 0) return `до сброса: ${h} ч ${m} мин`;
+  return `до сброса: ${m} мин`;
+}
+
 const GameIntroScreen: React.FC<GameIntroScreenProps> = ({ gameSlug, onStart }) => {
   const [rulesExpanded, setRulesExpanded] = React.useState(false);
+  const [storyLimit, setStoryLimit] = useState<{
+    usedToday: boolean;
+    isAdmin: boolean;
+    nextResetUtc: string;
+  } | null>(null);
   const { user, refresh: refreshUser } = useAuth();
   const puzzleDifficulty = user?.gameSettings?.puzzleDifficulty ?? "easy";
   const wordSearchGridSize = user?.gameSettings?.wordSearchGridSize ?? "small";
+
+  const [limitTick, setLimitTick] = useState(0);
+  useEffect(() => {
+    if (gameSlug !== "story-trainer" || !user) return;
+    storyTrainerApi
+      .getLimit()
+      .then((data) => setStoryLimit({ usedToday: data.usedToday, isAdmin: data.isAdmin, nextResetUtc: data.nextResetUtc }))
+      .catch(() => setStoryLimit(null));
+  }, [gameSlug, user]);
+
+  useEffect(() => {
+    if (gameSlug !== "story-trainer" || !storyLimit?.nextResetUtc) return;
+    const id = setInterval(() => setLimitTick((t) => t + 1), 60_000);
+    return () => clearInterval(id);
+  }, [gameSlug, storyLimit?.nextResetUtc]);
 
   const setPuzzleDifficulty = (value: "easy" | "hard") => {
     authService.updateGameSettings({ puzzleDifficulty: value });
@@ -165,6 +219,28 @@ const GameIntroScreen: React.FC<GameIntroScreenProps> = ({ gameSlug, onStart }) 
             В MVP для этого режима используется только общий словарь A0.
           </p>
         ) : null}
+        {gameSlug === "story-trainer" && storyLimit && (
+          <div className="game-intro__setting game-intro__story-limit" aria-label="Ограничения">
+            <span className="game-intro__setting-label">Ограничения:</span>
+            {storyLimit.isAdmin ? (
+              <p className="game-intro__story-limit-text">Для администраторов ограничений по количеству попыток нет.</p>
+            ) : (
+              <>
+                <p className="game-intro__story-limit-text">
+                  Одна попытка в день. Отправить на проверку можно только один раз за сессию.
+                </p>
+                <p className="game-intro__story-limit-reset">
+                  {formatResetTime(storyLimit.nextResetUtc)}. {timeUntilReset(storyLimit.nextResetUtc)}
+                </p>
+                {storyLimit.usedToday && (
+                  <p className="game-intro__story-limit-used" role="status">
+                    Сегодня попытка уже использована — следующая доступна завтра.
+                  </p>
+                )}
+              </>
+            )}
+          </div>
+        )}
         {gameSlug === "puzzle" && (
           <div className="game-intro__setting">
             <span className="game-intro__setting-label">Сложность:</span>

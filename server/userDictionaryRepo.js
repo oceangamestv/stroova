@@ -1854,9 +1854,28 @@ export async function getTodayPack(username, langCode, db = pool) {
 }
 
 /**
+ * Слова для AI Story Trainer: due + new из словаря пользователя, до limit штук.
+ * due — уже в словаре (isSaved: true), new — нет (isSaved: false).
+ * @returns {Promise<Array<{ en: string, ru: string, senseId: number, isSaved: boolean }>>}
+ */
+export async function getWordsForStoryTrainer(username, langCode, limit = 12, db = pool) {
+  const pack = await getTodayPack(username, langCode, db);
+  const due = pack.due || [];
+  const newWords = pack.new || [];
+  const combined = [...due, ...newWords].slice(0, Math.max(1, Math.min(20, limit)));
+  const dueCount = due.length;
+  const words = combined.map((row, index) => ({
+    en: String(row.en ?? "").trim(),
+    ru: (String(row.ru ?? "").trim()) || "—",
+    senseId: row.senseId != null ? Number(row.senseId) : 0,
+    isSaved: index < dueCount,
+  }));
+  return words.filter((w) => w.en.length > 0);
+}
+
+/**
  * Унифицированная лента «Все слова»:
  * - слова (entry),
- * - формы (form),
  * - карточки форм (form_card),
  * - фразы (collocation),
  * - паттерны (pattern).
@@ -1912,58 +1931,7 @@ export async function listAllWords(username, langCode, opts = {}, db = pool) {
 
       UNION ALL
 
-      -- 1b) Смыслы без карточки entry (только v2: lemma/sense), чтобы «Все слова» не была пустой
-      SELECT
-        'entry'::text AS "itemType",
-        s.id::int AS "itemId",
-        NULL::int AS "entryId",
-        s.id::int AS "senseId",
-        m.lemma::text AS en,
-        COALESCE(s.gloss_ru, '')::text AS ru,
-        COALESCE(s.level, '')::text AS level,
-        COALESCE(ex.en, '')::text AS example,
-        COALESCE(ex.ru, '')::text AS "exampleRu",
-        COALESCE(m.frequency_rank, 999999)::int AS "frequencyRank",
-        CASE WHEN uss.sense_id IS NULL THEN FALSE ELSE TRUE END AS "isSaved"
-      FROM dictionary_senses s
-      JOIN dictionary_lemmas m ON m.id = s.lemma_id
-      LEFT JOIN dictionary_examples ex ON ex.sense_id = s.id AND ex.is_main = TRUE
-      LEFT JOIN user_saved_senses uss ON uss.username = $2 AND uss.sense_id = s.id
-      WHERE m.language_id = $1
-        AND NOT EXISTS (SELECT 1 FROM dictionary_entry_links el WHERE el.sense_id = s.id)
-
-      UNION ALL
-
-      -- 2) Формы слова
-      SELECT
-        'form'::text AS "itemType",
-        f.id::int AS "itemId",
-        link.entry_id::int AS "entryId",
-        s.id::int AS "senseId",
-        f.form::text AS en,
-        COALESCE(s.gloss_ru, '')::text AS ru,
-        COALESCE(s.level, '')::text AS level,
-        COALESCE(ex.en, '')::text AS example,
-        COALESCE(ex.ru, '')::text AS "exampleRu",
-        COALESCE(m.frequency_rank, 999999)::int AS "frequencyRank",
-        CASE WHEN uss.sense_id IS NULL THEN FALSE ELSE TRUE END AS "isSaved"
-      FROM dictionary_forms f
-      JOIN dictionary_lemmas m ON m.id = f.lemma_id
-      JOIN dictionary_senses s ON s.lemma_id = m.id AND s.sense_no = 1
-      LEFT JOIN dictionary_examples ex ON ex.sense_id = s.id AND ex.is_main = TRUE
-      LEFT JOIN LATERAL (
-        SELECT el.entry_id
-        FROM dictionary_entry_links el
-        WHERE el.lemma_id = m.id
-        ORDER BY el.entry_id ASC
-        LIMIT 1
-      ) link ON TRUE
-      LEFT JOIN user_saved_senses uss ON uss.username = $2 AND uss.sense_id = s.id
-      WHERE m.language_id = $1
-
-      UNION ALL
-
-      -- 3) Карточки форм: каждая форма — отдельная единица в словаре (user_phrase_progress form_card)
+      -- 2) Карточки форм: каждая форма — отдельная единица в словаре (user_phrase_progress form_card)
       SELECT
         'form_card'::text AS "itemType",
         fc.id::int AS "itemId",
@@ -2073,10 +2041,9 @@ export async function listAllWords(username, langCode, opts = {}, db = pool) {
         i."frequencyRank" ASC,
         CASE i."itemType"
           WHEN 'entry' THEN 1
-          WHEN 'form' THEN 2
-          WHEN 'form_card' THEN 3
-          WHEN 'collocation' THEN 4
-          WHEN 'pattern' THEN 5
+          WHEN 'form_card' THEN 2
+          WHEN 'collocation' THEN 3
+          WHEN 'pattern' THEN 4
           ELSE 99
         END ASC,
         i."itemId" ASC

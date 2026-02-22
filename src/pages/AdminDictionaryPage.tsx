@@ -437,9 +437,9 @@ const AdminDictionaryPage: React.FC = () => {
     updated: number;
     missingCount: number;
     missing: Array<{ id: number; en: string; slug: string }>;
-    debug?: { wordsTotal?: number; wordsChecked?: number; fileCountFemale?: number; fileCountMale?: number };
+    debug?: { wordsTotal?: number; wordsChecked?: number; formsEnTotal?: number; fileCountFemale?: number; fileCountMale?: number };
   } | null>(null);
-  const [audioMissingList, setAudioMissingList] = useState<Array<{ id: number; en: string; slug: string; hasFemale: boolean; hasMale: boolean }>>([]);
+  const [audioMissingList, setAudioMissingList] = useState<Array<{ id: number | null; en: string; slug: string; hasFemale: boolean; hasMale: boolean; source?: "entry" | "form" }>>([]);
   const [audioMissingTotal, setAudioMissingTotal] = useState(0);
   const [audioMissingState, setAudioMissingState] = useState<LoadState>("idle");
 
@@ -2470,7 +2470,7 @@ const AdminDictionaryPage: React.FC = () => {
                   Обновлено записей: {audioCheckResult.updated}. Слов без озвучки: {audioCheckResult.missingCount}.
                   {audioCheckResult.debug && (
                     <span className="admin-dict-muted" style={{ display: "block", marginTop: 4 }}>
-                      Отладка: слов в словаре — {audioCheckResult.debug.wordsTotal ?? audioCheckResult.debug.wordsChecked ?? "—"}, файлов female — {audioCheckResult.debug.fileCountFemale ?? "—"}, male — {audioCheckResult.debug.fileCountMale ?? "—"}.
+                      Отладка: слов в словаре — {audioCheckResult.debug.wordsTotal ?? audioCheckResult.debug.wordsChecked ?? "—"}, уникальных en (слова + формы) — {audioCheckResult.debug.formsEnTotal ?? "—"}, файлов female — {audioCheckResult.debug.fileCountFemale ?? "—"}, male — {audioCheckResult.debug.fileCountMale ?? "—"}.
                     </span>
                   )}
                 </div>
@@ -2482,8 +2482,10 @@ const AdminDictionaryPage: React.FC = () => {
                   <>
                     <ul className="admin-dict-results-list" style={{ maxHeight: 300, overflow: "auto" }} role="list">
                       {audioMissingList.slice(0, 100).map((m) => (
-                        <li key={`am-${m.id}`}>
-                          {m.en} <span className="admin-dict-muted">({m.slug})</span>
+                        <li key={`am-${m.slug}`}>
+                          {m.en}
+                          {m.source === "form" && <span className="admin-dict-muted" style={{ marginLeft: 6 }}>(форма)</span>}
+                          <span className="admin-dict-muted"> ({m.slug})</span>
                           {!m.hasFemale && <span style={{ marginLeft: 6, color: "var(--muted)" }}>нет ♀</span>}
                           {!m.hasMale && <span style={{ marginLeft: 4, color: "var(--muted)" }}>нет ♂</span>}
                         </li>

@@ -342,6 +342,22 @@ CREATE INDEX IF NOT EXISTS idx_dictionary_audit_log_created_at ON dictionary_aud
 CREATE INDEX IF NOT EXISTS idx_dictionary_audit_log_entity ON dictionary_audit_log (entity_type, entity_id);
 CREATE INDEX IF NOT EXISTS idx_dictionary_audit_log_username ON dictionary_audit_log (username);
 
+-- AI Story Trainer: одна сессия = одна история, один пересказ, лимит раз в день для не-админов
+CREATE TABLE IF NOT EXISTS user_story_trainer_sessions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  username VARCHAR(255) NOT NULL REFERENCES users(username) ON DELETE CASCADE,
+  lang_code VARCHAR(10) NOT NULL DEFAULT 'en',
+  story_text TEXT NOT NULL,
+  word_sense_ids JSONB NOT NULL DEFAULT '[]'::jsonb,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  submitted_at TIMESTAMPTZ,
+  retelling_text TEXT,
+  retelling_language VARCHAR(5),
+  semantic_score NUMERIC(4,2),
+  xp_granted NUMERIC(10,2)
+);
+CREATE INDEX IF NOT EXISTS idx_story_trainer_username_created ON user_story_trainer_sessions(username, created_at);
+
 INSERT INTO rewards (reward_key, config, description)
 VALUES ('active_day', '{"xp": 10}', '10 XP за активный день')
 ON CONFLICT (reward_key) DO NOTHING;

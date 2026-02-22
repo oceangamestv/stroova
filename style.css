@@ -777,6 +777,63 @@
   margin-top: 14px;
 }
 
+/* Контент страниц коллекции и «Все слова»: ширина по оболочке (ПК — не под сайдбар; планшет/мобильная — отступы от app-shell) */
+.dict-collection-page-content {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  position: relative;
+}
+
+/* Кнопка «В начало страницы» — оранжевый круг справа внизу */
+.dict-scroll-to-top {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  border: none;
+  background: var(--accent);
+  color: #000;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 16px rgba(255, 193, 7, 0.45);
+  z-index: 50;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.dict-scroll-to-top:hover {
+  transform: scale(1.06);
+  box-shadow: 0 6px 20px rgba(255, 193, 7, 0.5);
+}
+.dict-scroll-to-top:active {
+  transform: scale(0.98);
+}
+.dict-scroll-to-top svg {
+  width: 24px;
+  height: 24px;
+}
+@media (max-width: 1100px) {
+  .dict-scroll-to-top {
+    right: max(24px, env(safe-area-inset-right));
+  }
+  /* Нижнее меню (нав + панель вкладок словаря) — поднимаем кнопку выше */
+  .app-shell--dictionary-mobile .dict-scroll-to-top {
+    bottom: calc(56px + 64px - 9px + env(safe-area-inset-bottom));
+  }
+  .app-shell:not(.app-shell--dictionary-mobile) .dict-scroll-to-top {
+    bottom: max(24px, env(safe-area-inset-bottom));
+  }
+}
+
+@media (min-width: 1101px) {
+  .dict-collection-page-content {
+    padding-right: 16px;
+  }
+}
+
 .dict-casual-section-title {
   font-weight: 800;
   font-size: 16px;
@@ -975,6 +1032,8 @@
   background: var(--card-soft);
   position: relative;
   border-left: 4px solid rgba(245, 158, 11, 0.45);
+  min-height: 72px;
+  justify-content: center;
 }
 
 .dict-card__example::before {
@@ -1003,6 +1062,12 @@
 .dict-card__example-ru {
   font-size: 12px;
   color: var(--text-soft);
+}
+
+.dict-card__example--placeholder {
+  color: var(--text-soft);
+  font-weight: 500;
+  font-style: italic;
 }
 
 .dict-card__actions {
@@ -1148,6 +1213,64 @@
   }
 }
 
+/* Кнопка «Поиск и фильтр» в коллекциях — тот же размер и место, что и «В начало» */
+.dict-collections-tools-fab {
+  display: none;
+}
+@media (max-width: 1100px) {
+  .dict-collections-tools-fab {
+    position: fixed;
+    right: 24px;
+    bottom: 24px;
+    width: 48px;
+    height: 48px;
+    min-width: 48px;
+    padding: 0;
+    gap: 0;
+    border-radius: 50%;
+    border: none;
+    background: var(--card);
+    color: var(--text);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+    font-weight: 800;
+    font-size: 13px;
+    cursor: pointer;
+    z-index: 92;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.2s ease, box-shadow 0.2s ease, background var(--transition-fast);
+  }
+  .dict-collections-tools-fab .dict-my-tools-fab__label {
+    display: none;
+  }
+  .dict-collections-tools-fab:hover,
+  .dict-collections-tools-fab:focus-visible {
+    background: var(--card-soft);
+    transform: scale(1.06);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.22);
+  }
+  .dict-collections-tools-fab:active {
+    transform: scale(0.98);
+  }
+  .dict-collections-tools-fab svg {
+    width: 24px;
+    height: 24px;
+  }
+  .app-shell--dictionary-mobile .dict-collections-tools-fab {
+    bottom: calc(56px + 64px - 9px + env(safe-area-inset-bottom));
+    right: max(24px, env(safe-area-inset-right));
+  }
+  .app-shell:not(.app-shell--dictionary-mobile) .dict-collections-tools-fab {
+    bottom: max(24px, env(safe-area-inset-bottom));
+  }
+}
+@media (min-width: 1101px) {
+  .dict-collections-tools-fab {
+    display: none !important;
+  }
+}
+
 .dict-my-words-sheet-overlay {
   position: fixed;
   inset: 0;
@@ -1182,6 +1305,23 @@
 }
 .dict-my-toolbar--sheet {
   margin-bottom: 12px;
+}
+
+.dict-collection-filter-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+.dict-collection-filter-checkbox input {
+  width: 20px;
+  height: 20px;
+  accent-color: var(--accent);
+  cursor: pointer;
 }
 
 .dict-my-filter-select {
@@ -6261,6 +6401,253 @@ body::after {
   padding: 0 4px;
 }
 
+/* ========== AI Story Trainer ========== */
+.story-trainer {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 0 8px;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+.story-trainer-error {
+  color: var(--danger, #c00);
+  margin: 0;
+  font-size: 0.9375rem;
+}
+.story-trainer-story {
+  background: var(--card);
+  border: 1px solid var(--border-subtle);
+  border-radius: 14px;
+  padding: 20px;
+  box-shadow: var(--shadow-soft);
+}
+.story-trainer-heading {
+  margin: 0 0 12px;
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: -0.02em;
+}
+.story-trainer-text-wrap {
+  margin: 0;
+}
+.story-trainer-text {
+  margin: 0;
+  font-size: 1.125rem;
+  line-height: 1.7;
+  letter-spacing: 0.01em;
+  color: var(--text);
+  font-family: var(--font-sans);
+}
+.story-trainer-word-btn {
+  display: inline;
+  margin: 0;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  border-radius: 0;
+  transition: none;
+}
+.story-trainer-word-plain {
+  color: var(--text);
+}
+.story-trainer-tap-hint {
+  margin: 12px 0 0;
+  font-size: 0.875rem;
+  color: var(--text-soft);
+}
+.story-trainer-words {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--text-soft);
+}
+.story-trainer-hint {
+  margin: 0 0 8px;
+  font-size: 0.9375rem;
+  color: var(--text-soft);
+}
+.story-trainer-lang {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 8px;
+}
+.story-trainer-lang label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+.story-trainer-textarea {
+  width: 100%;
+  min-height: 120px;
+  padding: 12px 14px;
+  font: inherit;
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  resize: vertical;
+  box-sizing: border-box;
+  background: var(--card);
+  color: var(--text);
+}
+.story-trainer-word-count {
+  margin: 0 0 8px;
+  font-size: 0.875rem;
+  color: var(--text-soft);
+}
+.story-trainer-result .story-trainer-xp,
+.story-trainer-result .story-trainer-score {
+  margin: 0 0 4px;
+  font-weight: 600;
+}
+.story-trainer-feedback {
+  margin: 8px 0 0;
+  font-size: 0.9375rem;
+  color: var(--text);
+}
+
+/* Story Trainer: popover */
+.story-trainer-popover-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 999;
+  background: rgba(0, 0, 0, 0.2);
+}
+.story-trainer-popover {
+  position: fixed;
+  z-index: 1000;
+  background: var(--card);
+  border: 1px solid var(--border-subtle);
+  box-shadow: var(--shadow-strong);
+  padding: 0;
+}
+.story-trainer-popover--mobile {
+  left: 0;
+  right: 0;
+  bottom: 0;
+  top: auto;
+  border-radius: 16px 16px 0 0;
+  max-height: 40vh;
+  overflow: auto;
+}
+.story-trainer-popover--desktop {
+  min-width: 220px;
+  max-width: 280px;
+  border-radius: 12px;
+}
+.story-trainer-popover-inner {
+  padding: 14px 16px;
+}
+.story-trainer-popover--desktop .story-trainer-popover-inner {
+  padding: 12px 14px;
+}
+.story-trainer-popover-word {
+  margin: 0 0 4px;
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--text);
+}
+.story-trainer-popover-ru {
+  margin: 0 0 12px;
+  font-size: 0.9375rem;
+  color: var(--text-soft);
+}
+.story-trainer-popover-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+.story-trainer-popover-btn {
+  padding: 8px 14px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  border-radius: 8px;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-elevated);
+  color: var(--text);
+  cursor: pointer;
+  transition: background var(--transition-fast), border-color var(--transition-fast);
+}
+.story-trainer-popover-btn:hover:not(:disabled) {
+  background: var(--card);
+  border-color: var(--accent);
+}
+.story-trainer-popover-btn--add {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--text);
+}
+.story-trainer-popover-btn--add:hover:not(:disabled) {
+  background: var(--accent);
+  color: var(--bg);
+}
+.story-trainer-popover-btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+.story-trainer-popover-saved {
+  font-size: 0.8125rem;
+  color: var(--text-soft);
+}
+
+/* Кнопка «Отправить на проверку» в стилистике приложения */
+.story-trainer-submit-btn {
+  margin-top: 16px;
+  border-radius: 12px;
+  font-size: 1rem;
+  padding: 12px 20px;
+}
+.story-trainer-submit-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+.story-trainer-submit-btn:disabled:hover {
+  transform: none;
+  box-shadow: 0 4px 0 rgba(0, 0, 0, 0.2);
+}
+
+/* Story Trainer: tablet/mobile — story card padding */
+@media (max-width: 767px) {
+  .story-trainer-story {
+    padding: 16px;
+  }
+  .story-trainer-text {
+    font-size: 1.0625rem;
+    line-height: 1.7;
+  }
+  .story-trainer-word-btn {
+    padding: 2px 2px;
+    min-height: 28px;
+    -webkit-tap-highlight-color: transparent;
+  }
+}
+@media (max-width: 480px) {
+  .story-trainer {
+    padding: 0 4px;
+    gap: 16px;
+  }
+  .story-trainer-story {
+    padding: 14px;
+    border-radius: 12px;
+  }
+  .story-trainer-heading {
+    font-size: 1rem;
+  }
+  .story-trainer-text {
+    font-size: 1rem;
+    line-height: 1.75;
+  }
+  .story-trainer-submit-btn {
+    width: 100%;
+    min-height: 44px;
+  }
+}
+
 .word-search__title {
   margin: 0;
   font-size: clamp(1.25rem, 4vw, 1.5rem);
@@ -6762,6 +7149,18 @@ body::after {
   font-weight: 600;
   color: var(--text);
   transition: color var(--transition-theme);
+}
+
+.game-intro__story-limit .game-intro__story-limit-text,
+.game-intro__story-limit .game-intro__story-limit-reset,
+.game-intro__story-limit .game-intro__story-limit-used {
+  margin: 0 0 6px;
+  font-size: 0.9rem;
+  color: var(--text-soft);
+}
+.game-intro__story-limit .game-intro__story-limit-used {
+  font-weight: 600;
+  color: var(--text);
 }
 
 .game-intro__start {

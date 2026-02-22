@@ -10,6 +10,7 @@ import WordSearchGame from "../components/exercises/WordSearchGame";
 import DanetkaExercise from "../components/exercises/DanetkaExercise";
 import OneOfThreeExercise from "../components/exercises/OneOfThreeExercise";
 import GatesOfKnowledgeExercise from "../components/exercises/GatesOfKnowledgeExercise";
+import StoryTrainerExercise from "../components/exercises/StoryTrainerExercise";
 import { useAuth } from "../features/auth/AuthContext";
 import { useDictionary } from "../features/dictionary/useDictionary";
 import { personalDictionaryService } from "../services/personalDictionaryService";
@@ -36,13 +37,15 @@ export const GameRoute: React.FC = () => {
       ? "puzzle"
       : pathname === "/word-search"
         ? "word-search"
-      : pathname === "/danetka"
-        ? "danetka"
-        : pathname === "/one-of-three"
-          ? "one-of-three"
-          : pathname === "/gates-of-knowledge"
-            ? "gates-of-knowledge"
-            : "pairs";
+        : pathname === "/danetka"
+          ? "danetka"
+          : pathname === "/one-of-three"
+            ? "one-of-three"
+            : pathname === "/gates-of-knowledge"
+              ? "gates-of-knowledge"
+              : pathname === "/story-trainer"
+                ? "story-trainer"
+                : "pairs";
 
   const personalWords = personalDictionaryService.getPersonalWordsFromPool(dictionaryWords);
   const personalWordIds = new Set(personalWords.map((word) => word.id));
@@ -98,6 +101,8 @@ export const GameRoute: React.FC = () => {
       <OneOfThreeExercise />
     ) : exercise === "gates-of-knowledge" ? (
       <GatesOfKnowledgeExercise />
+    ) : exercise === "story-trainer" ? (
+      <StoryTrainerExercise />
     ) : (
       <PairsExercise />
     );

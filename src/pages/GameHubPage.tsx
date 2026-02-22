@@ -55,6 +55,16 @@ const IconGates: React.FC<{ className?: string }> = ({ className }) => (
   </svg>
 );
 
+/** Иконка: книга/свиток (AI Story Trainer) */
+const IconStoryTrainer: React.FC<{ className?: string }> = ({ className }) => (
+  <svg className={className} viewBox="0 0 48 48" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+    <path d="M8 8h12v32H8V8z" />
+    <path d="M28 8h12v32H28V8z" />
+    <path d="M12 14h8M12 20h8M12 26h8" />
+    <path d="M32 14h4M32 20h4M32 26h4" />
+  </svg>
+);
+
 const GAMES = [
   {
     to: "/pairs",
@@ -91,6 +101,12 @@ const GAMES = [
     title: "Врата познаний",
     description: "Пройдите 5 врат A0: выполняйте задания, бейте боссов и удерживайте таймер.",
     Icon: IconGates,
+  },
+  {
+    to: "/story-trainer",
+    title: "AI Story Trainer",
+    description: "Читайте историю по словам из словаря, пишите пересказ и отправляйте на проверку. Раз в день.",
+    Icon: IconStoryTrainer,
   },
 ] as const;
 

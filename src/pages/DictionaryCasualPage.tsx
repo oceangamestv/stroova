@@ -3,7 +3,7 @@ import Header from "../components/common/Header";
 import { useAuth } from "../features/auth/AuthContext";
 import { userDictionaryApi } from "../api/endpoints";
 import { ApiError } from "../api/client";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { authService } from "../services/authService";
 import { useIsMobile } from "../hooks/useIsMobile";
 
@@ -12,21 +12,6 @@ type Tab = "today" | "my" | "collections";
 type StatusFilter = "all" | "queue" | "learning" | "known" | "hard";
 type StartProfile = "beginner" | "basic_sentences" | "everyday_topics";
 type DictionaryAddMode = "ask" | "instant" | "onboarding";
-type AllWordsItemType = "entry" | "form" | "form_card" | "collocation" | "pattern";
-type AllWordsItem = {
-  id: number;
-  itemType: AllWordsItemType;
-  itemId: number;
-  entryId: number | null;
-  senseId: number | null;
-  en: string;
-  ru: string;
-  level: string;
-  example: string;
-  exampleRu: string;
-  isSaved: boolean;
-};
-
 /** Элемент колоды: либо на повтор (due), либо новое слово (new). */
 type DeckItem =
   | { kind: "due"; senseId: number; en: string; ru?: string; example?: string; exampleRu?: string; level?: string; register?: string }
@@ -300,6 +285,7 @@ const WordDeck: React.FC<{
 const DictionaryCasualPage: React.FC = () => {
   const { user, refresh } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const lang = "en";
   const [tab, setTab] = useState<Tab>("today");
 
@@ -377,21 +363,6 @@ const DictionaryCasualPage: React.FC = () => {
   const [collectionsState, setCollectionsState] = useState<LoadState>("idle");
   const [collectionsError, setCollectionsError] = useState<string | null>(null);
   const [collections, setCollections] = useState<any[]>([]);
-
-  const [collectionOpen, setCollectionOpen] = useState(false);
-  const [collectionState, setCollectionState] = useState<LoadState>("idle");
-  const [collectionError, setCollectionError] = useState<string | null>(null);
-  const [collection, setCollection] = useState<any | null>(null);
-  const [collectionItems, setCollectionItems] = useState<any[]>([]);
-
-  const [allWordsOpen, setAllWordsOpen] = useState(false);
-  const [allWordsItems, setAllWordsItems] = useState<AllWordsItem[]>([]);
-  const [allWordsTotal, setAllWordsTotal] = useState(0);
-  const [allWordsState, setAllWordsState] = useState<LoadState>("idle");
-  const [allWordsError, setAllWordsError] = useState<string | null>(null);
-  const [allWordsOffset, setAllWordsOffset] = useState(0);
-  const [allWordsQ, setAllWordsQ] = useState("");
-  const allWordsPageSize = 50;
 
   const [deleteConfirm, setDeleteConfirm] = useState<{
     open: boolean;
@@ -702,177 +673,6 @@ const DictionaryCasualPage: React.FC = () => {
     }
   };
 
-  const openCollection = async (id: number) => {
-    if (!isLoggedIn) {
-      setCollectionsError("Войдите, чтобы открывать коллекции.");
-      return;
-    }
-    setCollectionOpen(true);
-    setCollectionState("loading");
-    setCollectionError(null);
-    setCollection(null);
-    setCollectionItems([]);
-    try {
-      const out = await userDictionaryApi.getCollection({ lang, id });
-      setCollection(out.collection);
-      setCollectionItems(Array.isArray(out.items) ? out.items : []);
-      setCollectionState("idle");
-    } catch (e) {
-      setCollectionState("error");
-      setCollectionError(formatApiError(e, "Не удалось открыть коллекцию"));
-    }
-  };
-
-  const closeCollection = () => {
-    setCollectionOpen(false);
-    setCollectionState("idle");
-    setCollectionError(null);
-    setCollection(null);
-    setCollectionItems([]);
-  };
-
-  const addAllCollection = async () => {
-    if (!isLoggedIn || !collection?.id) return;
-    setCollectionState("loading");
-    setCollectionError(null);
-    try {
-      await userDictionaryApi.addAllFromCollection({ lang, collectionId: Number(collection.id) });
-      await openCollection(Number(collection.id));
-      await loadToday();
-      await refreshProgress();
-      setCollectionState("idle");
-    } catch (e) {
-      setCollectionState("error");
-      setCollectionError(formatApiError(e, "Не удалось добавить слова из коллекции"));
-    }
-  };
-
-  const addOneFromCollection = async (senseId: number) => {
-    if (!isLoggedIn) return;
-    try {
-      await userDictionaryApi.addSense({ senseId });
-      await userDictionaryApi.setStatus({ senseId, status: "learning" });
-      setCollectionItems((prev) =>
-        prev.map((x) =>
-          Number(x.senseId) === Number(senseId)
-            ? { ...x, isSaved: true, status: "learning" }
-            : x
-        )
-      );
-      await loadToday();
-      await refreshProgress();
-    } catch (e) {
-      setCollectionError(formatApiError(e, "Не удалось добавить слово"));
-    }
-  };
-
-  const openAllWords = async () => {
-    if (!isLoggedIn) {
-      setCollectionsError("Войдите, чтобы открыть «Все слова».");
-      return;
-    }
-    setAllWordsOpen(true);
-    setAllWordsQ("");
-    await loadAllWords(0, "");
-  };
-
-  const loadAllWords = async (offset: number, q: string) => {
-    if (!isLoggedIn) return;
-    setAllWordsOffset(offset);
-    setAllWordsState("loading");
-    setAllWordsError(null);
-    try {
-      const out = await userDictionaryApi.allWords({ lang, offset, limit: allWordsPageSize, q: q || undefined });
-      setAllWordsItems(Array.isArray(out?.items) ? out.items : []);
-      setAllWordsTotal(typeof out?.total === "number" ? out.total : 0);
-      setAllWordsState("idle");
-    } catch (e) {
-      setAllWordsError(formatApiError(e, "Не удалось загрузить список слов"));
-      setAllWordsState("error");
-    }
-  };
-
-  const closeAllWords = () => {
-    setAllWordsOpen(false);
-    setAllWordsItems([]);
-    setAllWordsTotal(0);
-    setAllWordsState("idle");
-    setAllWordsError(null);
-    setAllWordsOffset(0);
-    setAllWordsQ("");
-  };
-
-  const allWordsItemTypeLabel = (t: AllWordsItemType) => {
-    if (t === "entry") return "Слово";
-    if (t === "form") return "Форма";
-    if (t === "form_card") return "Карточка формы";
-    if (t === "collocation") return "Фраза";
-    return "Паттерн";
-  };
-
-  const openAllWordsDetails = (item: AllWordsItem) => {
-    if (item.itemType === "form_card") {
-      navigate(`/dictionary/form/${Number(item.itemId)}`);
-      return;
-    }
-    if (item.senseId) navigate(`/dictionary/word/${Number(item.senseId)}`);
-  };
-
-  const addOneFromAllWords = async (item: AllWordsItem) => {
-    if (!isLoggedIn) return;
-    try {
-      if (item.itemType === "collocation" || item.itemType === "pattern" || item.itemType === "form_card") {
-        await userDictionaryApi.addPhrase({ itemType: item.itemType, itemId: Number(item.itemId) });
-        await userDictionaryApi.setPhraseStatus({ itemType: item.itemType, itemId: Number(item.itemId), status: "learning" });
-        setAllWordsItems((prev) =>
-          prev.map((it) =>
-            it.itemType === item.itemType && Number(it.itemId) === Number(item.itemId)
-              ? { ...it, isSaved: true }
-              : it
-          )
-        );
-        await loadToday();
-        await loadMyPhrases();
-      } else if (item.itemType === "entry") {
-        const entryId = item.entryId != null ? Number(item.entryId) : null;
-        const senseId = item.senseId != null ? Number(item.senseId) : null;
-        if (entryId != null) {
-          await userDictionaryApi.add({ lang, entryId });
-        } else if (senseId != null) {
-          await userDictionaryApi.addSense({ senseId });
-        } else {
-          throw new Error("Нет entryId или senseId для добавления");
-        }
-        if (senseId) await userDictionaryApi.setStatus({ senseId, status: "learning" });
-        setAllWordsItems((prev) =>
-          prev.map((it) =>
-            it.itemType === item.itemType && Number(it.itemId) === Number(item.itemId)
-              ? { ...it, isSaved: true }
-              : it
-          )
-        );
-        await loadToday();
-        await refreshProgress();
-      } else {
-        const senseId = Number(item.senseId || 0);
-        if (!senseId) throw new Error("Для выбранной сущности не найден senseId");
-        await userDictionaryApi.addSense({ senseId });
-        await userDictionaryApi.setStatus({ senseId, status: "learning" });
-        setAllWordsItems((prev) =>
-          prev.map((it) =>
-            it.itemType === item.itemType && Number(it.itemId) === Number(item.itemId)
-              ? { ...it, isSaved: true }
-              : it
-          )
-        );
-        await loadToday();
-        await refreshProgress();
-      }
-    } catch (e) {
-      setAllWordsError(formatApiError(e, "Не удалось добавить слово"));
-    }
-  };
-
   const statusLabel = (s: StatusFilter) => {
     if (s === "all") return "Все";
     if (s === "queue") return "В очереди";
@@ -888,6 +688,11 @@ const DictionaryCasualPage: React.FC = () => {
     void loadCollections();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLoggedIn]);
+
+  useEffect(() => {
+    const tabFromState = (location.state as { tab?: Tab } | null)?.tab;
+    if (tabFromState === "collections") setTab("collections");
+  }, [location.state]);
 
   useEffect(() => {
     const fromUser = (user?.gameSettings?.dictionaryStartProfile as StartProfile | undefined) || null;
@@ -1672,33 +1477,33 @@ const DictionaryCasualPage: React.FC = () => {
                   </div>
                   <div className="dict-collection-desc">Добавьте любое слово в «Мои слова» и начните учить.</div>
                   <div className="dict-card__actions">
-                    <button type="button" className="word-action-btn" onClick={openAllWords}>
+                    <button type="button" className="word-action-btn" onClick={() => navigate("/dictionary/all-words")}>
                       Открыть
                     </button>
                   </div>
                 </div>
                 {collections.map((c) => (
-                  <div key={c.id} className="dict-collection-card">
-                    <div className="dict-collection-title">{c.title}</div>
-                    <div className="dict-collection-meta">
-                      <MiniBadge className="muted">{c.levelFrom === c.levelTo ? c.levelFrom : `${c.levelFrom}–${c.levelTo}`}</MiniBadge>
-                      {typeof c.total === "number" && (
-                        <span className="dict-collection-stats">
-                          {c.total} слов
-                          {typeof c.saved === "number" && (
-                            <> · {c.saved} добавлено</>
-                          )}
-                        </span>
-                      )}
+                    <div key={c.id} className="dict-collection-card">
+                      <div className="dict-collection-title">{c.title}</div>
+                      <div className="dict-collection-meta">
+                        <MiniBadge className="muted">{c.levelFrom === c.levelTo ? c.levelFrom : `${c.levelFrom}–${c.levelTo}`}</MiniBadge>
+                        {typeof c.total === "number" && (
+                          <span className="dict-collection-stats">
+                            {c.total} слов
+                            {typeof c.saved === "number" && (
+                              <> · {c.saved} добавлено</>
+                            )}
+                          </span>
+                        )}
+                      </div>
+                      {!!c.description && <div className="dict-collection-desc">{c.description}</div>}
+                      <div className="dict-card__actions">
+                        <button type="button" className="word-action-btn" onClick={() => navigate(`/dictionary/collection/${c.id}`)}>
+                          Открыть
+                        </button>
+                      </div>
                     </div>
-                    {!!c.description && <div className="dict-collection-desc">{c.description}</div>}
-                    <div className="dict-card__actions">
-                      <button type="button" className="word-action-btn" onClick={() => openCollection(Number(c.id))}>
-                        Открыть
-                      </button>
-                    </div>
-                  </div>
-                ))}
+                  ))}
               </div>
               {collections.length === 0 && collectionsState !== "loading" && <div className="dict-empty">Пока нет коллекций (их можно наполнить позже).</div>}
               {collectionsState === "loading" && <div className="dict-empty">Загрузка…</div>}
@@ -2085,166 +1890,6 @@ const DictionaryCasualPage: React.FC = () => {
 
         </div>
 
-        {collectionOpen && (
-          <div className="dict-modal" role="dialog" aria-modal="true">
-            <div className="dict-modal__backdrop" onClick={closeCollection} />
-            <div className="dict-modal__panel">
-              <div className="dict-modal__head">
-                <div className="dict-modal__title">{collection?.title || "Коллекция"}</div>
-                <div style={{ display: "flex", gap: 8 }}>
-                  <button type="button" className="word-action-btn word-action-add-personal" onClick={addAllCollection} disabled={collectionState === "loading"}>
-                    Добавить всё
-                  </button>
-                  <button type="button" className="word-action-btn" onClick={closeCollection}>
-                    Закрыть
-                  </button>
-                </div>
-              </div>
-              {collectionError && <div className="dictionary-error-banner" style={{ padding: "10px 12px" }}>{collectionError}</div>}
-              {collectionState === "loading" && <div className="dict-empty">Загрузка…</div>}
-              {collection && (
-                <div className="dict-modal__content">
-                  {!!collection.description && <div className="dict-modal__ru">{collection.description}</div>}
-                  <div className="dict-grid" style={{ marginTop: 10 }}>
-                    {collectionItems.map((it) => (
-                      <div key={it.senseId} className="dict-card">
-                        <div className="dict-card__head">
-                          <div className="dict-card__word">{it.en}</div>
-                          <div className="dict-card__badges">
-                            {it.level && <MiniBadge className={`lvl lvl-${it.level}`}>{it.level}</MiniBadge>}
-                            {it.isSaved && <MiniBadge className="st">В моём</MiniBadge>}
-                          </div>
-                        </div>
-                        <div className="dict-card__ru">{it.ru || "—"}</div>
-                        {!!it.example && (
-                          <div className="dict-card__example">
-                            <div className="dict-card__example-en">{it.example}</div>
-                            {!!it.exampleRu && <div className="dict-card__example-ru">{it.exampleRu}</div>}
-                          </div>
-                        )}
-                        <div className="dict-card__actions">
-                          {!it.isSaved ? (
-                            <button type="button" className="word-action-btn word-action-add-personal" onClick={() => addOneFromCollection(Number(it.senseId))}>
-                              Учить
-                            </button>
-                          ) : (
-                            <button type="button" className="word-action-btn" disabled>
-                              Уже добавлено
-                            </button>
-                          )}
-                          <button type="button" className="word-action-btn" onClick={() => navigate(`/dictionary/word/${Number(it.senseId)}`)}>
-                            Подробнее
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                  {collectionItems.length === 0 && <div className="dict-empty">Пусто.</div>}
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {allWordsOpen && (
-          <div className="dict-modal" role="dialog" aria-modal="true">
-            <div className="dict-modal__backdrop" onClick={closeAllWords} />
-            <div className="dict-modal__panel">
-              <div className="dict-modal__head">
-                <div className="dict-modal__title">Все слова</div>
-                <button type="button" className="word-action-btn" onClick={closeAllWords}>
-                  Закрыть
-                </button>
-              </div>
-              {allWordsError && <div className="dictionary-error-banner" style={{ padding: "10px 12px" }}>{allWordsError}</div>}
-              <div className="dict-modal__content">
-                <div className="dict-all-words-toolbar">
-                  <input
-                    className="search-input"
-                    placeholder="Поиск по слову или переводу…"
-                    value={allWordsQ}
-                    onChange={(e) => setAllWordsQ(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") void loadAllWords(0, allWordsQ);
-                    }}
-                  />
-                  <button type="button" className="word-action-btn" onClick={() => loadAllWords(0, allWordsQ)} disabled={allWordsState === "loading"}>
-                    Найти
-                  </button>
-                </div>
-                {allWordsState === "loading" && <div className="dict-empty">Загрузка…</div>}
-                {allWordsState !== "loading" && (
-                  <>
-                    <div className="dict-all-words-pagination">
-                      <span className="dict-all-words-pagination__info">
-                        {allWordsTotal > 0 ? `${allWordsOffset + 1}–${Math.min(allWordsOffset + allWordsPageSize, allWordsTotal)} из ${allWordsTotal}` : "Нет слов"}
-                      </span>
-                      <div className="dict-all-words-pagination__buttons">
-                        <button
-                          type="button"
-                          className="word-action-btn"
-                          onClick={() => loadAllWords(Math.max(0, allWordsOffset - allWordsPageSize), allWordsQ)}
-                          disabled={allWordsOffset <= 0 || allWordsState === "loading"}
-                        >
-                          Назад
-                        </button>
-                        <button
-                          type="button"
-                          className="word-action-btn"
-                          onClick={() => loadAllWords(allWordsOffset + allWordsPageSize, allWordsQ)}
-                          disabled={allWordsOffset + allWordsPageSize >= allWordsTotal || allWordsState === "loading"}
-                        >
-                          Вперёд
-                        </button>
-                      </div>
-                    </div>
-                    <div className="dict-grid" style={{ marginTop: 10 }}>
-                      {allWordsItems.map((it) => (
-                        <div key={`${it.itemType}-${it.itemId}`} className="dict-card">
-                          <div className="dict-card__head">
-                            <div className="dict-card__word">{it.en}</div>
-                            <div className="dict-card__badges">
-                              {it.level && <MiniBadge className={`lvl lvl-${it.level}`}>{it.level}</MiniBadge>}
-                              <MiniBadge className="muted">{allWordsItemTypeLabel(it.itemType)}</MiniBadge>
-                              {it.isSaved && <MiniBadge className="st">В моём</MiniBadge>}
-                            </div>
-                          </div>
-                          <div className="dict-card__ru">{it.ru || "—"}</div>
-                          {!!it.example && (
-                            <div className="dict-card__example">
-                              <div className="dict-card__example-en">{it.example}</div>
-                              {!!it.exampleRu && <div className="dict-card__example-ru">{it.exampleRu}</div>}
-                            </div>
-                          )}
-                          <div className="dict-card__actions">
-                            {!it.isSaved ? (
-                              <button type="button" className="word-action-btn word-action-add-personal" onClick={() => addOneFromAllWords(it)}>
-                                {it.itemType === "collocation" || it.itemType === "pattern" ? "Добавить в мои фразы" : "Добавить в мои слова"}
-                              </button>
-                            ) : (
-                              <button type="button" className="word-action-btn" disabled>
-                                Уже добавлено
-                              </button>
-                            )}
-                            <button
-                              type="button"
-                              className="word-action-btn"
-                              onClick={() => openAllWordsDetails(it)}
-                              disabled={!it.senseId && it.itemType !== "form_card"}
-                            >
-                              Подробнее
-                            </button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                    {allWordsItems.length === 0 && <div className="dict-empty">Слов не найдено.</div>}
-                  </>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
       </main>
 
       {deleteConfirm.open && (deleteConfirm.senseId !== null || deleteConfirm.itemId !== null) && (

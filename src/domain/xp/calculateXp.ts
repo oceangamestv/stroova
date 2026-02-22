@@ -35,6 +35,9 @@ function getGameMultiplier(
   if (gameType === "WORD_SEARCH") {
     return GAME_MULTIPLIERS.WORD_SEARCH;
   }
+  if (gameType === "AI_STORY_TRAINER") {
+    return GAME_MULTIPLIERS.AI_STORY_TRAINER;
+  }
   return 1.0;
 }
 

@@ -58,6 +58,43 @@ async function getLanguageId(langCode) {
 }
 
 /**
+ * Все уникальные строки en, для которых может запрашиваться озвучка: из dictionary_entries и из dictionary_form_cards.
+ * @param {number} languageId
+ * @returns {Promise<Array<{ en: string, source: 'entry'|'form' }>>}
+ */
+async function getAllEnForAudio(languageId) {
+  const entriesRes = await pool.query(
+    "SELECT en FROM dictionary_entries WHERE language_id = $1",
+    [languageId]
+  );
+  const bySlug = new Map();
+  for (const row of entriesRes.rows) {
+    const en = String(row.en != null ? row.en : "").trim();
+    if (!en) continue;
+    const slug = wordToSlug(en);
+    if (!bySlug.has(slug)) bySlug.set(slug, { en, source: "entry" });
+  }
+  try {
+    const formsRes = await pool.query(
+      `SELECT DISTINCT fc.en
+       FROM dictionary_form_cards fc
+       JOIN dictionary_entries e ON e.id = fc.entry_id
+       WHERE e.language_id = $1 AND fc.en IS NOT NULL AND LENGTH(TRIM(COALESCE(fc.en, ''))) > 0`,
+      [languageId]
+    );
+    for (const row of formsRes.rows) {
+      const en = String(row.en != null ? row.en : "").trim();
+      if (!en) continue;
+      const slug = wordToSlug(en);
+      if (!bySlug.has(slug)) bySlug.set(slug, { en, source: "form" });
+    }
+  } catch (err) {
+    console.warn("audioAdminRepo: getAllEnForAudio forms query failed, using entries only:", err.message);
+  }
+  return Array.from(bySlug.values());
+}
+
+/**
  * Полная проверка: обновить флаги у всех слов по языку.
  * @param {string} langCode
  * @returns {Promise<{ updated: number, missingCount: number, missing: Array<{ id: number, en: string, slug: string }> }>}
@@ -70,7 +107,7 @@ export async function runFullCheck(langCode) {
     "SELECT id, en FROM dictionary_entries WHERE language_id = $1 ORDER BY id",
     [languageId]
   );
-  const words = wordsRes.rows;
+  const words = wordsRes.rows || [];
   const { female: femaleSlugs, male: maleSlugs } = readSlugsFromDisk();
 
   let updated = 0;
@@ -89,8 +126,9 @@ export async function runFullCheck(langCode) {
     }
   }
 
-  const missing = words.filter((w) => {
-    const slug = wordToSlug(w.en);
+  const allEn = await getAllEnForAudio(languageId);
+  const missing = allEn.filter(({ en }) => {
+    const slug = wordToSlug(en);
     const hasF = femaleSlugs.has(slug);
     const hasM = maleSlugs.has(slug);
     return !hasF || !hasM;
@@ -98,6 +136,7 @@ export async function runFullCheck(langCode) {
 
   const debug = {
     wordsTotal: words.length,
+    formsEnTotal: allEn.length,
     fileCountFemale: femaleSlugs.size,
     fileCountMale: maleSlugs.size,
   };
@@ -105,13 +144,15 @@ export async function runFullCheck(langCode) {
     console.log("[audio check-full]", debug);
   }
 
+  const entryIdBySlug = new Map(words.map((w) => [wordToSlug(w.en != null ? w.en : ""), w.id]));
   return {
     updated,
     missingCount: missing.length,
-    missing: missing.map((w) => ({
-      id: w.id,
-      en: w.en,
-      slug: wordToSlug(w.en),
+    missing: missing.map(({ en, source }) => ({
+      id: entryIdBySlug.get(wordToSlug(en)) ?? null,
+      en,
+      slug: wordToSlug(en),
+      source,
     })),
     debug,
   };
@@ -132,7 +173,7 @@ export async function runNewWordsCheck(langCode) {
      ORDER BY id`,
     [languageId]
   );
-  const words = wordsRes.rows;
+  const words = wordsRes.rows || [];
   const { female: femaleSlugs, male: maleSlugs } = readSlugsFromDisk();
 
   let updated = 0;
@@ -147,13 +188,15 @@ export async function runNewWordsCheck(langCode) {
     updated++;
   }
 
-  const missing = words.filter((w) => {
-    const slug = wordToSlug(w.en);
+  const allEn = await getAllEnForAudio(languageId);
+  const missing = allEn.filter(({ en }) => {
+    const slug = wordToSlug(en);
     return !femaleSlugs.has(slug) || !maleSlugs.has(slug);
   });
 
   const debug = {
     wordsChecked: words.length,
+    formsEnTotal: allEn.length,
     fileCountFemale: femaleSlugs.size,
     fileCountMale: maleSlugs.size,
   };
@@ -161,49 +204,68 @@ export async function runNewWordsCheck(langCode) {
     console.log("[audio check-new]", debug);
   }
 
+  const entryWords = await pool.query(
+    "SELECT id, en FROM dictionary_entries WHERE language_id = $1",
+    [languageId]
+  );
+  const entryBySlug = new Map((entryWords.rows || []).map((w) => [wordToSlug(w.en != null ? w.en : ""), w]));
+
   return {
     updated,
     missingCount: missing.length,
-    missing: missing.map((w) => ({
-      id: w.id,
-      en: w.en,
-      slug: wordToSlug(w.en),
+    missing: missing.map(({ en, source }) => ({
+      id: entryBySlug.get(wordToSlug(en))?.id ?? null,
+      en,
+      slug: wordToSlug(en),
+      source,
     })),
     debug,
   };
 }
 
 /**
- * Список слов без озвучки (по текущим флагам в БД): хотя бы одна проверка выполнена и нет женского или нет мужского.
- * До первой проверки (все NULL) возвращаем пустой список.
+ * Список всех en без озвучки: слова (entries) + формы (form_cards). Проверка по диску.
  * @param {string} langCode
- * @returns {Promise<{ missing: Array<{ id: number, en: string, slug: string, hasFemale: boolean, hasMale: boolean }>, total: number }>}
+ * @returns {Promise<{ missing: Array<{ id: number|null, en: string, slug: string, hasFemale: boolean, hasMale: boolean }>, total: number }>}
  */
 export async function getMissing(langCode) {
-  const languageId = await getLanguageId(langCode);
-  if (!languageId) return { missing: [], total: 0 };
+  try {
+    const languageId = await getLanguageId(langCode);
+    if (!languageId) return { missing: [], total: 0 };
 
-  const r = await pool.query(
-    `SELECT id, en,
-            COALESCE(audio_has_female, false) AS "hasFemale",
-            COALESCE(audio_has_male, false) AS "hasMale"
-     FROM dictionary_entries
-     WHERE language_id = $1
-       AND (audio_has_female IS NOT NULL OR audio_has_male IS NOT NULL)
-       AND (audio_has_female IS DISTINCT FROM true OR audio_has_male IS DISTINCT FROM true)
-     ORDER BY id`,
-    [languageId]
-  );
+    const allEn = await getAllEnForAudio(languageId);
+    const { female: femaleSlugs, male: maleSlugs } = readSlugsFromDisk();
 
-  const missing = r.rows.map((row) => ({
-    id: row.id,
-    en: row.en,
-    slug: wordToSlug(row.en),
-    hasFemale: row.hasFemale,
-    hasMale: row.hasMale,
-  }));
+    const entriesRes = await pool.query(
+      "SELECT id, en FROM dictionary_entries WHERE language_id = $1",
+      [languageId]
+    );
+    const entryIdBySlug = new Map(
+      (entriesRes.rows || []).map((w) => [wordToSlug(w.en != null ? w.en : ""), w.id])
+    );
 
-  return { missing, total: missing.length };
+    const missing = [];
+    for (const { en, source } of allEn) {
+      const slug = wordToSlug(en);
+      const hasFemale = femaleSlugs.has(slug);
+      const hasMale = maleSlugs.has(slug);
+      if (hasFemale && hasMale) continue;
+      missing.push({
+        id: entryIdBySlug.get(slug) ?? null,
+        en,
+        slug,
+        hasFemale,
+        hasMale,
+        source,
+      });
+    }
+    missing.sort((a, b) => String(a.en).localeCompare(String(b.en)));
+
+    return { missing, total: missing.length };
+  } catch (err) {
+    console.error("audioAdminRepo: getMissing failed:", err);
+    return { missing: [], total: 0 };
+  }
 }
 
 /**

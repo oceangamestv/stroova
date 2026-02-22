@@ -34,6 +34,7 @@ export const GAME_MULTIPLIERS: Record<GameType, number> = {
   ONE_OF_THREE: 1.2,
   GATES_OF_KNOWLEDGE: 1.35,
   WORD_SEARCH: 1.2,
+  AI_STORY_TRAINER: 1.5,
 };
 
 /** Множители за сложность пазлов (k_game для PUZZLE). */

@@ -92,7 +92,14 @@ import {
   setSavedStatus,
   syncUserDictionaryFromMePatch,
   getPersonalEntryIdsFromSavedSenses,
+  getWordsForStoryTrainer,
 } from "./userDictionaryRepo.js";
+import {
+  createSession as storyTrainerCreateSession,
+  getSessionById as storyTrainerGetSessionById,
+  countSessionsToday as storyTrainerCountSessionsToday,
+  updateSessionSubmit as storyTrainerUpdateSessionSubmit,
+} from "./storyTrainerRepo.js";
 import { getIpaBoth } from "./lib/ipaGenerator.js";
 import {
   enqueueInternalDictionarySyncJob,
@@ -863,6 +870,206 @@ const routes = {
     }
     const out = await getUserSenseState(auth.user.username, Number(senseId));
     send(res, 200, out || { isSaved: false, status: null });
+  },
+
+  "POST /api/story-trainer/generate": async (req, res, body) => {
+    const auth = await requireAuthUser(req, res);
+    if (!auth) return;
+    const user = auth.user;
+    const lang = String(body?.lang || "en").trim() || "en";
+    if (!user.isAdmin) {
+      const todayCount = await storyTrainerCountSessionsToday(user.username);
+      if (todayCount > 0) {
+        send(res, 429, { error: "В эту игру можно играть только один раз в день. Зайдите завтра." });
+        return;
+      }
+    }
+    let words = await getWordsForStoryTrainer(user.username, lang, 12);
+    if (words.length < 3) {
+      send(res, 400, { error: "Добавьте больше слов в словарь, чтобы сгенерировать историю (минимум 3 слова)." });
+      return;
+    }
+    const shuffleArray = (arr) => {
+      const a = [...arr];
+      for (let i = a.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [a[i], a[j]] = [a[j], a[i]];
+      }
+      return a;
+    };
+    words = shuffleArray(words);
+    if (words.length > 8) {
+      const minCount = 8;
+      const maxCount = Math.min(12, words.length);
+      const takeCount = Math.floor(Math.random() * (maxCount - minCount + 1)) + minCount;
+      words = words.slice(0, takeCount);
+    }
+    const apiKey = sanitizeOpenAiKey(process.env.OPENAI_API_KEY);
+    const baseUrl = (process.env.OPENAI_BASE_URL || "https://api.openai.com/v1").trim();
+    const model = (process.env.OPENAI_MODEL || "gpt-4o-mini").trim();
+    if (!apiKey) {
+      send(res, 503, { error: "Сервис генерации историй временно недоступен." });
+      return;
+    }
+    const wordList = words.map((w) => w.en).join(", ");
+    const systemPrompt = [
+      "You are a helpful assistant that writes very short English stories for language learners.",
+      "Use ONLY the given English words naturally in the story. The story must be coherent and 3-6 sentences long.",
+      "Each story should be different and creative; vary the setting, characters, and plot. Avoid repeating the same story structure.",
+      "Reply with ONLY the story text, no title, no explanations, no JSON.",
+    ].join("\n");
+    const userPrompt = `Write a short story in English using these words: ${wordList}.`;
+    let storyText = "";
+    try {
+      const endpoint = `${baseUrl.replace(/\/$/, "")}/chat/completions`;
+      const response = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+        body: JSON.stringify({
+          model,
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: userPrompt },
+          ],
+          temperature: 0.85,
+          max_tokens: 400,
+        }),
+      });
+      if (!response.ok) {
+        const t = await response.text();
+        throw new Error(`LLM ${response.status}: ${t.slice(0, 200)}`);
+      }
+      const data = await response.json();
+      storyText = (data?.choices?.[0]?.message?.content || "").trim();
+      if (!storyText) throw new Error("Пустой ответ от модели");
+    } catch (e) {
+      console.error("story-trainer generate:", e);
+      send(res, 502, { error: "Не удалось сгенерировать историю. Попробуйте позже.", details: e?.message });
+      return;
+    }
+    const wordSenseIds = words.map((w) => w.senseId).filter((id) => id > 0);
+    const session = await storyTrainerCreateSession(user.username, lang, storyText, wordSenseIds);
+    if (!session) {
+      send(res, 500, { error: "Не удалось сохранить сессию." });
+      return;
+    }
+    send(res, 200, {
+      sessionId: session.sessionId,
+      story: session.storyText,
+      words: words.map((w) => ({ en: w.en, ru: w.ru || "—", senseId: w.senseId, isSaved: w.isSaved })),
+    });
+  },
+
+  "POST /api/story-trainer/check": async (req, res, body) => {
+    const auth = await requireAuthUser(req, res);
+    if (!auth) return;
+    const sessionId = body?.sessionId;
+    const retelling = typeof body?.retelling === "string" ? body.retelling.trim() : "";
+    const language = String(body?.language || "ru").trim().toLowerCase();
+    const lang = language === "en" ? "en" : "ru";
+    if (!sessionId) {
+      send(res, 400, { error: "Поле sessionId обязательно." });
+      return;
+    }
+    const wordCount = retelling.split(/\s+/).filter(Boolean).length;
+    if (wordCount < 10) {
+      send(res, 400, { error: "Пересказ должен содержать минимум 10 слов." });
+      return;
+    }
+    const session = await storyTrainerGetSessionById(sessionId);
+    if (!session || session.username !== auth.user.username) {
+      send(res, 404, { error: "Сессия не найдена." });
+      return;
+    }
+    if (session.submitted_at) {
+      send(res, 400, { error: "Пересказ уже был отправлен. Отправить можно только один раз." });
+      return;
+    }
+    const apiKey = sanitizeOpenAiKey(process.env.OPENAI_API_KEY);
+    const baseUrl = (process.env.OPENAI_BASE_URL || "https://api.openai.com/v1").trim();
+    const model = (process.env.OPENAI_MODEL || "gpt-4o-mini").trim();
+    if (!apiKey) {
+      send(res, 503, { error: "Сервис проверки временно недоступен." });
+      return;
+    }
+    const systemPrompt = [
+      "You evaluate how well a learner's retelling captures the meaning of the original English story.",
+      "The retelling can be in Russian or English. Score 0.0 to 1.0 (semanticScore): 1.0 = meaning fully preserved, 0.0 = unrelated.",
+      "Reply with ONLY a JSON object with exactly: semanticScore (number 0-1), feedback (short string, one sentence). No other text.",
+    ].join("\n");
+    const userContent = `Original story:\n${session.story_text}\n\nLearner retelling (${lang === "en" ? "English" : "Russian"}):\n${retelling}`;
+    let semanticScore = 0.5;
+    let feedback = "";
+    try {
+      const endpoint = `${baseUrl.replace(/\/$/, "")}/chat/completions`;
+      const response = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+        body: JSON.stringify({
+          model,
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: userContent },
+          ],
+          temperature: 0.2,
+          max_tokens: 200,
+        }),
+      });
+      if (!response.ok) {
+        const t = await response.text();
+        throw new Error(`LLM ${response.status}: ${t.slice(0, 200)}`);
+      }
+      const data = await response.json();
+      const content = (data?.choices?.[0]?.message?.content || "").trim();
+      const parsed = (() => {
+        try {
+          return JSON.parse(content);
+        } catch {
+          const start = content.indexOf("{");
+          const end = content.lastIndexOf("}");
+          if (start >= 0 && end > start) return JSON.parse(content.slice(start, end + 1));
+          throw new Error("Не удалось распарсить ответ модели");
+        }
+      })();
+      semanticScore = Math.max(0, Math.min(1, Number(parsed.semanticScore) || 0.5));
+      feedback = String(parsed.feedback || "").trim() || "Оценка получена.";
+    } catch (e) {
+      console.error("story-trainer check:", e);
+      send(res, 502, { error: "Не удалось проверить пересказ. Попробуйте позже.", details: e?.message });
+      return;
+    }
+    const STORY_TRAINER_BASE_XP = 2;
+    const wordCap = Math.min(wordCount, 80);
+    const languageBonus = lang === "en" ? 1.35 : 1.0;
+    const xp = Math.round(STORY_TRAINER_BASE_XP * semanticScore * wordCap * languageBonus);
+    const xpGranted = Math.max(0, xp);
+    const updated = await storyTrainerUpdateSessionSubmit(
+      sessionId,
+      auth.user.username,
+      retelling,
+      lang,
+      semanticScore,
+      xpGranted
+    );
+    if (!updated) {
+      send(res, 500, { error: "Не удалось сохранить результат." });
+      return;
+    }
+    send(res, 200, { xp: xpGranted, score: semanticScore, feedback });
+  },
+
+  "GET /api/story-trainer/limit": async (req, res) => {
+    const auth = await requireAuthUser(req, res);
+    if (!auth) return;
+    const user = auth.user;
+    const usedToday = user.isAdmin ? 0 : await storyTrainerCountSessionsToday(user.username);
+    const now = new Date();
+    const nextMidnight = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1));
+    send(res, 200, {
+      usedToday: usedToday > 0,
+      isAdmin: !!user.isAdmin,
+      nextResetUtc: nextMidnight.toISOString(),
+    });
   },
 
   "GET /api/dictionary/card": async (req, res, body, url) => {
@@ -3587,7 +3794,7 @@ const server = http.createServer(async (req, res) => {
   const url = new URL(req.url || "/", `http://${req.headers.host}`);
   let pathname = url.pathname;
   // Если прокси отдаёт путь без /api (например /admin/dictionary/...), добавляем префикс для совпадения с routes
-  if (!pathname.startsWith("/api") && /^\/(admin|auth|rating|me|languages|dictionary|user-dictionary)/.test(pathname)) {
+  if (!pathname.startsWith("/api") && /^\/(admin|auth|rating|me|languages|dictionary|user-dictionary|story-trainer)/.test(pathname)) {
     pathname = "/api" + pathname;
   }
   let path = `${req.method} ${pathname}`;

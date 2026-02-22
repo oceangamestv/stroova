@@ -4,6 +4,8 @@ import DictionaryCasualPage from "../pages/DictionaryCasualPage";
 import DictionaryPage from "../pages/DictionaryPage";
 import DictionaryWordPage from "../pages/DictionaryWordPage";
 import DictionaryFormCardPage from "../pages/DictionaryFormCardPage";
+import DictionaryCollectionPage from "../pages/DictionaryCollectionPage";
+import DictionaryAllWordsPage from "../pages/DictionaryAllWordsPage";
 import ProfilePage from "../pages/ProfilePage";
 import LoginPage from "../pages/LoginPage";
 import RatingsPage from "../pages/RatingsPage";
@@ -39,6 +41,8 @@ const routeConfig = [
   { path: "/dictionary/advanced", element: <DictionaryPage /> },
   { path: "/dictionary/word/:senseId", element: <DictionaryWordPage /> },
   { path: "/dictionary/form/:cardId", element: <DictionaryFormCardPage /> },
+  { path: "/dictionary/collection/:id", element: <DictionaryCollectionPage /> },
+  { path: "/dictionary/all-words", element: <DictionaryAllWordsPage /> },
   {
     path: "/admin/dictionary",
     element: (
@@ -75,6 +79,7 @@ const routeConfig = [
   { path: "/danetka", element: <GameRoute /> },
   { path: "/one-of-three", element: <GameRoute /> },
   { path: "/gates-of-knowledge", element: <GameRoute /> },
+  { path: "/story-trainer", element: <GameRoute /> },
   { path: "*", element: <Navigate to="/" replace /> },
 ];
 

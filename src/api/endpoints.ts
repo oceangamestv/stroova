@@ -403,12 +403,12 @@ export const adminDictionaryApi = {
 
 export const adminAudioApi = {
   checkFull: (body?: { lang?: string }) =>
-    api.post<{ updated: number; missingCount: number; missing: Array<{ id: number; en: string; slug: string }> }>(
+    api.post<{ updated: number; missingCount: number; missing: Array<{ id: number | null; en: string; slug: string; source?: "entry" | "form" }>; debug?: { wordsTotal?: number; formsEnTotal?: number; fileCountFemale?: number; fileCountMale?: number } }>(
       "/admin/audio/check-full",
       body ?? {}
     ),
   checkNew: (body?: { lang?: string }) =>
-    api.post<{ updated: number; missingCount: number; missing: Array<{ id: number; en: string; slug: string }> }>(
+    api.post<{ updated: number; missingCount: number; missing: Array<{ id: number | null; en: string; slug: string; source?: "entry" | "form" }>; debug?: { wordsChecked?: number; formsEnTotal?: number; fileCountFemale?: number; fileCountMale?: number } }>(
       "/admin/audio/check-new",
       body ?? {}
     ),
@@ -417,10 +417,23 @@ export const adminAudioApi = {
     if (params?.lang) search.set("lang", params.lang);
     const q = search.toString();
     return api.get<{
-      missing: Array<{ id: number; en: string; slug: string; hasFemale: boolean; hasMale: boolean }>;
+      missing: Array<{ id: number | null; en: string; slug: string; hasFemale: boolean; hasMale: boolean; source?: "entry" | "form" }>;
       total: number;
     }>(`/admin/audio/missing${q ? `?${q}` : ""}`);
   },
+};
+
+export const storyTrainerApi = {
+  generate: (params?: { lang?: string }) =>
+    api.post<{
+      sessionId: string;
+      story: string;
+      words: Array<{ en: string; ru: string; senseId: number; isSaved: boolean }>;
+    }>("/story-trainer/generate", params ?? {}),
+  check: (body: { sessionId: string; retelling: string; language: "ru" | "en" }) =>
+    api.post<{ xp: number; score: number; feedback: string }>("/story-trainer/check", body),
+  getLimit: () =>
+    api.get<{ usedToday: boolean; isAdmin: boolean; nextResetUtc: string }>("/story-trainer/limit"),
 };
 
 export const ratingApi = {
