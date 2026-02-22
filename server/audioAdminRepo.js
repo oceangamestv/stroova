@@ -14,6 +14,8 @@ const MALE_DIR = path.join(AUDIO_BASE, "male");
 
 /**
  * Читает имена файлов .wav из каталога, возвращает множество slug (без .wav).
+ * Имена файлов нормализуются через wordToSlug, чтобы совпадать с slug слов из БД
+ * (регистр, пробелы → _, лишние символы — иначе "Hello.wav" не совпадал бы с словом "hello").
  * @param {string} dirPath
  * @returns {Set<string>}
  */
@@ -24,7 +26,8 @@ function readSlugsFromDir(dirPath) {
     const names = fs.readdirSync(dirPath);
     for (const name of names) {
       if (name.endsWith(".wav")) {
-        slugs.add(name.slice(0, -4));
+        const raw = name.slice(0, -4);
+        slugs.add(wordToSlug(raw));
       }
     }
   } catch (err) {
@@ -93,6 +96,15 @@ export async function runFullCheck(langCode) {
     return !hasF || !hasM;
   });
 
+  const debug = {
+    wordsTotal: words.length,
+    fileCountFemale: femaleSlugs.size,
+    fileCountMale: maleSlugs.size,
+  };
+  if (process.env.NODE_ENV !== "production") {
+    console.log("[audio check-full]", debug);
+  }
+
   return {
     updated,
     missingCount: missing.length,
@@ -101,6 +113,7 @@ export async function runFullCheck(langCode) {
       en: w.en,
       slug: wordToSlug(w.en),
     })),
+    debug,
   };
 }
 
@@ -139,6 +152,15 @@ export async function runNewWordsCheck(langCode) {
     return !femaleSlugs.has(slug) || !maleSlugs.has(slug);
   });
 
+  const debug = {
+    wordsChecked: words.length,
+    fileCountFemale: femaleSlugs.size,
+    fileCountMale: maleSlugs.size,
+  };
+  if (process.env.NODE_ENV !== "production") {
+    console.log("[audio check-new]", debug);
+  }
+
   return {
     updated,
     missingCount: missing.length,
@@ -147,6 +169,7 @@ export async function runNewWordsCheck(langCode) {
       en: w.en,
       slug: wordToSlug(w.en),
     })),
+    debug,
   };
 }
 

@@ -437,6 +437,7 @@ const AdminDictionaryPage: React.FC = () => {
     updated: number;
     missingCount: number;
     missing: Array<{ id: number; en: string; slug: string }>;
+    debug?: { wordsTotal?: number; wordsChecked?: number; fileCountFemale?: number; fileCountMale?: number };
   } | null>(null);
   const [audioMissingList, setAudioMissingList] = useState<Array<{ id: number; en: string; slug: string; hasFemale: boolean; hasMale: boolean }>>([]);
   const [audioMissingTotal, setAudioMissingTotal] = useState(0);
@@ -2467,6 +2468,11 @@ const AdminDictionaryPage: React.FC = () => {
               {audioCheckResult && (
                 <div className="dictionary-success-banner" style={{ padding: "8px 12px", marginTop: 8 }}>
                   Обновлено записей: {audioCheckResult.updated}. Слов без озвучки: {audioCheckResult.missingCount}.
+                  {audioCheckResult.debug && (
+                    <span className="admin-dict-muted" style={{ display: "block", marginTop: 4 }}>
+                      Отладка: слов в словаре — {audioCheckResult.debug.wordsTotal ?? audioCheckResult.debug.wordsChecked ?? "—"}, файлов female — {audioCheckResult.debug.fileCountFemale ?? "—"}, male — {audioCheckResult.debug.fileCountMale ?? "—"}.
+                    </span>
+                  )}
                 </div>
               )}
               <div style={{ marginTop: 14 }}>
