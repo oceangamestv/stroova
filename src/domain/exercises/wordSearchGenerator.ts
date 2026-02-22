@@ -55,9 +55,9 @@ type NormalizedWord = {
 type GridSize = { rows: number; cols: number };
 
 export const GRID_SIZES = {
-  small: { rows: 6, cols: 6 },
-  medium: { rows: 8, cols: 8 },
-  large: { rows: 10, cols: 10 },
+  small: { rows: 5, cols: 5 },
+  medium: { rows: 6, cols: 6 },
+  large: { rows: 7, cols: 7 },
 } as const satisfies Record<GenerateGridOptions["gridSize"], GridSize>;
 
 const VALID_WORD_RE = /^[a-z]+$/;

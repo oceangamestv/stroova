@@ -283,6 +283,26 @@ export const playTickSound = (): void => {
     .catch(() => {});
 };
 
+/** Короткий нейтральный звук при неверном выделении слова (та же длина, что тик) */
+export const playWrongWordSound = (): void => {
+  if (!getSoundEnabled()) return;
+  getAudioContext()
+    .then((ctx) => {
+      const t0 = ctx.currentTime;
+      const gainNode = ctx.createGain();
+      gainNode.connect(ctx.destination);
+      gainNode.gain.setValueAtTime(0.06, t0);
+      gainNode.gain.exponentialRampToValueAtTime(0.001, t0 + 0.04);
+      const osc = ctx.createOscillator();
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(380, t0);
+      osc.connect(gainNode);
+      osc.start(t0);
+      osc.stop(t0 + 0.04);
+    })
+    .catch(() => {});
+};
+
 export const initializeVoices = async (): Promise<void> => {
   // Голоса только Bella и Michael, предзагрузка TTS не нужна
 };

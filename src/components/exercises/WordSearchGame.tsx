@@ -11,18 +11,18 @@ import {
   type DictionaryWord,
   type GeneratedGridResult,
 } from "../../domain/exercises/wordSearchGenerator";
-import { speakWord, playTickSound } from "../../utils/sounds";
+import { speakWord, playTickSound, playWrongWordSound } from "../../utils/sounds";
 import { progressService } from "../../services/progressService";
 import { authService } from "../../services/authService";
 import { guestPendingResultService } from "../../services/guestPendingResultService";
 import { useAuth } from "../../features/auth/AuthContext";
 import { formatXp } from "../../domain/xp";
 
-/** XP за раунд по размеру поля: лёгкое 25, среднее 38, большое 50. */
+/** XP за раунд по размеру поля: 5×5, 6×6, 7×7. */
 const WORD_SEARCH_XP: Record<WordSearchGridSize, number> = {
-  small: 25,
-  medium: 38,
-  large: 50,
+  small: 20,
+  medium: 28,
+  large: 38,
 };
 
 /** Палитра фонов для найденных слов: насыщенные, но не ядовитые, с хорошей читаемостью чёрного. */
@@ -99,6 +99,9 @@ const WordSearchGame: React.FC<WordSearchProps> = ({
   /** Финальное окно: показывать и данные для него */
   const [showResult, setShowResult] = useState(false);
   const [resultStats, setResultStats] = useState<WordSearchResultStats | null>(null);
+  /** Ячейки собранного слова, которого нет в загаданных (показать приглушённую подсветку и сообщение) */
+  const [wrongWordCells, setWrongWordCells] = useState<CellCoord[] | null>(null);
+  const wrongWordTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   /** Инкремент перезапускает генерацию поля (новая игра) */
   const [gameSeed, setGameSeed] = useState(0);
   /** Момент нахождения первого слова (для подсчёта времени до конца раунда) */
@@ -164,6 +167,11 @@ const WordSearchGame: React.FC<WordSearchProps> = ({
     (row: number, col: number) => {
       if (!gridResult) return;
       if (gridResult.grid[row]?.[col] === null) return;
+      setWrongWordCells(null);
+      if (wrongWordTimeoutRef.current) {
+        clearTimeout(wrongWordTimeoutRef.current);
+        wrongWordTimeoutRef.current = null;
+      }
       setIsDragging(true);
       setSelectedCells([{ row, col }]);
     },
@@ -292,12 +300,18 @@ const WordSearchGame: React.FC<WordSearchProps> = ({
       const result = checkSelectedCells(
         { ...gridResult, foundWordIds: foundWords.map((f) => f.wordId) } as Parameters<typeof checkSelectedCells>[0],
         cells,
-        dictionaryForMode,
+        globalDictionary,
         usedCellKeys
       );
 
       if (!result.isValid) {
+        playWrongWordSound();
         setSelectedCells([]);
+        if (result.reason === "not-in-placed-words" && result.word) {
+          setWrongWordCells([...cells]);
+          if (wrongWordTimeoutRef.current) clearTimeout(wrongWordTimeoutRef.current);
+          wrongWordTimeoutRef.current = setTimeout(() => setWrongWordCells(null), 1800);
+        }
         return;
       }
 
@@ -309,6 +323,7 @@ const WordSearchGame: React.FC<WordSearchProps> = ({
       );
 
       if (!placedWord) {
+        playWrongWordSound();
         setSelectedCells([]);
         return;
       }
@@ -342,14 +357,24 @@ const WordSearchGame: React.FC<WordSearchProps> = ({
         finishRound(newFoundWords);
       }
     },
-    [gridResult, dictionaryForMode, foundWords, usedCellKeys, finishRound]
+    [gridResult, globalDictionary, foundWords, usedCellKeys, finishRound]
   );
   applyCheckResultRef.current = applyCheckResult;
+
+  useEffect(() => () => {
+    if (wrongWordTimeoutRef.current) clearTimeout(wrongWordTimeoutRef.current);
+  }, []);
 
   const isCellSelected = useCallback(
     (row: number, col: number) =>
       selectedCells.some((c) => c.row === row && c.col === col),
     [selectedCells]
+  );
+
+  const isCellWrongWord = useCallback(
+    (row: number, col: number) =>
+      wrongWordCells?.some((c) => c.row === row && c.col === col) ?? false,
+    [wrongWordCells]
   );
 
   if (!gridResult) {
@@ -379,6 +404,7 @@ const WordSearchGame: React.FC<WordSearchProps> = ({
             row.map((cell, colIndex) => {
               const isEmpty = cell === null;
               const selected = isCellSelected(rowIndex, colIndex);
+              const wrongWord = isCellWrongWord(rowIndex, colIndex);
               const key = cellKey(rowIndex, colIndex);
               const colorIdx = cellToColorIndex.get(key);
               const bg =
@@ -390,7 +416,7 @@ const WordSearchGame: React.FC<WordSearchProps> = ({
                 <div
                   key={`${rowIndex}-${colIndex}`}
                   role="gridcell"
-                  className={`word-search__cell ${isEmpty ? "word-search__cell--empty" : ""} ${selected ? "word-search__cell--selected" : ""} ${isFound ? "word-search__cell--found" : ""}`}
+                  className={`word-search__cell ${isEmpty ? "word-search__cell--empty" : ""} ${selected ? "word-search__cell--selected" : ""} ${wrongWord ? "word-search__cell--wrong-word" : ""} ${isFound ? "word-search__cell--found" : ""}`}
                   data-word-search-cell
                   data-row={rowIndex}
                   data-col={colIndex}
@@ -413,6 +439,12 @@ const WordSearchGame: React.FC<WordSearchProps> = ({
         </div>
       </div>
 
+      {wrongWordCells != null && wrongWordCells.length > 0 && (
+        <p className="word-search__wrong-word-msg" role="status">
+          Слово не загадано в этом раунде. Эти буквы можно использовать снова.
+        </p>
+      )}
+
       {showResult && resultStats && (
         <div className="modal puzzle-result-modal-backdrop">
           <div
@@ -434,7 +466,7 @@ const WordSearchGame: React.FC<WordSearchProps> = ({
                   <span className="puzzle-result-score-card-value">
                     {formatDurationMs(resultStats.durationMs)}
                   </span>
-                  <span className="puzzle-result-score-card-label">Время (от 1-го слова)</span>
+                  <span className="puzzle-result-score-card-label">Время</span>
                 </div>
                 <div className="puzzle-result-score-card puzzle-result-score-card--words">
                   <span className="puzzle-result-score-card-value">{resultStats.words.length}</span>
@@ -443,7 +475,7 @@ const WordSearchGame: React.FC<WordSearchProps> = ({
               </div>
             </header>
             <section className="puzzle-result-words-section" aria-label="Прогресс по словам">
-              <h3 className="puzzle-result-words-heading">Прогресс по словам (+1% за каждое)</h3>
+              <h3 className="puzzle-result-words-heading">Прогресс по словам</h3>
               <ul className="puzzle-result-words-grid" aria-label="Список слов и прогресс">
                 {resultStats.words.map((w, i) => (
                   <li

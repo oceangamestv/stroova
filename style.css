@@ -6356,6 +6356,19 @@ body::after {
   font-weight: 800;
 }
 
+/* Собранное слово не из загаданных: приглушённая подсветка, цвет букв не меняется */
+.word-search__cell--wrong-word {
+  background: rgba(120, 120, 120, 0.18) !important;
+  border-color: rgba(100, 100, 100, 0.4);
+}
+
+.word-search__wrong-word-msg {
+  margin: 0.5rem 0 0;
+  font-size: 0.9rem;
+  color: var(--text-soft);
+  text-align: center;
+}
+
 /* ПК: буквы крупнее, занимают ~2× больше места в ячейке */
 @media (min-width: 769px) {
   .word-search__cell {

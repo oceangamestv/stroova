@@ -87,8 +87,8 @@ export const GameRoute: React.FC = () => {
           globalDictionary={toDictionaryWords(globalWords)}
           userDictionary={toDictionaryWords(personalWords)}
           gridSize={user?.gameSettings?.wordSearchGridSize ?? "small"}
-          mode={user?.gameSettings?.wordSearchDictionaryMode ?? "mixed"}
-          allowEmptyCells={user?.gameSettings?.wordSearchAllowEmptyCells ?? true}
+          mode="mixed"
+          allowEmptyCells={true}
         />
       )
     ) : exercise === "danetka" ? (
