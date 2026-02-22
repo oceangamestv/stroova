@@ -24,6 +24,7 @@ module.exports = {
       cwd: __dirname,
       autorestart: true,
       max_restarts: 10,
+      restart_delay: 15000,
       time: true,
       env: {
         NODE_ENV: "production",
